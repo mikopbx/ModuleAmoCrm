@@ -1,0 +1,29 @@
+{
+    "widget":{
+        "name":"MikoPBX: Интеграция с бесплатной АТС",
+        "short_description":"Совершай звонки в один клик. Анализируй историю звонков.",
+        "description":"MikoPBX - бесплатная АТС  с открытым исходным кодом.",
+        "tour_description":"Предоставляет возможность интеграции с Asterisk",
+        "call_action": "Позвонить"
+    },
+    "settings":{
+        "host": "Адрес сервера MikoPBX",
+        "users": "Пользователи АТС"
+    },
+    "advanced":{
+        "title":"Интеграция с MikoPBX"
+    },
+    "salesbot":{
+        "button_title":"Заголовок кнопки",
+        "button_caption":"Описание кнопки",
+        "button_title_default_value":"Заголовок кнопки",
+        "button_caption_default_value":"Описание кнопки",
+        "text":"Текст",
+        "number":"Число",
+        "url":"URL",
+        "handler_name":"Название обработчика"
+    },
+    "dp":{
+        "message": "Сообщение"
+    }
+}

@@ -1,0 +1,85 @@
+{
+  "widget": {
+    "name": "widget.name",
+    "description": "widget.description",
+    "short_description": "widget.short_description",
+    "version": "1.0.2",
+    "interface_version": 2,
+    "init_once": true,
+    "locale": [
+      "ru",
+      "en"
+    ],
+    "installation": true,
+    "support": {
+      "link": "https://www.mikopbx.ru",
+      "email": "help@miko.ru"
+    }
+  },
+  "locations": [
+    "ccard-1",
+    "clist-0",
+    "lcard-1",
+    "llist-0",
+    "settings",
+    "advanced_settings",
+    "salesbot_designer"
+  ],
+  "tour": {
+    "is_tour": true,
+    "tour_images": {
+      "ru": [
+        "/images/logo_main.png",
+        "/images/logo_main.png",
+        "/images/logo_main.png"
+      ]
+    },
+    "tour_description": "widget.tour_description"
+  },
+  "settings": {
+    "miko_pbx_host": {
+      "name": "settings.host",
+      "type": "text",
+      "required": true
+    },
+    "pbx_users": {
+      "name": "settings.users",
+      "type": "users",
+      "required": false
+    }
+  },
+  "advanced": {
+    "title": "advanced.title"
+  },
+  "salesbot_designer": {
+    "handler_code": {
+      "name": "salesbot.handler_name",
+      "settings": {
+        "button_title": {
+          "name": "salesbot.button_title",
+          "type": "text",
+          "default_value": "salesbot.button_title_default_value",
+          "manual": true
+        },
+        "button_caption": {
+          "name": "salesbot.button_caption",
+          "type": "text",
+          "default_value": "salesbot.button_caption_default_value",
+          "manual": true
+        },
+        "text": {
+          "name": "salesbot.text",
+          "type": "text"
+        },
+        "number": {
+          "name": "salesbot.number",
+          "type": "numeric"
+        },
+        "url": {
+          "name": "salesbot.url",
+          "type": "url"
+        }
+      }
+    }
+  }
+}
