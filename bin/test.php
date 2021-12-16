@@ -27,5 +27,3 @@ $ud = new \MikoPBX\Core\System\Upgrade\UpdateDatabase();
 $ud->createUpdateDbTableByAnnotations(\Modules\ModuleAmoCrm\Models\ModuleAmoCrm::class);
 $ud->createUpdateDbTableByAnnotations(\Modules\ModuleAmoCrm\Models\ModuleAmoRequestData::class);
 
-$settings = ModuleAmoCrm::findFirst();
-print_r($settings->toArray());

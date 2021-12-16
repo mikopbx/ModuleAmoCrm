@@ -245,7 +245,7 @@ class AmoCrmMain extends PbxExtensionBase
     private function parseResponse($resultHttp, $message, $code):PBXAmoResult
     {
         $res = new PBXAmoResult();
-        if($code === 200 && isset($resultHttp)){
+        if( ($code === 200 || $resultHttp->getReasonPhrase() === 'Accepted') && isset($resultHttp)){
             $content = $resultHttp->getBody()->getContents();
             $data    = [];
             try {
@@ -391,6 +391,25 @@ class AmoCrmMain extends PbxExtensionBase
             ],
         ];
         return $this->sendHttpPatchRequest($url, $params, $headers);
+    }
+
+    public function notifyUsers(string $phone, array $users):PBXApiResult
+    {
+        $url = "https://$this->baseDomain/api/v2/events/";
+        $headers = [
+            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
+        ];
+        $notify = [
+            'add' => [
+                [
+                'type' => "phone_call",
+                'phone_number' => $phone,
+                'users' => $users
+                ],
+            ]
+        ];
+        return $this->sendHttpPostRequest($url, $notify, $headers);
+
     }
 
 

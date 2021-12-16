@@ -42,10 +42,15 @@ define(['jquery', 'underscore', 'twigjs'], function ($, _, Twig) {
             // Вывести сообщение ош ошибке. self.langs
           }
         });
+
         return true;
       }, this),
       bind_actions: function () {
         console.log('bind_actions');
+        window.AMOCRM.player_prepare[self.params.widget_code] = function ($el) {
+          console.log($el)
+          this.play($el, $el.attr('href'));
+        };
         return true;
       },
       settings: function () {
