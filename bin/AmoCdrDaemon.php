@@ -27,7 +27,9 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use MikoPBX\Common\Models\Extensions;
+use MikoPBX\Common\Providers\CDRDatabaseProvider;
 use Modules\ModuleAmoCrm\Models\ModuleAmoRequestData;
+
 class AmoCdrDaemon
 {
     public const PID_FILE     = "/var/run/amo-cdr-daemon.pid";
@@ -169,10 +171,8 @@ class AmoCdrDaemon
             ],
             'order'               => 'id',
             'limit'               => self::LIMIT,
-            'miko_result_in_file' => true,
         ];
-        $rows = $this->getCdr($filter);
-
+        $rows = CDRDatabaseProvider::getCdr($filter);
         $extHostname = $this->connector->getExtHostname();
         $calls  = [];
         foreach ($rows as $row){
@@ -329,8 +329,10 @@ class AmoCdrDaemon
      * @param $uid
      * @param $request
      * @param $response
+     * @param int $isError
+     * @return void
      */
-    private function saveResponse($uid, $request, $response, $isError=0):void
+    private function saveResponse($uid, $request, $response, int $isError=0):void
     {
         try {
             $resDb = ModuleAmoRequestData::findFirst("UNIQUEID='{$uid}'");
