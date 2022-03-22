@@ -13,6 +13,8 @@ use MikoPBX\Modules\PbxExtensionUtils;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
+use MikoPBX\Common\Models\Extensions;
+use MikoPBX\Common\Models\PbxSettings;
 use Throwable;
 
 class AmoCrmMain extends PbxExtensionBase
@@ -477,4 +479,53 @@ class AmoCrmMain extends PbxExtensionBase
             }
         }
     }
+
+    /**
+     * Обновление таблицы пользователей AMO.
+     */
+    public static function updateUsers():array
+    {
+        $users = [];
+        try {
+            /** @var ModuleAmoUsers $user */
+            $amoUsers = ModuleAmoUsers::find('enable=1');
+            foreach ($amoUsers as $user){
+                $users[$user->number] = $user->amoUserId;
+            }
+        }catch (Throwable $e){
+            Util::sysLogMsg(__CLASS__, $e->getMessage());
+        }
+        $extensionLength = 1*PbxSettings::getValueByKey('PBXInternalExtensionLength');
+        $userList   = [];
+        $innerNums = [];
+        /** @var Extensions $ext */
+        $extensions = Extensions::find(['order' => 'type DESC']);
+        foreach ($extensions as $ext){
+            if($ext->type === Extensions::TYPE_SIP){
+                $userList[$ext->userid] = $ext->number;
+            }elseif($ext->type === Extensions::TYPE_EXTERNAL && isset($userList[$ext->userid])){
+                $innerNum = $userList[$ext->userid];
+                if(isset($users[$innerNum])){
+                    $amoUserId = $users[$innerNum];
+                    $users[self::getPhoneIndex($ext->number)] = $amoUserId;
+                }
+            }
+            $innerNums[] = self::getPhoneIndex($ext->number);
+        }
+        unset($userList);
+        return [$extensionLength, $users, $innerNums];
+    }
+
+    /**
+     * Возвращает усеценный слева номер телефона.
+     *
+     * @param $number
+     *
+     * @return bool|string
+     */
+    public static function getPhoneIndex($number)
+    {
+        return substr($number, -10);
+    }
+
 }

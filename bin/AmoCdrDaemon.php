@@ -17,27 +17,28 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 
+namespace Modules\ModuleAmoCrm\bin;
 require_once('Globals.php');
 
 use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Core\System\Util;
-use MikoPBX\Core\Workers\WorkerCdr;
-use MikoPBX\Core\System\BeanstalkClient;
+use MikoPBX\Core\Workers\WorkerBase;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Common\Providers\CDRDatabaseProvider;
 use Modules\ModuleAmoCrm\Models\ModuleAmoRequestData;
+use DateTime;
 
-class AmoCdrDaemon
+
+class AmoCdrDaemon extends WorkerBase
 {
     public const PID_FILE     = "/var/run/amo-cdr-daemon.pid";
-    public const DAEMON_TITLE = 'AmoCdrDaemon';
     public const SOURCE_ID    = 'miko-pbx';
 
-    private const LIMIT   = 2;
-    private int $offset;
+    private const   LIMIT   = 2;
+    private int     $offset = 1;
     private array $users = [];
     private int $extensionLength;
     public AmoCrmMain $connector;
@@ -45,22 +46,6 @@ class AmoCdrDaemon
     public string $referenceDate='';
 
     private array $cdrRows = [];
-
-    /**
-     * AmoCdrDaemon constructor.
-     */
-    public function __construct()
-    {
-        /** @var ModuleAmoCrm $settings */
-        $settings = ModuleAmoCrm::findFirst();
-        if($settings){
-            $this->offset = 1*$settings->offsetCdr;
-            $this->offset = max($this->offset,1);
-            $this->referenceDate = $settings->referenceDate;
-        }
-        $this->connector = new AmoCrmMain();
-        $this->updateUsers();
-    }
 
     /**
      * Обновление таблицы пользователей AMO.
@@ -74,7 +59,7 @@ class AmoCdrDaemon
             foreach ($amoUsers as $user){
                 $this->users[$user->number] = $user->amoUserId;
             }
-        }catch (Throwable $e){
+        }catch (\Throwable $e){
             Util::sysLogMsg(__CLASS__, $e->getMessage());
         }
         $this->extensionLength = 1*PbxSettings::getValueByKey('PBXInternalExtensionLength');
@@ -90,26 +75,19 @@ class AmoCdrDaemon
                 $innerNum = $userList[$ext->userid];
                 if(isset($this->users[$innerNum])){
                     $amoUserId = $this->users[$innerNum];
-                    $this->users[$this->getPhoneIndex($ext->number)] = $amoUserId;
+                    $this->users[AmoCrmMain::getPhoneIndex($ext->number)] = $amoUserId;
                 }
             }
-            $this->innerNums[] = $this->getPhoneIndex($ext->number);
+            $this->innerNums[] = AmoCrmMain::getPhoneIndex($ext->number);
         }
         unset($userList);
+
+
     }
 
     /**
-     * Возвращает усеценный слева номер телефона.
-     *
-     * @param $number
-     *
-     * @return bool|string
+     * @return bool
      */
-    public function getPhoneIndex($number)
-    {
-        return substr($number, -10);
-    }
-
     public static function processExists():bool
     {
         $result = false;
@@ -129,38 +107,29 @@ class AmoCdrDaemon
     }
 
     /**
-     * Получение порции CDR для анализа.
-     * @param array $filter
-     * @return array
-     */
-    public function getCdr(array $filter):array
-    {
-        $rows = [];
-        $filter['miko_result_in_file'] = true;
-        $result_data = null;
-        try {
-            $client     = new BeanstalkClient(WorkerCdr::SELECT_CDR_TUBE);
-            $result   = $client->request(json_encode($filter), 2);
-            $filename = json_decode($result, true, 512, JSON_THROW_ON_ERROR);
-            if (!file_exists($filename)) {
-                return $rows;
-            }
-            $result_data = json_decode(file_get_contents($filename), true, 512, JSON_THROW_ON_ERROR);
-            unlink($filename);
-        }catch (Throwable $e){
-            Util::sysLogMsg(self::class, $e->getMessage());
-        }
-
-        if(is_array($result_data)){
-            $rows = $result_data;
-        }
-        return $rows;
-    }
-
-    /**
      * Начало загрузки истории звонков в Amo.
      */
-    public function start():void
+    public function start($params):void
+    {
+        /** @var ModuleAmoCrm $settings */
+        $settings = ModuleAmoCrm::findFirst();
+        if($settings){
+            $this->offset = 1*$settings->offsetCdr;
+            $this->offset = max($this->offset,1);
+            $this->referenceDate = $settings->referenceDate;
+        }else{
+            // Настройки не заполенны.
+            return;
+        }
+        $this->connector = new AmoCrmMain();
+        [$this->extensionLength, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
+        while (true){
+            $this->cdrSync();
+            sleep(3);
+        }
+    }
+
+    private function cdrSync():void
     {
         $this->cdrRows = [];
         $filter = [
@@ -176,8 +145,8 @@ class AmoCdrDaemon
         $extHostname = $this->connector->getExtHostname();
         $calls  = [];
         foreach ($rows as $row){
-            $srcNum = $this->getPhoneIndex($row['src_num']);
-            $dstNum = $this->getPhoneIndex($row['dst_num']);
+            $srcNum = AmoCrmMain::getPhoneIndex($row['src_num']);
+            $dstNum = AmoCrmMain::getPhoneIndex($row['dst_num']);
             if(isset($this->innerNums[$srcNum], $this->innerNums[$dstNum])){
                 // Это внутренний разговор.
                 // Не переносим его в AMO.
@@ -207,7 +176,7 @@ class AmoCdrDaemon
             try {
                 $d          = new DateTime($row['start']);
                 $created_at = $d->getTimestamp();
-            }catch (Throwable $e){
+            }catch (\Throwable $e){
                 Util::sysLogMsg(__CLASS__, $row['UNIQUEID'].' : '.$row['start'].' : '.$e->getMessage());
                 continue;
             }
@@ -239,6 +208,9 @@ class AmoCdrDaemon
 
     private function addCalls($calls):void
     {
+        if(empty($calls)){
+            return;
+        }
         $result = $this->connector->addCalls($calls);
         $forUnsorted     = [];
         $validationError = [];
@@ -344,7 +316,7 @@ class AmoCdrDaemon
             $resDb->response = json_encode($response, JSON_THROW_ON_ERROR);
             $resDb->isError  = $isError;
             $resDb->save();
-        }catch (Throwable $e){
+        }catch (\Throwable $e){
             Util::sysLogMsg(__CLASS__, $e->getMessage());
         }
     }
@@ -366,7 +338,8 @@ class AmoCdrDaemon
     /**
      * Обновление текущей позиции CDR.
      */
-    private function updateOffset(){
+    private function updateOffset():void
+    {
         /** @var ModuleAmoCrm $settings */
         $settings = ModuleAmoCrm::findFirst();
         if(!$settings){
@@ -377,14 +350,4 @@ class AmoCdrDaemon
     }
 }
 
-if(AmoCdrDaemon::processExists()){
-    exit(0);
-}
-
-cli_set_process_title(AmoCdrDaemon::DAEMON_TITLE);
-
-$daemon = new AmoCdrDaemon();
-while (true){
-    $daemon->start();
-    sleep(3);
-}
+AmoCdrDaemon::startWorker($argv??null);

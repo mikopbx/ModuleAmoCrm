@@ -13,6 +13,9 @@ use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Core\Workers\Cron\WorkerSafeScriptsCore;
 use MikoPBX\Modules\Config\ConfigClass;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
+use Modules\ModuleAmoCrm\bin\AmoCdrDaemon;
+use Modules\ModuleAmoCrm\bin\WorkerAmoCrmAMI;
+use Modules\ModuleAmoCrm\bin\WorkerAmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\RestAPI\Controllers\ApiController;
 use MikoPBX\PBXCoreREST\Controllers\Cdr\GetController as CdrGetController;
 
@@ -26,7 +29,6 @@ class AmoCrmConf extends ConfigClass
      */
     public function modelsEventChangeData($data): void
     {
-        // f.e. if somebody changes PBXLanguage, we will restart all workers
         if (
             $data['model'] === PbxSettings::class
             && $data['recordId'] === 'PBXLanguage'
@@ -51,6 +53,10 @@ class AmoCrmConf extends ConfigClass
             [
                 'type'   => WorkerSafeScriptsCore::CHECK_BY_AMI,
                 'worker' => WorkerAmoCrmAMI::class,
+            ],
+            [
+                'type'   => WorkerSafeScriptsCore::CHECK_BY_PID_NOT_ALERT,
+                'worker' => AmoCdrDaemon::class,
             ],
         ];
     }

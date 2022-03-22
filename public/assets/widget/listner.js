@@ -36,7 +36,7 @@ setInterval(function(){
 }, 5);
 
 /*
-curl 'https://172.16.156.223/pbxcore/api/nchan/sub/calls?token=test' \
+curl 'https://172.16.156.223/pbxcore/api/nchan/sub/calls?token=201' \
 -X 'GET' \
 -H 'Accept: text/event-stream' \
 -H 'Cache-Control: no-cache' \
@@ -44,5 +44,5 @@ curl 'https://172.16.156.223/pbxcore/api/nchan/sub/calls?token=test' \
 -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15' \
 -H 'Pragma: no-cache' -k
 
-curl --request POST --data "test message" -H "Accept: text/json" https://172.16.156.223/pbxcore/api/nchan/pub/calls
+curl -k --request POST --data "test message" -H "Accept: text/json" https://172.16.156.223/pbxcore/api/nchan/pub/calls
 */
