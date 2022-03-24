@@ -13,6 +13,15 @@
     "advanced":{
         "title":"Settings menu item title"
     },
+    "calls": {
+        "incoming": "Incoming call",
+        "outgoing": "Outgoing call"
+    },
+    "contacts": {
+        "goto_contact" : "Go to the contact card",
+        "create_contact" : "Create a contact",
+        "call_title": "New call"
+    },
     "salesbot":{
         "button_title":"Button title",
         "button_caption":"Button caption",

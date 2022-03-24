@@ -1,78 +1,50 @@
-define(['jquery', 'underscore', 'twigjs'], function ($, _, Twig) {
+define(function (require) {
+  let $ = require('jquery'),
+      connector = require('./mpbx-connector.js?v=1.0.24');
+
   return function () {
     let self = this;
-
-    this.getTemplate = _.bind(function (template, params, callback) {
-      params = (typeof params == 'object') ? params : {};
-      template = template || '';
-
-      return this.render({
-        href: '/templates/' + template + '.twig',
-        base_path: this.params.path,
-        v: this.get_version(),
-        load: callback
-      }, params);
-    }, this);
+    self.findContact = function (notifications_data){
+      $.get('//' + window.location.host + '/private/api/contact_search.php?SEARCH=' + notifications_data.number , function(res) {
+        notifications_data.element = {};
+        notifications_data.element.id = $(res).find('contact > id').eq(0).text();
+        notifications_data.element.name = $(res).find('contact > name').eq(0).text();
+        notifications_data.element.company = $(res).find('contact > company > name').eq(0).text();
+        self.addCallNotify(notifications_data);
+      });
+    }
+    self.addCallNotify = function (data) {
+      let n_data = {
+        to: data.to,
+        date: Math.ceil(Date.now() / 1000),
+      };
+      if (data.element.id > 0) {
+        n_data.text = self.langs.contacts.call_title + ': ' + data.element.name + '. <a href="/contacts/detail/' + data.element.id + '">'+self.langs.contacts.goto_contact+'</a>';
+        n_data.header = '' + self.langs.calls[data.type] + ': ' + data.number + ' ';
+      } else {
+        n_data.text = '<a href="/contacts/add/?phone=' + data.number + '">'+self.langs.contacts.create_contact+'</a>';
+        n_data.header = '' + self.langs.calls[data.type] + ': ' + data.number;
+      }
+      AMOCRM.notifications.add_call(n_data);
+    };
 
     this.callbacks = {
       render: function () {
         return true;
       },
-      init: _.bind(function () {
-        this.add_action("phone", function (params) {
-          let settings     = self.get_settings();
-          let current_user = AMOCRM.constant('user').id;
-          let phones       = settings.pbx_users || false;
-          let host         = settings.miko_pbx_host || false;
-
-          if (typeof phones == 'string') {
-            phones = phones ? $.parseJSON(phones) : false;
-          }
-          if (host && phones && typeof phones[current_user] !== 'undefined') {
-            let postParams = {
-              'action': 'call',
-              'number': params.value,
-              'user-number': phones[current_user],
-              'user-id': current_user
-            };
-            $.post(`https://${host}/pbxcore/api/amo-crm/v1/callback`, postParams, function( data ) {
-              console.log('result', data);
-            });
-          }else {
-            // Вывести сообщение ош ошибке. self.langs
-          }
-        });
-
+      init: function () {
+        self.connector = connector(self);
         return true;
-      }, this),
+      },
       bind_actions: function () {
         console.log('bind_actions');
-        window.AMOCRM.player_prepare[self.params.widget_code] = function ($el) {
-          console.log($el)
-          this.play($el, $el.attr('href'));
-        };
         return true;
       },
       settings: function () {
         return true;
       },
       onSave: function () {
-        let settings     = self.get_settings();
-        let phones       = settings.pbx_users || false;
-        let host         = settings.miko_pbx_host || false;
-        if (typeof phones == 'string') {
-          phones = phones ? $.parseJSON(phones) : false;
-        }
-        if (host && phones) {
-          let postParams = {
-            'users': phones,
-          };
-          $.post(`https://${host}/pbxcore/api/amo-crm/v1/change-settings`, postParams, function( data ) {
-            console.log('result', data);
-          });
-        }else {
-          // Вывести сообщение ош ошибке. self.langs
-        }
+        self.connector.onSaveSettings();
         return true;
       },
       destroy: function () {
@@ -95,85 +67,6 @@ define(['jquery', 'underscore', 'twigjs'], function ($, _, Twig) {
         selected: function () {
           console.log('tasks');
         }
-      },
-      advancedSettings: _.bind(function () {
-        var $work_area = $('#work-area-' + self.get_settings().widget_code),
-            $save_button = $(
-                Twig({ref: '/tmpl/controls/button.twig'}).render({
-                  text: 'Сохранить',
-                  class_name: 'button-input_blue button-input-disabled js-button-save-' + self.get_settings().widget_code,
-                  additional_data: ''
-                })
-            ),
-            $cancel_button = $(
-                Twig({ref: '/tmpl/controls/cancel_button.twig'}).render({
-                  text: 'Отмена',
-                  class_name: 'button-input-disabled js-button-cancel-' + self.get_settings().widget_code,
-                  additional_data: ''
-                })
-            );
-
-        console.log('advancedSettings');
-
-        $save_button.prop('disabled', true);
-        $('.content__top__preset').css({float: 'left'});
-
-        $('.list__body-right__top').css({display: 'block'})
-            .append('<div class="list__body-right__top__buttons"></div>');
-        $('.list__body-right__top__buttons').css({float: 'right'})
-            .append($cancel_button)
-            .append($save_button);
-
-        self.getTemplate('advanced_settings', {}, function (template) {
-          var $page = $(
-              template.render({title: self.i18n('advanced').title, widget_code: self.get_settings().widget_code})
-          );
-
-          $work_area.append($page);
-        });
-      }, self),
-
-      /**
-       * Метод срабатывает, когда пользователь в конструкторе Salesbot размещает один из хендлеров виджета.
-       * Мы должны вернуть JSON код salesbot'а
-       *
-       * @param handler_code - Код хендлера, который мы предоставляем. Описан в manifest.json, в примере равен handler_code
-       * @param params - Передаются настройки виджета. Формат такой:
-       * {
-       *   button_title: "TEST",
-       *   button_caption: "TEST",
-       *   text: "{{lead.cf.10929}}",
-       *   number: "{{lead.price}}",
-       *   url: "{{contact.cf.10368}}"
-       * }
-       *
-       * @return {{}}
-       */
-      onSalesbotDesignerSave: function (handler_code, params) {
-        var salesbot_source = {
-              question: [],
-              require: []
-            },
-            button_caption = params.button_caption || "",
-            button_title = params.button_title || "",
-            text = params.text || "",
-            number = params.number || 0,
-            handler_template = {
-              handler: "show",
-              params: {
-                type: "buttons",
-                value: text + ' ' + number,
-                buttons: [
-                  button_title + ' ' + button_caption,
-                ]
-              }
-            };
-
-        console.log(params);
-
-        salesbot_source.question.push(handler_template);
-
-        return JSON.stringify([salesbot_source]);
       },
     };
     return this;

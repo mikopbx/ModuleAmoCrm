@@ -13,6 +13,15 @@
     "advanced":{
         "title":"Интеграция с MikoPBX"
     },
+    "calls": {
+        "incoming": "Входящий",
+        "outgoing": "Исходящий"
+    },
+    "contacts": {
+        "goto_contact" : "Перейти в карту контакта",
+        "create_contact" : "Создать контакт",
+        "call_title": "Вам звонит"
+    },
     "salesbot":{
         "button_title":"Заголовок кнопки",
         "button_caption":"Описание кнопки",
