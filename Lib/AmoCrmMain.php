@@ -490,7 +490,10 @@ class AmoCrmMain extends PbxExtensionBase
             /** @var ModuleAmoUsers $user */
             $amoUsers = ModuleAmoUsers::find('enable=1');
             foreach ($amoUsers as $user){
-                $users[$user->number] = $user->amoUserId;
+                if(!is_numeric($user->amoUserId)){
+                    continue;
+                }
+                $users[$user->number] = 1*$user->amoUserId;
             }
         }catch (Throwable $e){
             Util::sysLogMsg(__CLASS__, $e->getMessage());
@@ -507,7 +510,7 @@ class AmoCrmMain extends PbxExtensionBase
                 $innerNum = $userList[$ext->userid];
                 if(isset($users[$innerNum])){
                     $amoUserId = $users[$innerNum];
-                    $users[self::getPhoneIndex($ext->number)] = $amoUserId;
+                    $users[self::getPhoneIndex($ext->number)] = 1*$amoUserId;
                 }
             }
             $innerNums[] = self::getPhoneIndex($ext->number);

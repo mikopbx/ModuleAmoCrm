@@ -25,8 +25,6 @@ use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
-use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
-use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Common\Providers\CDRDatabaseProvider;
 use Modules\ModuleAmoCrm\Models\ModuleAmoRequestData;
 use DateTime;
@@ -34,77 +32,16 @@ use DateTime;
 
 class AmoCdrDaemon extends WorkerBase
 {
-    public const PID_FILE     = "/var/run/amo-cdr-daemon.pid";
     public const SOURCE_ID    = 'miko-pbx';
-
-    private const   LIMIT   = 2;
+    private const   LIMIT   = 50;
     private int     $offset = 1;
-    private array $users = [];
     private int $extensionLength;
     public AmoCrmMain $connector;
     public array $innerNums = [];
+    private array $users = [];
     public string $referenceDate='';
 
     private array $cdrRows = [];
-
-    /**
-     * Обновление таблицы пользователей AMO.
-     */
-    private function updateUsers():void
-    {
-        try {
-            /** @var ModuleAmoUsers $user */
-            $amoUsers = ModuleAmoUsers::find('enable=1');
-            $this->users = [];
-            foreach ($amoUsers as $user){
-                $this->users[$user->number] = $user->amoUserId;
-            }
-        }catch (\Throwable $e){
-            Util::sysLogMsg(__CLASS__, $e->getMessage());
-        }
-        $this->extensionLength = 1*PbxSettings::getValueByKey('PBXInternalExtensionLength');
-
-        $userList   = [];
-        $this->innerNums = [];
-        /** @var Extensions $ext */
-        $extensions = Extensions::find(['order' => 'type DESC']);
-        foreach ($extensions as $ext){
-            if($ext->type === Extensions::TYPE_SIP){
-                $userList[$ext->userid] = $ext->number;
-            }elseif($ext->type === Extensions::TYPE_EXTERNAL && isset($userList[$ext->userid])){
-                $innerNum = $userList[$ext->userid];
-                if(isset($this->users[$innerNum])){
-                    $amoUserId = $this->users[$innerNum];
-                    $this->users[AmoCrmMain::getPhoneIndex($ext->number)] = $amoUserId;
-                }
-            }
-            $this->innerNums[] = AmoCrmMain::getPhoneIndex($ext->number);
-        }
-        unset($userList);
-
-
-    }
-
-    /**
-     * @return bool
-     */
-    public static function processExists():bool
-    {
-        $result = false;
-        if(file_exists(self::PID_FILE)){
-            $psPath      = Util::which('ps');
-            $busyboxPath = Util::which('busybox');
-            $pid     = file_get_contents(self::PID_FILE);
-            $output  = shell_exec("$psPath -A -o pid | $busyboxPath grep $pid ");
-            if(!empty($output)){
-                $result = true;
-            }
-        }
-        if(!$result){
-            file_put_contents(self::PID_FILE, getmypid());
-        }
-        return $result;
-    }
 
     /**
      * Начало загрузки истории звонков в Amo.
@@ -134,20 +71,22 @@ class AmoCdrDaemon extends WorkerBase
         $this->cdrRows = [];
         $filter = [
             'id>:id: AND start>:referenceDate:',
-            'bind'                => [
-                'id' => $this->offset,
+            'bind'    => [
+                'id'  => $this->offset,
                 'referenceDate' => $this->referenceDate
             ],
-            'order'               => 'id',
-            'limit'               => self::LIMIT,
+            'order'   => 'id',
+            'columns' => 'id,start,src_num,dst_num,billsec,recordingfile,UNIQUEID,linkedid,disposition',
+            'limit'   => self::LIMIT,
         ];
         $rows = CDRDatabaseProvider::getCdr($filter);
         $extHostname = $this->connector->getExtHostname();
-        $calls  = [];
+        $calls    = [];
         foreach ($rows as $row){
             $srcNum = AmoCrmMain::getPhoneIndex($row['src_num']);
             $dstNum = AmoCrmMain::getPhoneIndex($row['dst_num']);
-            if(isset($this->innerNums[$srcNum], $this->innerNums[$dstNum])){
+            if( in_array($srcNum, $this->innerNums, true)
+                && in_array($dstNum, $this->innerNums, true)){
                 // Это внутренний разговор.
                 // Не переносим его в AMO.
                 continue;
@@ -156,12 +95,12 @@ class AmoCdrDaemon extends WorkerBase
             if($this->extensionLength < strlen($srcNum)){
                 // Это входящий.
                 $direction = 'inbound';
-                $amoUserId = $this->innerNums[$dstNum]??null;
+                $amoUserId = $this->users[$dstNum]??null;
             }elseif($this->extensionLength < strlen($dstNum)){
                 // Исходящий.
                 $direction = 'outbound';
                 $phoneCol  = 'dst_num';
-                $amoUserId = $this->innerNums[$srcNum]??null;
+                $amoUserId = $this->users[$srcNum]??null;
             }else{
                 continue;
             }
@@ -169,7 +108,10 @@ class AmoCdrDaemon extends WorkerBase
                 // Пропущенный вызов.
                 $call_status = 6;
                 $link = '';
+                $this->cdrRows[$row['linkedid']]['answered'] |= false;
             }else{
+                // Это точно не пропущенный вызов.
+                $this->cdrRows[$row['linkedid']]['answered'] |= true;
                 $link = "https://$extHostname/pbxcore/api/amo-crm/playback?view={$row['recordingfile']}";
                 $call_status = 4;
             }
@@ -191,7 +133,8 @@ class AmoCdrDaemon extends WorkerBase
                 'call_status'         => $call_status,
                 'created_at'          => $created_at,
                 'updated_at'          => $created_at,
-                'request_id'          => $row['UNIQUEID']
+                'request_id'          => $row['UNIQUEID'],
+                'id'                  => $row['linkedid']
             ];
             if(isset($amoUserId)){
                 $call['created_by'] = $amoUserId;
@@ -201,7 +144,16 @@ class AmoCdrDaemon extends WorkerBase
             $this->offset = $row['id'];
             $this->cdrRows[$row['UNIQUEID']] = $call;
         }
-        unset($rows);
+
+        foreach ($calls as $index => &$call){
+            if( $this->cdrRows[$call['id']]['answered'] === 1 && $call['call_status'] === 6){
+                // Если вызов отвечен, то не следует загружать информацию о пропущенных.
+                unset($calls[$index],$call);
+            }else{
+                unset($call['id']);
+            }
+        }
+        unset($rows,$call);
         $this->addCalls($calls);
         $this->updateOffset();
     }
@@ -260,10 +212,10 @@ class AmoCdrDaemon extends WorkerBase
                 continue;
             }
             $calls[] = [
-                'request_id' => $call['request_id'],
+                'request_id'  => $call['request_id'],
                 'source_name' => self::SOURCE_ID,
-                'source_uid' => self::SOURCE_ID,
-                'created_at' => $call['created_at'],
+                'source_uid'  => self::SOURCE_ID,
+                'created_at'  => $call['created_at'],
                 "metadata" => [
                     "is_call_event_needed"  => true,
                     "uniq"                  => $call['uniq'],
@@ -273,7 +225,7 @@ class AmoCdrDaemon extends WorkerBase
                     "phone"                 => $call["phone"],
                     "called_at"             => $call['created_at'],
                     "from"                  => $call['source']
-                ]
+                ],
             ];
         }
         if(empty($calls)){

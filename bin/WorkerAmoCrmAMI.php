@@ -283,7 +283,7 @@ class WorkerAmoCrmAMI extends WorkerBase
                 continue;
             }
             $phone  = $this->activeChannels[$channel];
-            $userId = $this->users[$phone]??'';
+            $userId = $this->users[$phone]??null;
             if(empty($userId)){
                 continue;
             }
