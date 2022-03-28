@@ -1,16 +1,17 @@
 define(function (require) {
   let $ = require('jquery'),
-      connector = require('./mpbx-connector.js?v=1.0.24');
+      connector = require('./mpbx-connector.js?v=1.0.28');
 
   return function () {
     let self = this;
-    self.findContact = function (notifications_data){
+    self.findContact = function (notifications_data, callback){
       $.get('//' + window.location.host + '/private/api/contact_search.php?SEARCH=' + notifications_data.number , function(res) {
         notifications_data.element = {};
         notifications_data.element.id = $(res).find('contact > id').eq(0).text();
         notifications_data.element.name = $(res).find('contact > name').eq(0).text();
         notifications_data.element.company = $(res).find('contact > company > name').eq(0).text();
-        self.addCallNotify(notifications_data);
+
+        callback(notifications_data)
       });
     }
     self.addCallNotify = function (data) {
@@ -19,13 +20,31 @@ define(function (require) {
         date: Math.ceil(Date.now() / 1000),
       };
       if (data.element.id > 0) {
-        n_data.text = self.langs.contacts.call_title + ': ' + data.element.name + '. <a href="/contacts/detail/' + data.element.id + '">'+self.langs.contacts.goto_contact+'</a>';
+        n_data.text = self.langs.contacts.call_title + ': ' + data.element.name + '. <a data-phone="'+data.number+'" href="/contacts/detail/' + data.element.id + '">'+self.langs.contacts.goto_contact+'</a>';
         n_data.header = '' + self.langs.calls[data.type] + ': ' + data.number + ' ';
       } else {
-        n_data.text = '<a href="/contacts/add/?phone=' + data.number + '">'+self.langs.contacts.create_contact+'</a>';
+        // href="/contacts/add/?phone=' + data.number + '"
+        n_data.text = '<a data-phone="'+data.number+'" class="miko-pbx-create-contact-link">'+self.langs.contacts.create_contact+'</a>';
         n_data.header = '' + self.langs.calls[data.type] + ': ' + data.number;
       }
+      self.removeOldNotify(data.number);
       AMOCRM.notifications.add_call(n_data);
+    };
+
+    self.removeOldNotify = function (phone) {
+      $('.miko-pbx-create-contact-link[data-phone="'+phone+'"]').each(function( index ) {
+        let id = $( this ).parents(".notification__item.notification-inner").attr('data-id');
+
+        $.ajax({
+          url:'//' + window.location.host + "/v3/inbox/delete",
+          type:"POST",
+          data:JSON.stringify({'id': [id],"all":false}),
+          contentType:'application/json;charset=utf-8',
+          success: function(){
+            console.log("Data Loaded: ", this);
+          }
+        })
+      });
     };
 
     this.callbacks = {
@@ -37,7 +56,9 @@ define(function (require) {
         return true;
       },
       bind_actions: function () {
-        console.log('bind_actions');
+        $(document).on('click', '.miko-pbx-create-contact-link', function(){
+          console.log($(this));
+        });
         return true;
       },
       settings: function () {

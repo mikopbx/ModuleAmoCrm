@@ -25,7 +25,7 @@ define(function (require) {
     let channels = {};
 
     let onPbxMessage = function(event) {
-        let currentUser = ''+AMOCRM.constant('user').id;
+        let currentUser = AMOCRM.constant('user').id;
         let callData = $.parseJSON(event.data);
         let n_data = null;
 
@@ -45,7 +45,7 @@ define(function (require) {
                     type: 'incoming'
                 };
             }
-            self.findContact(n_data);
+            self.findContact(n_data, self.addCallNotify);
         }else if(callData.action === 'hangup'){
             delete channels[callData.uid];
         }
