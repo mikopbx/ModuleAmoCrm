@@ -20,7 +20,6 @@
 namespace Modules\ModuleAmoCrm\bin;
 require_once('Globals.php');
 
-use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
@@ -158,7 +157,7 @@ class AmoCdrDaemon extends WorkerBase
         $this->updateOffset();
     }
 
-    private function addCalls($calls):void
+    private function addCalls($calls, bool $mainOnly = false):void
     {
         if(empty($calls)){
             return;
@@ -195,7 +194,9 @@ class AmoCdrDaemon extends WorkerBase
             $row['error'] = $err;
             $validationError[] = $row;
         }
-        $this->addUnsorted($forUnsorted, $validationError);
+        if($mainOnly === false){
+            $this->addUnsorted($forUnsorted, $validationError);
+        }
         $this->logErrors($validationError);
     }
 
@@ -206,11 +207,24 @@ class AmoCdrDaemon extends WorkerBase
      */
     private function addUnsorted($forUnsorted, &$validationError):void
     {
+        // Создаем "неразобранное". На каждый из номеров телефонов.
         $calls = [];
+        // При создании неразобранного формируется сделка и контакт,
+        // дополнительные звонки по телефонам регистрируем обычным способом.
+        $secondaryCalls = []; $uniqPhones = [];
+        $outCalls = [];
         foreach ($forUnsorted as $call){
             if($call['direction'] !== 'inbound'){
+                unset($call['id']);
+                $outCalls[] = $call;
                 continue;
             }
+            if(in_array($call["phone"], $uniqPhones, true)){
+                unset($call['id']);
+                $secondaryCalls[] = $call;
+                continue;
+            }
+            $uniqPhones[] = $call["phone"];
             $calls[] = [
                 'request_id'  => $call['request_id'],
                 'source_name' => self::SOURCE_ID,
@@ -226,8 +240,25 @@ class AmoCdrDaemon extends WorkerBase
                     "called_at"             => $call['created_at'],
                     "from"                  => $call['source']
                 ],
+                "_embedded" => [
+                    'contacts' => [
+                        [
+                            'name' => $call["phone"],
+                            'custom_fields_values' => [
+                                [
+                                    'field_code' => 'PHONE',
+                                    'values' => [['value' => $call["phone"]]]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
             ];
         }
+
+        $this->connector->createContacts($outCalls);
+        $this->addCalls($outCalls, true);
+
         if(empty($calls)){
             return;
         }
@@ -246,6 +277,12 @@ class AmoCdrDaemon extends WorkerBase
             }
             $this->saveResponse($row['request_id'],$call, $row);
         }
+
+        /**
+         * Подгружаем оставшиеся записи.
+         */
+        $this->addCalls($secondaryCalls, true);
+
     }
 
     /**

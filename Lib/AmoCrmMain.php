@@ -414,6 +414,36 @@ class AmoCrmMain extends PbxExtensionBase
 
     }
 
+    /**
+     * @param array $data
+     * @return PBXApiResult
+     */
+    public function createContacts(array $data):PBXApiResult
+    {
+        $url = "https://$this->baseDomain/api/v4/contacts";
+        $headers = [
+            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
+        ];
+        $params = [];
+        $phones = [];
+        foreach ($data as $contactData){
+            if(in_array($contactData['phone'], $phones, true)){
+                continue;
+            }
+            $phones[] = $contactData['phone'];
+            $params[] = [
+                'name' => $contactData['phone'],
+                'custom_fields_values' => [
+                    [
+                        'field_code' => 'PHONE',
+                        'values' => [['value' => $contactData['phone']]]
+                    ]
+                ]
+            ];
+        }
+        unset($phones);
+        return $this->sendHttpPostRequest($url, $params, $headers);
+    }
 
     /**
      * Process something received over AsteriskAMI
