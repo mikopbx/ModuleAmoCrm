@@ -1,16 +1,44 @@
 define(function (require) {
   let $ = require('jquery'),
-      connector = require('./mpbx-connector.js?v=1.0.28');
+      connector = require('./mpbx-connector.js?v=1.0.30');
 
   return function () {
     let self = this;
+
+    self.createContact = function (notifications_data){
+      let params = [
+        {
+          "name": notifications_data.number,
+          "created_by": AMOCRM.constant('user').id,
+          "custom_fields_values": [
+            {
+              'field_code': 'PHONE',
+              'values': [
+                {'value': notifications_data.number}
+              ]
+            }
+          ]
+        }
+      ];
+      $.ajax({
+        url:'//' + window.location.host + "/api/v4/contacts",
+        type:"POST",
+        data:JSON.stringify(params),
+        contentType:'application/json;charset=utf-8',
+        success: function(result){
+          if(typeof result._embedded.contacts[0] !== 'undefined'){
+            window.location = '/contacts/detail/'+ result._embedded.contacts[0].id;
+          }
+        }
+      });
+    };
+
     self.findContact = function (notifications_data, callback){
-      $.get('//' + window.location.host + '/private/api/contact_search.php?SEARCH=' + notifications_data.number , function(res) {
+      $.get('//' + window.location.host + '/private/api/contact_search.php?SEARCH=' + notifications_data.number).done(function(res) {
         notifications_data.element = {};
         notifications_data.element.id = $(res).find('contact > id').eq(0).text();
         notifications_data.element.name = $(res).find('contact > name').eq(0).text();
         notifications_data.element.company = $(res).find('contact > company > name').eq(0).text();
-
         callback(notifications_data)
       });
     }
@@ -23,7 +51,6 @@ define(function (require) {
         n_data.text = self.langs.contacts.call_title + ': ' + data.element.name + '. <a data-phone="'+data.number+'" href="/contacts/detail/' + data.element.id + '">'+self.langs.contacts.goto_contact+'</a>';
         n_data.header = '' + self.langs.calls[data.type] + ': ' + data.number + ' ';
       } else {
-        // href="/contacts/add/?phone=' + data.number + '"
         n_data.text = '<a data-phone="'+data.number+'" class="miko-pbx-create-contact-link">'+self.langs.contacts.create_contact+'</a>';
         n_data.header = '' + self.langs.calls[data.type] + ': ' + data.number;
       }
@@ -56,7 +83,16 @@ define(function (require) {
         return true;
       },
       bind_actions: function () {
-        $(document).on('click', '.miko-pbx-create-contact-link', function(){
+        $(document).on(AMOCRM.click_event + self.ns, '.miko-pbx-create-contact-link', function(){
+          self.findContact({'number': $(this).attr('data-phone')}, function(data){
+            if(data.element.id === ''){
+              // Контакт НЕ найден.
+              self.createContact(data);
+            }else{
+              // контакт найден.
+              window.location = '/contacts/detail/'+data.element.id;
+            }
+          })
           console.log($(this));
         });
         return true;
