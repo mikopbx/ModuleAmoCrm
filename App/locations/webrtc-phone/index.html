@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Bootstrap CSS -->
+    <link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <title>Web RTC Phone</title>
+    <link href="css/all.min.css" rel="stylesheet">
+    <link href="css/brands.min.css" rel="stylesheet">
+    <link href="css/regular.min.css" rel="stylesheet">
+    <link href="css/solid.min.css" rel="stylesheet">
+    <style>
+        .m-btn-dial-pad {
+            height: 3.2em;
+            width: 3.2em;
+            border-color: #adb5bd;
+        }
+        .m-max-height {
+            height: 300px;
+        }
+    </style>
+</head>
+<body style="background: rgba(0, 0, 0, 0);">
+
+<div id="web-rtc-phone" class="p-3" style="width: 300px">
+    <nav class="d-none">
+        <div class="nav nav-tabs d-none" id="nav-tab" role="tablist">
+            <button class="nav-link active" id="web-rtc-phone-cdr-tab" aria-controls="web-rtc-phone-cdr" data-bs-target="#web-rtc-phone-cdr" data-bs-toggle="tab" type="button" role="tab" aria-selected="true">CDR</button>
+            <button class="nav-link" id="web-rtc-phone-dial-pad-tab" aria-controls="web-rtc-phone-dial-pad" data-bs-target="#web-rtc-phone-dial-pad" data-bs-toggle="tab" type="button" role="tab" aria-selected="false">Dial pad</button>
+            <button class="nav-link" id="web-rtc-phone-settings-tab" aria-controls="web-rtc-phone-settings" data-bs-target="#web-rtc-phone-settings" data-bs-toggle="tab" type="button" role="tab" aria-selected="false">Settings</button>
+        </div>
+    </nav>
+    <div id="web-rtc-phone-calls" class="tab-content m-max-height ">
+        <div id="web-rtc-phone-cdr" class="tab-pane fade show active m-max-height rounded" role="tabpanel" aria-labelledby="web-rtc-phone-cdr-tab" style="overflow-y: scroll;">
+            <div id="empty-row"></div>
+            <div class="container card m-cdr-card p-3 shadow fw-lighter mt-2">
+                <div class="row">
+                    <div class="col text-start ">
+                        12/27 12:09:19
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col text-start ">
+                        <i class="fa fa-sign-in-alt me-2"></i>000063
+                    </div>
+                    <div class="col text-end">
+                        10 c.
+                    </div>
+                </div>
+                <div class="row">
+                    <div data-callid='miko-pbx-1' class="d-flex flex-row-reverse mt-1">
+                        <button data-action="hangup" class="btn btn-outline-danger rounded ms-1 btn-sm"><i class="fa fa-phone"></i></button>
+                        <button data-action="transfer" class="btn btn-outline-primary rounded ms-1 btn-sm"><i class="fa fa-share-square"></i></button>
+                        <button data-action="card" class="btn btn-outline-dark rounded ms-1 btn-sm"><i class="fa fa-user-tie"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="container card m-cdr-card p-3 shadow fw-lighter mt-2">
+                <div class="row">
+                    <div class="col text-start ">
+                        12/27 12:05:01
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col text-start ">
+                        <i class="fa fa-sign-in-alt me-2"></i>000063
+                    </div>
+                    <div class="col text-end">
+                        5 c.
+                    </div>
+                </div>
+            </div>
+            <div class="container card m-cdr-card p-3 shadow fw-lighter mt-2">
+                <div class="row">
+                    <div class="col text-start ">
+                        12/27 12:05:01
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col text-start ">
+                        <i class="fa fa-sign-in-alt me-2"></i>000063
+                    </div>
+                    <div class="col text-end">
+                        5 c.
+                    </div>
+                </div>
+            </div>
+            <div class="container card m-cdr-card p-3 shadow fw-lighter mt-2">
+                <div class="row">
+                    <div class="col text-start ">
+                        12/27 12:05:01
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col text-start ">
+                        <i class="fa fa-sign-in-alt me-2"></i>000063
+                    </div>
+                    <div class="col text-end">
+                        5 c.
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="web-rtc-phone-dial-pad" class="tab-pane fade container shadow bg-light rounded m-max-height" role="tabpanel" aria-labelledby="web-rtc-phone-dial-pad-tab">
+            <div class="row justify-content-center ">
+                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="1">1</button>
+                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="2">2</button>
+                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="3">3</button>
+            </div>
+            <div class="row justify-content-center">
+                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="4">4</button>
+                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="5" >5</button>
+                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="6" >6</button>
+            </div>
+            <div class="row justify-content-center">
+                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="7" >7</button>
+                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="8" >8</button>
+                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="9" >9</button>
+            </div>
+            <div class="row justify-content-center">
+                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0"  data-digit="*"><i class="fa fa-asterisk"></i></button>
+                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0"  data-digit="0">0</button>
+                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0"  data-digit="#">#</button>
+            </div>
+            <div class="row justify-content-center">
+                <button type="button" class="btn btn-outline-success rounded-circle m-btn-dial-pad m-1 shadow border-0 m-call-button" ><i class="fa fa-phone-alt"></i></button>
+            </div>
+        </div>
+
+        <div id="web-rtc-phone-settings" class="tab-pane fade container shadow bg-light rounded m-max-height fw-lighter pt-3" role="tabpanel" aria-labelledby="web-rtc-phone-settings-tab">
+            <input id="settingHost" type="text" class="form-control form-control-sm mt-2 m-web-rtc-setting" placeholder="hostname, ex. sip.test.ru:8089">
+            <input id="settingUser" type="text" class="form-control form-control-sm mt-2 m-web-rtc-setting" placeholder="username, ex. 201">
+            <input id="settingPassword" type="password" class="form-control form-control-sm mt-2 m-web-rtc-setting" placeholder="password" aria-describedby="password">
+
+            <select id='sslMode' class="form-select form-select-sm fw-lighter mt-2 m-web-rtc-setting" aria-label=".form-select-sm example">
+                <option value="1">Use SSL</option>
+                <option value="0">Without SSL</option>
+            </select>
+
+            <label for="settingVolume" class="form-label mb-0 mt-2">Volume</label>
+            <input type="range" class="form-range m-web-rtc-setting" min="0" max="100" id="settingVolume">
+        </div>
+    </div>
+
+    <div id="web-rtc-phone-buttons" class="input-group shadow mb-2 mt-3 d-none" >
+        <button id='dialPadButton' type="button" class="bg-light btn btn-outline-secondary"><i class="fa fa-th"></i></button>
+        <input  id="numDisplay" type="text" class="form-control" placeholder="Enter number..." aria-label="" aria-describedby="">
+        <button id='settingsButton' type="button" class="bg-light btn btn-outline-secondary"><i class="fa fa-cog"></i></button>
+    </div>
+    <div id="web-rtc-phone-status" class="container card p-2 shadow mt-3 bg-light fw-lighter d-none" >
+        <div class="row">
+            <div id="txtRegStatus" class="col text-start"></div>
+            <div id="txtCallStatus" class="col text-end"></div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript"  src="js/vendors/jquery-3.6.0.min.js" crossorigin="anonymous"></script>
+<script type="text/javascript"  src="js/vendors/moment-with-locales.min.js" crossorigin="anonymous"></script>
+
+<script src="bootstrap/js/bootstrap.bundle.min.js"></script>
+
+<script type="text/javascript"  crossorigin="anonymous">
+    $(document).ready(function() {
+        /* globals $ */
+        setInterval(function (){
+            let calls    = $('#web-rtc-phone-calls');
+            let buttonsH = $('#web-rtc-phone-buttons').height();
+            let statusH  = $('#web-rtc-phone-status').height();
+            let cdr      = $('#web-rtc-phone-cdr');
+
+            let delta    = $('body').height() - buttonsH - statusH - calls.height();
+            let deltaCdr = calls.height() - cdr.height();
+
+            calls.height($( window ).height() - buttonsH - statusH - delta);
+            cdr.height(calls.height() - deltaCdr);
+
+            let rowsheight = 0;
+            $('.m-cdr-card').each(function() {
+               rowsheight += $(this).outerHeight(true);
+            });
+            $('#empty-row').height(calls.outerHeight() - rowsheight);
+        }, 1000);
+
+        let sendMsg = function (msgData){
+            window.parent.postMessage (JSON.stringify(msgData), '*')
+        };
+        window.addEventListener("message", function(event) {
+            sendMsg('Сообщение, отправленное дочерней страницей');
+        });
+
+        $(document).on('click', 'button', function(){
+            if($(this).attr('data-action') === undefined){
+                return;
+            }
+            let params = {
+                'action': $(this).attr('data-action'),
+                'callid': $(this).parent().attr('data-callid')
+            };
+            sendMsg(params);
+        });
+    });
+</script>
+
+</body>
+</html>

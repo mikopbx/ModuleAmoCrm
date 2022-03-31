@@ -1,6 +1,6 @@
 define(function (require) {
   let $ = require('jquery'),
-      connector = require('./mpbx-connector.js?v=1.0.30');
+      connector = require('./mpbx-connector.js?v=1.0.34');
 
   return function () {
     let self = this;
@@ -32,7 +32,6 @@ define(function (require) {
         }
       });
     };
-
     self.findContact = function (notifications_data, callback){
       $.get('//' + window.location.host + '/private/api/contact_search.php?SEARCH=' + notifications_data.number).done(function(res) {
         notifications_data.element = {};
@@ -47,17 +46,17 @@ define(function (require) {
         to: data.to,
         date: Math.ceil(Date.now() / 1000),
       };
+      n_data.header = '' + self.langs.calls[data.type];
       if (data.element.id > 0) {
-        n_data.text = self.langs.contacts.call_title + ': ' + data.element.name + '. <a data-phone="'+data.number+'" href="/contacts/detail/' + data.element.id + '">'+self.langs.contacts.goto_contact+'</a>';
-        n_data.header = '' + self.langs.calls[data.type] + ': ' + data.number + ' ';
+        n_data.text = data.element.name + '<br>'+
+                      '<a data-phone="'+data.number+'" href="/contacts/detail/' + data.element.id + '">'+self.langs.contacts.goto_contact+'</a>';
       } else {
-        n_data.text = '<a data-phone="'+data.number+'" class="miko-pbx-create-contact-link">'+self.langs.contacts.create_contact+'</a>';
-        n_data.header = '' + self.langs.calls[data.type] + ': ' + data.number;
+        n_data.text = '' + data.number + '<br>' +
+                      '<a data-phone="'+data.number+'" class="miko-pbx-create-contact-link">'+self.langs.contacts.create_contact+'</a>';
       }
       self.removeOldNotify(data.number);
       AMOCRM.notifications.add_call(n_data);
     };
-
     self.removeOldNotify = function (phone) {
       $('.miko-pbx-create-contact-link[data-phone="'+phone+'"]').each(function( index ) {
         let id = $( this ).parents(".notification__item.notification-inner").attr('data-id');
@@ -80,6 +79,13 @@ define(function (require) {
       },
       init: function () {
         self.connector = connector(self);
+        self.bootstrap = bootstrap;
+        // let settings = self.get_settings();
+        // let href = settings.path + '/bootstrap/css/bootstrap.min.css?v=' + settings.version;
+        // if ($('link[href="' + href +'"').length < 1) {
+        //   //  Подключаем файл style.css передавая в качестве параметра версию виджета
+        //   $("head").prepend('<link href="'+href+'" type="text/css" rel="stylesheet">');
+        // }
         return true;
       },
       bind_actions: function () {
@@ -93,7 +99,6 @@ define(function (require) {
               window.location = '/contacts/detail/'+data.element.id;
             }
           })
-          console.log($(this));
         });
         return true;
       },

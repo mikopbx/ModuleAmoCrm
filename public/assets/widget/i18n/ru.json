@@ -14,11 +14,11 @@
         "title":"Интеграция с MikoPBX"
     },
     "calls": {
-        "incoming": "Входящий",
-        "outgoing": "Исходящий"
+        "incoming": "Входящий звонок",
+        "outgoing": "Исходящий звонок"
     },
     "contacts": {
-        "goto_contact" : "Перейти в карту контакта",
+        "goto_contact" : "Открыть контакт",
         "create_contact" : "Создать контакт",
         "call_title": "Вам звонит"
     },

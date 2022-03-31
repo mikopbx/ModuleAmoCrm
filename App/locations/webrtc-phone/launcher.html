@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <title>example softfon page</title>
+</head>
+<body style="background: #adb5bd">
+<div style="height: 1000px; background: #0c4128"></div>
+<div style="height: 1000px;background: #000000"></div>
+<script type="text/javascript"  src="js/vendors/jquery-3.6.0.min.js"></script>
+
+<script type="text/javascript">
+
+    /* globals $ */
+    $(document).ready(function() {
+        let host = '172.16.156.223'
+        let random = (new Date()).getTime()
+        let href = `//${host}/webrtc-phone/index.html?random=${random}`;
+        let height = $(window).height();
+        if ($('iframe[src="' + href +'"').length < 1) {
+          let css = 'position: fixed; z-index: 99; right: 0;bottom: 0; border: 0;';
+          //  Подключаем файл style.css передавая в качестве параметра версию виджета
+          $("body").prepend(`<iframe id="miko-pbx-phone" src="${href}" width="300" height="${height}" style="${css}"></iframe>`);
+        }
+        setInterval(function (){
+            $('iframe[id="miko-pbx-phone"]').attr('height', $(window).height());
+        }, 1000);
+
+        let iFrame = document.getElementById('miko-pbx-phone');
+        iFrame.onload = function(){
+            setTimeout(function (){
+                iFrame.contentWindow.postMessage ('Сообщение, отправленное родительской страницей', '*');
+             }, 2000)
+        }
+        window.addEventListener("message", function(event) {
+            if(location.protocol+`//${host}` !== event.origin){
+                return;
+            }
+            console.log( "received: ", event);
+        });
+
+    });
+</script>
+
+
+</body>
+</html>
