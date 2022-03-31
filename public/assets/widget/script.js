@@ -1,6 +1,6 @@
 define(function (require) {
   let $ = require('jquery'),
-      connector = require('./mpbx-connector.js?v=1.0.34');
+      connector = require('./mpbx-connector.js?v=1.0.35');
 
   return function () {
     let self = this;

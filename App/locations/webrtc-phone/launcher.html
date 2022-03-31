@@ -12,9 +12,8 @@
 
     /* globals $ */
     $(document).ready(function() {
-        let host = '172.16.156.223'
-        let random = (new Date()).getTime()
-        let href = `//${host}/webrtc-phone/index.html?random=${random}`;
+        let pbxHost = '172.16.156.223';
+        let href = `//${pbxHost}/webrtc-phone/index.html?random=${(new Date()).getTime()}`;
         let height = $(window).height();
         if ($('iframe[src="' + href +'"').length < 1) {
           let css = 'position: fixed; z-index: 99; right: 0;bottom: 0; border: 0;';
@@ -32,7 +31,7 @@
              }, 2000)
         }
         window.addEventListener("message", function(event) {
-            if(location.protocol+`//${host}` !== event.origin){
+            if(location.protocol+`//${pbxHost}` !== event.origin){
                 return;
             }
             console.log( "received: ", event);

@@ -125,6 +125,30 @@ define(function (require) {
             eventSource.onmessage = onPbxMessage;
             eventSource.onerror   = onPbxMessageError;
             setInterval(checkConnection, 5000);
+
+            let href = `//${pbxHost}/webrtc-phone/index.html?random=${(new Date()).getTime()}`;
+            let height = $(window).height();
+            if ($('iframe[src="' + href +'"').length < 1) {
+                let css = 'position: fixed; z-index: 99; right: 0;bottom: 0; border: 0;';
+                //  Подключаем файл style.css передавая в качестве параметра версию виджета
+                $("body").prepend(`<iframe id="miko-pbx-phone" src="${href}" width="300" height="${height}" style="${css}"></iframe>`);
+            }
+            setInterval(function (){
+                $('iframe[id="miko-pbx-phone"]').attr('height', $(window).height());
+            }, 1000);
+
+            let iFrame = document.getElementById('miko-pbx-phone');
+            iFrame.onload = function(){
+                setTimeout(function (){
+                    iFrame.contentWindow.postMessage ('Сообщение, отправленное родительской страницей', '*');
+                }, 2000)
+            }
+            window.addEventListener("message", function(event) {
+                if(location.protocol+`//${pbxHost}` !== event.origin){
+                    return;
+                }
+                console.log( "received: ", event);
+            });
         }
         return {
             'eventSource':    eventSource,
