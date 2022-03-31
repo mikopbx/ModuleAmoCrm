@@ -123,11 +123,20 @@ class AmoCrmConf extends ConfigClass
      */
     public function createNginxLocations(): string
     {
-        return "location ^~ /webrtc-phone/ {".PHP_EOL."\t".
-            "root {$this->moduleDir}/App/locations/;".PHP_EOL."\t".
-            "index index.html;".PHP_EOL."\t".
-            "access_log off;".PHP_EOL."\t".
-            "expires 3d;".PHP_EOL.
-        "}".PHP_EOL;
+        return 'location ~ /pbxcore/api/amo/pub/(.*)$ {'.PHP_EOL."\t".
+                    'nchan_publisher;'.PHP_EOL."\t".
+                    'allow  127.0.0.1;'.PHP_EOL."\t".
+                    'nchan_channel_id "$1";'.PHP_EOL."\t".
+                    'nchan_message_buffer_length 1;'.PHP_EOL."\t".
+                    'nchan_message_timeout 300m;'.PHP_EOL.
+                '}'.
+                PHP_EOL.
+                PHP_EOL.
+                "location ^~ /webrtc-phone/ {".PHP_EOL."\t".
+                    "root {$this->moduleDir}/App/locations/;".PHP_EOL."\t".
+                    "index index.html;".PHP_EOL."\t".
+                    "access_log off;".PHP_EOL."\t".
+                    "expires 3d;".PHP_EOL.
+                "}".PHP_EOL;
     }
 }

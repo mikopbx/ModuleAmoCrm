@@ -26,7 +26,8 @@ use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 
 class WorkerAmoCrmAMI extends WorkerBase
 {
-    public const CHANNEL_NAME = 'http://127.0.0.1/pbxcore/api/nchan/pub/calls';
+    public const CHANNEL_CALL_NAME = 'http://127.0.0.1/pbxcore/api/nchan/pub/calls';
+    public const CHANNEL_CDR_NAME  = 'http://127.0.0.1/pbxcore/api/nchan/pub/active-calls';
 
     private AmoCrmMain $amoApi;
     private int     $extensionLength = 3;
@@ -91,6 +92,11 @@ class WorkerAmoCrmAMI extends WorkerBase
         $this->am->sendRequestTimeout('Filter', $params);
     }
 
+    /**
+     * Событие для перехвата на ответственного.
+     * @param $data
+     * @return void
+     */
     private function interception($data):void
     {
         $params = [
@@ -101,7 +107,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'did'     => $data['FROM_DID'],
             'action'  => 'interception'
         ];
-        $this->amoApi->sendHttpPostRequest(self::CHANNEL_NAME, $params);
+        $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
     }
 
     /**
@@ -238,7 +244,7 @@ class WorkerAmoCrmAMI extends WorkerBase
                 $this->calls[$call['id']][] = $call;
             }
             $this->activeChannels[$data['src_chan']] = $data['src_num'];
-            $this->amoApi->sendHttpPostRequest(self::CHANNEL_NAME, $call);
+            $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
         }
     }
 
@@ -294,7 +300,7 @@ class WorkerAmoCrmAMI extends WorkerBase
                 'user'    => $userId,
                 'action'  => 'hangup'
             ];
-            $this->amoApi->sendHttpPostRequest(self::CHANNEL_NAME, $params);
+            $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
         }
     }
 
@@ -341,7 +347,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'dst'     => $transferCall['dst'],
             'action'  => 'call'
         ];
-        $this->amoApi->sendHttpPostRequest(self::CHANNEL_NAME, $params);
+        $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
 
         $data = [
             'action'   => 'answer',
@@ -349,7 +355,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'id'       => $data['linkedid'],
             'uid'      => $transferCall['uid'],
         ];
-        $this->amoApi->sendHttpPostRequest(self::CHANNEL_NAME, $data);
+        $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $data);
     }
 
     /**
@@ -389,7 +395,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'user'    => $this->users[$number],
             'action'  => 'create-chan'
         ];
-        $this->amoApi->sendHttpPostRequest(self::CHANNEL_NAME, $params);
+        $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
     }
 
     /**
@@ -413,7 +419,7 @@ class WorkerAmoCrmAMI extends WorkerBase
                 'id'       => $params['linkedid'],
                 'uid'      => $call['uid'],
             ];
-            $this->amoApi->sendHttpPostRequest(self::CHANNEL_NAME, $data);
+            $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $data);
             break;
         }
         unset($call);
@@ -460,7 +466,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'filename'         => $data['recordingfile'],
             'action'           => 'end-call',
         ];
-        $this->amoApi->sendHttpPostRequest(self::CHANNEL_NAME, $call);
+        $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
 
         // Чистим мусор.
         unset(

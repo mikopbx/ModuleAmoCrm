@@ -80,12 +80,6 @@ define(function (require) {
       init: function () {
         self.connector = connector(self);
         self.bootstrap = bootstrap;
-        // let settings = self.get_settings();
-        // let href = settings.path + '/bootstrap/css/bootstrap.min.css?v=' + settings.version;
-        // if ($('link[href="' + href +'"').length < 1) {
-        //   //  Подключаем файл style.css передавая в качестве параметра версию виджета
-        //   $("head").prepend('<link href="'+href+'" type="text/css" rel="stylesheet">');
-        // }
         return true;
       },
       bind_actions: function () {

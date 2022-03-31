@@ -188,7 +188,7 @@
             window.parent.postMessage (JSON.stringify(msgData), '*')
         };
         window.addEventListener("message", function(event) {
-            sendMsg('Сообщение, отправленное дочерней страницей');
+            sendMsg('PONG');
         });
 
         $(document).on('click', 'button', function(){

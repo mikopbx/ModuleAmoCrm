@@ -150,4 +150,17 @@ curl 'https://boffart.ru/pbxcore/api/nchan/sub/calls?token=201' \
 -H 'Pragma: no-cache' -k
 
 curl -k --request POST --data "test message" -H "Accept: text/json" https://172.16.156.223/pbxcore/api/nchan/pub/calls
+
+
+
+curl 'https://127.0.0.1/pbxcore/api/nchan/sub/active-calls?token=test' \
+-X 'GET' \
+-H 'Accept: text/event-stream' \
+-H 'Cache-Control: no-cache' \
+-H 'Origin: null' \
+-H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15' \
+-H 'Pragma: no-cache' -k
+
+curl -k --request POST --data "test message" -H "Accept: text/json" https://172.16.156.223/pbxcore/api/amo/pub/active-calls
+
 */

@@ -40,13 +40,18 @@ class AmoCdrDaemon extends WorkerBase
     private array $users = [];
     public string $referenceDate='';
 
+    private AmoCrmMain $amoApi;
+
     private array $cdrRows = [];
+    private string $lastCacheCdr = '';
 
     /**
      * Начало загрузки истории звонков в Amo.
      */
     public function start($params):void
     {
+        $this->amoApi = new AmoCrmMain();
+
         /** @var ModuleAmoCrm $settings */
         $settings = ModuleAmoCrm::findFirst();
         if($settings){
@@ -60,8 +65,54 @@ class AmoCdrDaemon extends WorkerBase
         $this->connector = new AmoCrmMain();
         [$this->extensionLength, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
         while (true){
+            $this->updateActiveCalls();
             $this->cdrSync();
             sleep(3);
+        }
+    }
+
+    /**
+     * Обновление информации по текущим звонкам в nchan.
+     * @return void
+     */
+    private function updateActiveCalls():void
+    {
+        $params  = [];
+        $cdrData = CDRDatabaseProvider::getCacheCdr();
+        foreach ($cdrData as $cdr){
+            $endTime    = '';
+            $answerTime = '';
+            try {
+                $startTime = date(\DateTimeInterface::ATOM, strtotime($cdr['start']));
+                if(!empty($cdr['answer'])){
+                    $answerTime = date(\DateTimeInterface::ATOM, strtotime($cdr['answer']));
+                }
+                if(!empty($cdr['endtime'])){
+                    $endTime    = date(\DateTimeInterface::ATOM, strtotime($cdr['endtime']));
+                }
+            }catch (\Exception $e){
+                continue;
+            }
+            $params[] = [
+                'start'            => $startTime,
+                'answer'           => $answerTime,
+                'end'              => $endTime,
+                'src'              => $cdr['src_num'],
+                'dst'              => $cdr['dst_num'],
+                'uid'              => $cdr['UNIQUEID'],
+                'id'               => $cdr['linkedid'],
+                'user-src'         => $this->users[$cdr['src_num']]??'',
+                'user-dst'         => $this->users[$cdr['dst_num']]??'',
+                'src-chan'         => $cdr['src_chan'],
+                'dst-chan'         => $cdr['dst_chan'],
+                'action'           => 'CDRs',
+            ];
+        }
+        $md5Cdr = md5(print_r($params, true));
+        if($md5Cdr !== $this->lastCacheCdr){
+            // Оповещаме только если изменилось состояние.
+            $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CDR_NAME, $params);
+            $this->lastCacheCdr = $md5Cdr;
         }
     }
 
