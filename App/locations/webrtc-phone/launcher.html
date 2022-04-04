@@ -7,9 +7,7 @@
 <div style="height: 1000px; background: #0c4128"></div>
 <div style="height: 1000px;background: #000000"></div>
 <script type="text/javascript"  src="js/vendors/jquery-3.6.0.min.js"></script>
-
 <script type="text/javascript">
-
     /* globals $ */
     $(document).ready(function() {
         let pbxHost = '172.16.156.223';
@@ -20,18 +18,60 @@
           //  Подключаем файл style.css передавая в качестве параметра версию виджета
           $("body").prepend(`<iframe id="miko-pbx-phone" src="${href}" width="300" height="${height}" style="${css}"></iframe>`);
         }
-        setInterval(function (){
+        let onResize = function (){
             $('iframe[id="miko-pbx-phone"]').attr('height', $(window).height());
-        }, 1000);
+        }
+        onResize();
+        $(window).resize(onResize);
 
         let iFrame = document.getElementById('miko-pbx-phone');
-        iFrame.onload = function(){
-            setTimeout(function (){
-                iFrame.contentWindow.postMessage ('Сообщение, отправленное родительской страницей', '*');
-             }, 2000)
+        iFrame.onerror = function (){
+            console.log('MikoPBX', 'Error load iframe');
+            $('#miko-pbx-phone').hide();
         }
         window.addEventListener("message", function(event) {
             if(location.protocol+`//${pbxHost}` !== event.origin){
+                return;
+            }
+            if(JSON.parse(event.data) === 'init-done'){
+                console.log('we');
+                let settings = {
+                    currentUser:  2794642,
+                    currentPhone: '201',
+                    pbxHost:      '172.16.156.223',
+                    users:        {
+                        '203': 480711,
+                        '204': 480712
+                    },
+                    token: 'test'
+                };
+                iFrame.contentWindow.postMessage({action: 'connect', data: settings}, '*');
+
+
+                let call = {
+                    start: '1649072434',
+                    number: '79257184254',
+                    call_id: 'mikopbx-123213',
+                    call_type: 'in',
+                    time_unit: 'c.'
+                };
+                iFrame.contentWindow.postMessage({action: 'addCall', data: call}, '*');
+                call = {
+                    start: '1649072434',
+                    number: '79066614140',
+                    contact: 'Инженум',
+                    call_id: 'mikopbx-123214',
+                    call_type: 'out',
+                    time_unit: 'c.'
+                };
+                iFrame.contentWindow.postMessage({action: 'addCall', data: call}, '*');
+                setTimeout(function (){
+                    let call = {
+                        call_id: 'mikopbx-123213'
+                    };
+                    iFrame.contentWindow.postMessage({action: 'delCall', data: call}, '*');
+
+                }, 4000);
                 return;
             }
             console.log( "received: ", event);

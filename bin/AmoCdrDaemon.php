@@ -105,13 +105,12 @@ class AmoCdrDaemon extends WorkerBase
                 'user-dst'         => $this->users[$cdr['dst_num']]??'',
                 'src-chan'         => $cdr['src_chan'],
                 'dst-chan'         => $cdr['dst_chan'],
-                'action'           => 'CDRs',
             ];
         }
         $md5Cdr = md5(print_r($params, true));
         if($md5Cdr !== $this->lastCacheCdr){
             // Оповещаме только если изменилось состояние.
-            $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CDR_NAME, $params);
+            $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CDR_NAME, ['data' => $params, 'action' => 'CDRs']);
             $this->lastCacheCdr = $md5Cdr;
         }
     }

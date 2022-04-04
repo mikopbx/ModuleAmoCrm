@@ -27,7 +27,7 @@ use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 class WorkerAmoCrmAMI extends WorkerBase
 {
     public const CHANNEL_CALL_NAME = 'http://127.0.0.1/pbxcore/api/nchan/pub/calls';
-    public const CHANNEL_CDR_NAME  = 'http://127.0.0.1/pbxcore/api/nchan/pub/active-calls';
+    public const CHANNEL_CDR_NAME  = 'http://127.0.0.1/pbxcore/api/amo/pub/active-calls';
 
     private AmoCrmMain $amoApi;
     private int     $extensionLength = 3;
