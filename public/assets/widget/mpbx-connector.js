@@ -196,4 +196,5 @@ curl 'http//172.16.156.223/pbxcore/api/nchan/sub/calls?token=test' \
 -H 'Pragma: no-cache' -k
 
 
+curl -k --request POST --data "test message" -H "Accept: text/json" https://172.16.156.223/pbxcore/api/amo/pub/active-calls
 */

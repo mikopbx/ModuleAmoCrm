@@ -18,8 +18,8 @@
 
 define(function (require) {
     let $           = require('jquery');
-    let self = undefined;
-    const PubSub = require('pubsub');
+    const PubSub    = require('pubsub');
+    let self        = undefined;
 
     return {
         channels: [],
@@ -54,8 +54,8 @@ define(function (require) {
                 return;
             }
             if(callData.action === 'CDRs'){
+                self.parseCDRs(callData.data)
                 // Обновим таблицу активных линий.
-                PubSub.publish('CALLS', callData.data);
             }else if( callData.action === 'call' && self.settings.currentUser === callData.user && typeof self.channels[callData.uid] === 'undefined'){
                 self.channels[callData.uid] = 1;
                 console.log(callData);
@@ -70,6 +70,32 @@ define(function (require) {
             if(self.eventSource['calls'].readyState !== 1){
                 console.log('Not connected to PBX', self.eventSource);
             }
+        },
+        parseCDRs: function (data){
+            let calls = [], IDs=[];
+            $.each(data, function (i, cdr){
+                let number = '', type = '';
+                if(self.settings.currentUser === cdr['user-src']){
+                    type = 'in';
+                    number = cdr['dst'];
+                }else if(self.settings.currentUser === cdr['user-dst']){
+                    type = 'out';
+                    number = cdr['src'];
+                }else{
+                    return;
+                }
+                let call = {
+                    start:      Math.round((new Date(cdr.start)).getTime()/1000),
+                    number:     number,
+                    call_id:    cdr['uid'],
+                    call_type:  type,
+                    time_unit: 'c.'
+                };
+                calls.push(call);
+                IDs.push(cdr['uid']);
+            });
+            PubSub.publish('CALLS', {action: 'CDRs', 'data': calls, 'IDs': IDs});
         }
+
     };
 });

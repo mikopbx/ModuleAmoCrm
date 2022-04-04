@@ -2,7 +2,7 @@ define(function (require) {
     let $           = require('jquery');
     let Twig        = require('twig');
     let connector   = require('connector');
-    const PubSub = require('pubsub');
+    const PubSub    = require('pubsub');
     let self   = undefined;
 
     return {
@@ -75,8 +75,17 @@ define(function (require) {
             self.sendMessage('init-done');
 
             // create a function to subscribe to topics
-            self.token = PubSub.subscribe('CALLS', function (msg, data) {
-                console.log( msg, data );
+            self.token = PubSub.subscribe('CALLS', function (msg, message) {
+                if(message.action === 'CDRs'){
+                    $('#web-rtc-phone .m-cdr-card').each(function (index, element) {
+                        if($.inArray( $(element).attr('data-callid'), message.IDs ) < 0){
+                            $(element).remove();
+                        }
+                    });
+                    $.each(message.data, function (i, cdr){
+                        self.addCall({data: cdr});
+                    });
+                }
             });
         },
         sendMessage: function (msgData){

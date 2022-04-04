@@ -46,32 +46,6 @@
                     token: 'test'
                 };
                 iFrame.contentWindow.postMessage({action: 'connect', data: settings}, '*');
-
-
-                let call = {
-                    start: '1649072434',
-                    number: '79257184254',
-                    call_id: 'mikopbx-123213',
-                    call_type: 'in',
-                    time_unit: 'c.'
-                };
-                iFrame.contentWindow.postMessage({action: 'addCall', data: call}, '*');
-                call = {
-                    start: '1649072434',
-                    number: '79066614140',
-                    contact: 'Инженум',
-                    call_id: 'mikopbx-123214',
-                    call_type: 'out',
-                    time_unit: 'c.'
-                };
-                iFrame.contentWindow.postMessage({action: 'addCall', data: call}, '*');
-                setTimeout(function (){
-                    let call = {
-                        call_id: 'mikopbx-123213'
-                    };
-                    iFrame.contentWindow.postMessage({action: 'delCall', data: call}, '*');
-
-                }, 4000);
                 return;
             }
             console.log( "received: ", event);

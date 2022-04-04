@@ -247,7 +247,7 @@ class AmoCrmMain extends PbxExtensionBase
     private function parseResponse($resultHttp, $message, $code):PBXAmoResult
     {
         $res = new PBXAmoResult();
-        if( ($code === 200 || $resultHttp->getReasonPhrase() === 'Accepted') && isset($resultHttp)){
+        if( isset($resultHttp) && ($code === 200 || $resultHttp->getReasonPhrase() === 'Accepted')){
             $content = $resultHttp->getBody()->getContents();
             $data    = [];
             try {
