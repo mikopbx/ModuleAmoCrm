@@ -37,7 +37,6 @@ define(function (require) {
             }
         },
         connect: function (settings){
-            console.log('start init');
             connector.init(settings.data);
         },
         addCall: function (event){
@@ -50,6 +49,10 @@ define(function (require) {
             let html = template.render(event.data);
             $("#web-rtc-phone-cdr").append(html)
             self.resize();
+        },
+        answerCall:function (event){
+            let element = $('#web-rtc-phone .m-cdr-card[data-callid="'+event.data.call_id+'"]');
+            element.attr('data-answer', event.data.answer);
         },
         delCall: function (event){
             $('#web-rtc-phone .m-cdr-card[data-callid="'+event.data.call_id+'"]').remove();
@@ -85,6 +88,12 @@ define(function (require) {
                     $.each(message.data, function (i, cdr){
                         self.addCall({data: cdr});
                     });
+                }else if(message.action === 'addCall'){
+                    self.addCall({data: message.data});
+                }else if(message.action === 'delCall'){
+                    self.delCall({data: message.data});
+                }else if(message.action === 'answerCall'){
+                    self.answerCall({data: message.data});
                 }
             });
         },
@@ -93,7 +102,10 @@ define(function (require) {
         },
         updateDuration: function (){
             $('#web-rtc-phone .m-cdr-card').each(function (index, element) {
-                let duration = Math.round((new Date()).getTime()/1000) - $(element).attr('data-start');
+                if($(element).attr('data-answer') === ''){
+                    return;
+                }
+                let duration = Math.round((new Date()).getTime()/1000) - $(element).attr('data-answer');
                 $(element).find('[data-type="duration"]').text(duration + ' ' + $(element).attr('data-time-unit'));
             })
         }

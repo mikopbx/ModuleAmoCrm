@@ -26,7 +26,7 @@
 
         let iFrame = document.getElementById('miko-pbx-phone');
         iFrame.onerror = function (){
-            console.log('MikoPBX', 'Error load iframe');
+            console.debug('MikoPBX', 'Error load iframe');
             $('#miko-pbx-phone').hide();
         }
         window.addEventListener("message", function(event) {
@@ -34,7 +34,6 @@
                 return;
             }
             if(JSON.parse(event.data) === 'init-done'){
-                console.log('we');
                 let settings = {
                     currentUser:  2794642,
                     currentPhone: '201',
@@ -43,12 +42,13 @@
                         '203': 480711,
                         '204': 480712
                     },
-                    token: 'test'
+                    token: 'test',
+                    time_unit: 'c.'
                 };
                 iFrame.contentWindow.postMessage({action: 'connect', data: settings}, '*');
                 return;
             }
-            console.log( "received: ", event);
+            console.debug( "received: ", event);
         });
 
     });

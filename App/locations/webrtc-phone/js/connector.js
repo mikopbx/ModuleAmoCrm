@@ -29,12 +29,18 @@ define(function (require) {
             currentPhone: '',
             pbxHost:      '',
             users:        [],
-            token:        ''
+            token:        '',
+            time_unit:    ''
         },
         currentPhone: '',
         init: function (settings){
             self = this;
-            self.settings = settings;
+            $.each(settings, function (key, value){
+                if(typeof self.settings[key] === 'undefined'){
+                    return;
+                }
+                self.settings[key] = value;
+            });
             self.initEventSource('calls');
             self.initEventSource('active-calls');
             setInterval(self.checkConnection, 5000);
@@ -58,28 +64,34 @@ define(function (require) {
                 // Обновим таблицу активных линий.
             }else if( callData.action === 'call' && self.settings.currentUser === callData.user && typeof self.channels[callData.uid] === 'undefined'){
                 self.channels[callData.uid] = 1;
-                console.log(callData);
+                self.parseCallEvent(callData);
+            }else if( callData.action === 'answer' && typeof self.channels[callData.uid] !== 'undefined'){
+                PubSub.publish('CALLS', {action: 'answerCall', 'data': {call_id: callData.uid, answer: (new Date(callData.date)).getTime()/1000 }});
             }else if(callData.action === 'hangup'){
                 delete self.channels[callData.uid];
+                PubSub.publish('CALLS', {action: 'delCall', 'data': {call_id: callData.uid}});
             }
         },
         onPbxMessageError: function(event) {
-            console.log("Error", event);
+            console.debug("Error", event);
         },
         checkConnection: function(){
             if(self.eventSource['calls'].readyState !== 1){
-                console.log('Not connected to PBX', self.eventSource);
+                console.debug('Not connected to PBX', self.eventSource);
             }
         },
         parseCDRs: function (data){
             let calls = [], IDs=[];
             $.each(data, function (i, cdr){
+                if(cdr.end !== ''){
+                    return;
+                }
                 let number = '', type = '';
                 if(self.settings.currentUser === cdr['user-src']){
-                    type = 'in';
+                    type = 'out';
                     number = cdr['dst'];
                 }else if(self.settings.currentUser === cdr['user-dst']){
-                    type = 'out';
+                    type = 'in';
                     number = cdr['src'];
                 }else{
                     return;
@@ -89,13 +101,31 @@ define(function (require) {
                     number:     number,
                     call_id:    cdr['uid'],
                     call_type:  type,
-                    time_unit: 'c.'
+                    time_unit: 'c.',
+                    answered:  (cdr.answer === '')?'':Math.round((new Date(cdr.answer)).getTime()/1000)
                 };
                 calls.push(call);
                 IDs.push(cdr['uid']);
             });
             PubSub.publish('CALLS', {action: 'CDRs', 'data': calls, 'IDs': IDs});
+        },
+        parseCallEvent: function (data){
+            let number, type;
+            if(self.settings.currentPhone === data.src){
+                type = 'out';
+                number = data['dst'];
+            }else{
+                type = 'in'
+                number = data['src'];
+            }
+            let call = {
+                start:      Math.round((new Date(data.date)).getTime()/1000),
+                number:     number,
+                call_id:    data['uid'],
+                call_type:  type,
+                time_unit:  self.settings.time_unit
+            };
+            PubSub.publish('CALLS', {action: 'addCall', 'data': call});
         }
-
     };
 });
