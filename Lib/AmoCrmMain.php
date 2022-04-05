@@ -5,6 +5,8 @@ namespace Modules\ModuleAmoCrm\Lib;
 use GuzzleHttp;
 use GuzzleHttp\Exception\GuzzleException;
 use MikoPBX\Common\Models\LanInterfaces;
+use MikoPBX\Common\Providers\CDRDatabaseProvider;
+use MikoPBX\Core\Asterisk\AsteriskManager;
 use MikoPBX\Core\System\Processes;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\Cron\WorkerSafeScriptsCore;
@@ -15,6 +17,7 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Common\Models\PbxSettings;
+use Phabel\Exception;
 use Throwable;
 
 class AmoCrmMain extends PbxExtensionBase
@@ -145,6 +148,31 @@ class AmoCrmMain extends PbxExtensionBase
         return $res;
     }
 
+    public function invokeCommand(array $request):PBXAmoResult
+    {
+        $res = new PBXAmoResult();
+        $action = $request['data']['action']??'';
+        if($action === 'hangup'){
+            $cdrData = CDRDatabaseProvider::getCacheCdr();
+            try {
+                $am = Util::getAstManager('off');
+            }catch (\Exception $e){
+                return $res;
+            }
+            foreach ($cdrData as $cdr){
+                if($cdr['UNIQUEID'] !== $request['data']['data']['call-id']){
+                    continue;
+                }
+                if($request['data']['data']['user-phone'] === $cdr['src_num']){
+                    $channel = $cdr['src_chan'];
+                }else{
+                    $channel = $cdr['dst_chan'];
+                }
+                $am->Hangup($channel);
+            }
+        }
+        return $res;
+    }
     /**
      * Обработка второго этапа авторизации, ответ от 3ей стороны.
      * @param array $request

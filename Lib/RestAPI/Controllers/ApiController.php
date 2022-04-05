@@ -27,6 +27,11 @@ class ApiController extends ModulesControllerBase
         $this->evalFunction('listener');
     }
 
+    public function commandAction():void
+    {
+        $this->evalFunction('command');
+    }
+
     public function changeSettingsAction():void
     {
         $this->evalFunction('change-settings');

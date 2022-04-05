@@ -67,6 +67,7 @@ class AmoCrmConf extends ConfigClass
             [ApiController::class, 'callAction',     '/pbxcore/api/amo-crm/v1/callback', 'post', '/', true],
             [ApiController::class, 'listenerAction', '/pbxcore/api/amo-crm/v1/listener', 'post', '/', true],
             [ApiController::class, 'listenerAction', '/pbxcore/api/amo-crm/v1/listener', 'get', '/', true],
+            [ApiController::class, 'commandAction', '/pbxcore/api/amo-crm/v1/command', 'post', '/', true],
             [CdrGetController::class, 'playbackAction',  '/pbxcore/api/amo-crm/playback', 'get', '/', true],
             [ApiController::class, 'changeSettingsAction', '/pbxcore/api/amo-crm/v1/change-settings', 'post', '/', true],
         ];
@@ -92,6 +93,11 @@ class AmoCrmConf extends ConfigClass
             case 'LISTENER':
                 $amo = new AmoCrmMain();
                 $res          = $amo->processRequest($request);
+                $res->success = true;
+                break;
+            case 'COMMAND':
+                $amo = new AmoCrmMain();
+                $res          = $amo->invokeCommand($request);
                 $res->success = true;
                 break;
             case 'CALLBACK':
