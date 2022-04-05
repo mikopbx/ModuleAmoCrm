@@ -1,9 +1,10 @@
 define(function (require) {
-    let $           = require('jquery');
-    let Twig        = require('twig');
-    let connector   = require('connector');
+    const $         = require('jquery');
+    const Twig      = require('twig');
+    const connector = require('connector');
     const PubSub    = require('pubsub');
-    let self   = undefined;
+    const cache     = require('cache');
+    let   self      = undefined;
 
     return {
         hide: function (){
@@ -11,6 +12,14 @@ define(function (require) {
         },
         show: function (){
             $('#web-rtc-phone').removeClass('invisible');
+        },
+        updateContact: function (event){
+            cache.flush();
+            cache.set('phone:'+event.data.number, event.data.contact, { ttl: 300 });
+            $('#web-rtc-phone div.m-contact-name[data-phone="'+event.data.number+'"]').each(function() {
+                $(this).text(event.data.contact);
+                $(this).attr('data-contact-id', event.data.id);
+            });
         },
         resize: function() {
             let calls    = $('#web-rtc-phone-calls');
@@ -31,15 +40,21 @@ define(function (require) {
             $('#empty-row').height(calls.outerHeight() - rowsHeight);
         },
         onGetEvent: function (event){
-            self.sendMessage('PING');
             if(typeof self[event.originalEvent.data.action] !== 'undefined'){
                 self[event.originalEvent.data.action](event.originalEvent.data);
             }
         },
-        connect: function (settings){
-            connector.init(settings.data);
+        connect: function (event){
+            connector.init(event.data);
         },
         addCall: function (event){
+            let contact = cache.get('phone:'+event.data.number);
+            if(contact !== null){
+                event.data.contact = contact;
+            }else if(cache.get('find:'+event.data.number) === null){
+                cache.set('find:'+event.data.number, '1', { ttl: 5 });
+                self.sendMessage({action: 'findContact', number: event.data.number});
+            }
             let template = Twig.twig({
                 data: $('#active-call-twig').html()
             });
@@ -67,11 +82,21 @@ define(function (require) {
                 if($(this).attr('data-action') === undefined){
                     return;
                 }
-                let params = {
-                    'action': $(this).attr('data-action'),
-                    'callid': $(this).parents('.m-cdr-card').attr('data-callid')
-                };
-                self.sendMessage(params);
+                let params;
+                if($(this).attr('data-action') === 'card'){
+                    params = {
+                        number: $(this).parents('.m-cdr-card').find('.m-contact-name').attr('data-phone'),
+                        id: $(this).parents('.m-cdr-card').find('.m-contact-name').attr('data-contact-id')
+                    };
+                    self.sendMessage({action: 'openCard', data: params});
+                }else{
+                    params = {
+                        'call-id': $(this).parents('.m-cdr-card').attr('data-callid'),
+                        'user-id': $(this).parents('.m-cdr-card').attr('data-user-id'),
+                        'user-phone': $(this).parents('.m-cdr-card').attr('data-user-phone')
+                    };
+                    PubSub.publish('COMMAND', {action: $(this).attr('data-action'), 'data': params});
+                }
             });
 
             setInterval(self.updateDuration, 1000);

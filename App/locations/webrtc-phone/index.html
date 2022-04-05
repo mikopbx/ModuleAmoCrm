@@ -78,9 +78,15 @@
 </div>
 
 <div id="active-call-twig" class="d-none">
-    <div data-callid='{{ call_id }}' data-start="{{ start }}" data-time-unit="{{ time_unit }}" data-answer="{{ answered }}" class="container card m-cdr-card p-3 shadow fw-lighter mt-2">
+    <div data-callid='{{ call_id }}'
+         data-start="{{ start }}"
+         data-time-unit="{{ time_unit }}"
+         data-answer="{{ answered }}"
+         data-user-id="{{ user }}"
+         data-user-phone="{{ user_phone }}"
+         class="container card m-cdr-card p-3 shadow fw-lighter mt-2">
         <div class="row">
-            <div class="col text-start fw-bold text-primary">
+            <div class="col text-start fw-bold text-primary m-contact-name" data-phone="{{ number }}" data-contact-id="">
                 {{ contact }}
             </div>
         </div>
@@ -94,7 +100,7 @@
         <div class="row">
             <div class="d-flex flex-row-reverse mt-1">
                 <button data-action="hangup" class="btn btn-outline-danger rounded ms-1 btn-sm"><i class="fa fa-phone"></i></button>
-                <button data-action="transfer" class="btn btn-outline-primary rounded ms-1 btn-sm"><i class="fa fa-share-square"></i></button>
+<!--                <button data-action="transfer" class="btn btn-outline-primary rounded ms-1 btn-sm"><i class="fa fa-share-square"></i></button>-->
                 <button data-action="card" class="btn btn-outline-dark rounded ms-1 btn-sm"><i class="fa fa-user-tie"></i></button>
             </div>
         </div>

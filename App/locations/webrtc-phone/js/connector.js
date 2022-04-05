@@ -44,6 +44,13 @@ define(function (require) {
             self.initEventSource('calls');
             self.initEventSource('active-calls');
             setInterval(self.checkConnection, 5000);
+
+            self.token = PubSub.subscribe('COMMAND', function (msg, message) {
+                message.token = self.settings.token;
+                $.post(`${window.location.origin}/pbxcore/api/amo-crm/v1/command`, message, function( data ) {
+                    console.log('result', data);
+                });
+            });
         },
         initEventSource: function (chan){
             self.eventSource[chan] = new EventSource(`${window.location.origin}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`, {
@@ -100,6 +107,8 @@ define(function (require) {
                     start:      Math.round((new Date(cdr.start)).getTime()/1000),
                     number:     number,
                     call_id:    cdr['uid'],
+                    user_phone: self.settings.currentPhone,
+                    user:       self.settings.currentUser,
                     call_type:  type,
                     time_unit: 'c.',
                     answered:  (cdr.answer === '')?'':Math.round((new Date(cdr.answer)).getTime()/1000)
@@ -122,6 +131,8 @@ define(function (require) {
                 start:      Math.round((new Date(data.date)).getTime()/1000),
                 number:     number,
                 call_id:    data['uid'],
+                user:       self.settings.currentUser,
+                user_phone: self.settings.currentPhone,
                 call_type:  type,
                 time_unit:  self.settings.time_unit
             };

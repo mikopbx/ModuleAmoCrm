@@ -33,7 +33,8 @@
             if(location.protocol+`//${pbxHost}` !== event.origin){
                 return;
             }
-            if(JSON.parse(event.data) === 'init-done'){
+            let data = JSON.parse(event.data);
+            if(data === 'init-done'){
                 let settings = {
                     currentUser:  2794642,
                     currentPhone: '201',
@@ -47,6 +48,10 @@
                 };
                 iFrame.contentWindow.postMessage({action: 'connect', data: settings}, '*');
                 return;
+            }else if(data.action === 'findContact'){
+                iFrame.contentWindow.postMessage({action: 'updateContact', data: {number: data.number, contact: 'МИКО ООО', id: '23233'} }, '*');
+            }else if(data.action === 'openCard'){
+                // Открыть карточку клиента.
             }
             console.debug( "received: ", event);
         });

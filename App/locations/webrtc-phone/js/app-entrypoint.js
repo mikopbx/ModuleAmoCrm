@@ -24,6 +24,7 @@ requirejs.config({
         moment:     'vendors/moment-with-locales.min',
         twig:       'vendors/twig.min',
         pubsub:     'vendors/pubsub.min',
+        cache:      'vendors/localstorage-slim',
         bootstrap:  '../bootstrap/js/bootstrap.bundle.min',
     }
 });
