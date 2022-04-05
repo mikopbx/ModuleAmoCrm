@@ -95,6 +95,7 @@ define(function (require) {
                     self.sendMessage({action: 'openCard', data: params});
                 }else{
                     params = {
+                        'action': $(this).attr('data-action'),
                         'call-id': $(this).parents('.m-cdr-card').attr('data-callid'),
                         'user-id': $(this).parents('.m-cdr-card').attr('data-user-id'),
                         'user-phone': $(this).parents('.m-cdr-card').attr('data-user-phone')

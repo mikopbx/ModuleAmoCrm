@@ -136,12 +136,12 @@ class AmoCrmMain extends PbxExtensionBase
         $users = $request['data']['users']??[];
         if(is_array($users)){
             foreach ($users as $amoUserId => $number){
-                $dbData = ModuleAmoUsers::findFirst("number='$number'");
+                $dbData = ModuleAmoUsers::findFirst("amoUserId='$amoUserId'");
                 if(!$dbData){
                     $dbData = new ModuleAmoUsers();
-                    $dbData->number = $number;
+                    $dbData->amoUserId = $amoUserId;
                 }
-                $dbData->amoUserId = $amoUserId;
+                $dbData->number = trim($number);
                 $dbData->save();
             }
         }
@@ -345,7 +345,7 @@ class AmoCrmMain extends PbxExtensionBase
      * @return PBXAmoResult
      * @throws \Exception
      */
-    public function callAction($params){
+    public function callbackAction($params){
         $res = new PBXAmoResult();
         $dst = preg_replace("/[^0-9+]/", '', $params['number']);
         Util::amiOriginate($params['user-number'], '', $dst);
