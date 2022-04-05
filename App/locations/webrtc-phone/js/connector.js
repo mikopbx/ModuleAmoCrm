@@ -47,8 +47,16 @@ define(function (require) {
 
             self.token = PubSub.subscribe('COMMAND', function (msg, message) {
                 message.token = self.settings.token;
-                $.post(`${window.location.origin}/pbxcore/api/amo-crm/v1/command`, message, function( data ) {
-                    console.log('result', data);
+                let url;
+                if(message.action === 'saveSettings'){
+                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/change-settings`;
+                }else if(message.action === 'callback'){
+                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/callback`;
+                }else{
+                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/command`;
+                }
+                $.post(url, message.data, function( response ) {
+                    console.log('result', response);
                 });
             });
         },

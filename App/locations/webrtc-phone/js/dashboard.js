@@ -21,6 +21,9 @@ define(function (require) {
                 $(this).attr('data-contact-id', event.data.id);
             });
         },
+        pbxAction: function (event){
+            PubSub.publish('COMMAND', {action: event.data.action, 'data': event.data});
+        },
         resize: function() {
             let calls    = $('#web-rtc-phone-calls');
             let buttonsH = $('#web-rtc-phone-buttons').height();
@@ -32,7 +35,6 @@ define(function (require) {
 
             calls.height($( window ).height() - buttonsH - statusH - delta);
             cdr.height(calls.height() - deltaCdr);
-
             let rowsHeight = 0;
             $('.m-cdr-card').each(function() {
                 rowsHeight += $(this).outerHeight(true);
@@ -42,6 +44,8 @@ define(function (require) {
         onGetEvent: function (event){
             if(typeof self[event.originalEvent.data.action] !== 'undefined'){
                 self[event.originalEvent.data.action](event.originalEvent.data);
+            }else{
+                self.pbxAction(event.originalEvent);
             }
         },
         connect: function (event){

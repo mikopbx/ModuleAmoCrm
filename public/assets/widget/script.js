@@ -1,10 +1,11 @@
 define(function (require) {
-  let $ = require('jquery'),
-      connector = require('./mpbx-connector.js?v=1.0.35');
+  const connector = require('./mpbx-connector.js?v=1.0.39');
+  const $         = require('jquery');
+  const PubSub    = require('pubsub');
+  let   self;
 
   return function () {
-    let self = this;
-
+    self = this;
     self.createContact = function (notifications_data){
       let params = [
         {
@@ -60,7 +61,6 @@ define(function (require) {
     self.removeOldNotify = function (phone) {
       $('.miko-pbx-create-contact-link[data-phone="'+phone+'"]').each(function( index ) {
         let id = $( this ).parents(".notification__item.notification-inner").attr('data-id');
-
         $.ajax({
           url:'//' + window.location.host + "/v3/inbox/delete",
           type:"POST",
@@ -73,13 +73,42 @@ define(function (require) {
       });
     };
 
+    self.getUserPhone = function (user){
+      let phone        = '';
+      let settings     = self.get_settings();
+      let phones       = settings.pbx_users || false;
+      if (typeof phones == 'string') {
+        phones = phones ? $.parseJSON(phones) : false;
+      }
+      if (phones && typeof phones[user] !== 'undefined') {
+        phone = phones[user];
+      }
+      return phone;
+    };
+
+    self.onClickPhone = function (params) {
+      let settings     = self.get_settings();
+      let current_user = AMOCRM.constant('user').id;
+      let host         = settings.miko_pbx_host || false;
+      let userPhone    = self.getUserPhone(current_user);
+      if (host && userPhone !== '') {
+        let postParams = {
+          'action':       'callback',
+          'number':       params.value,
+          'user-number':  userPhone,
+          'user-id':      current_user
+        };
+        PubSub.publish(self.ns + ':connector', postParams);
+      }
+    };
+
     this.callbacks = {
       render: function () {
         return true;
       },
       init: function () {
         self.connector = connector(self);
-        self.bootstrap = bootstrap;
+        self.add_action("phone", self.onClickPhone);
         return true;
       },
       bind_actions: function () {
@@ -100,7 +129,11 @@ define(function (require) {
         return true;
       },
       onSave: function () {
-        self.connector.onSaveSettings();
+        let phones = self.get_settings().pbx_users || false;
+        if (typeof phones == 'string') {
+          phones = phones ? $.parseJSON(phones) : false;
+        }
+        PubSub.publish(self.ns + ':connector', {'users': phones, action: 'saveSettings'});
         return true;
       },
       destroy: function () {

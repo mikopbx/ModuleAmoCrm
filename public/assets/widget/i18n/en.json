@@ -8,7 +8,9 @@
     },
     "settings":{
         "host": "MikoPBX address",
-        "users": "PBX users"
+        "users": "PBX users",
+        "token": "Token",
+        "time_unit": "s."
     },
     "advanced":{
         "title":"Settings menu item title"

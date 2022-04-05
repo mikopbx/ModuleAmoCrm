@@ -8,7 +8,9 @@
     },
     "settings":{
         "host": "Адрес сервера MikoPBX",
-        "users": "Пользователи АТС"
+        "users": "Пользователи АТС",
+        "token": "Токен",
+        "time_unit": "с."
     },
     "advanced":{
         "title":"Интеграция с MikoPBX"

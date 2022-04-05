@@ -3,7 +3,7 @@
     "name": "widget.name",
     "description": "widget.description",
     "short_description": "widget.short_description",
-    "version": "1.0.35",
+    "version": "1.0.39",
     "interface_version": 2,
     "init_once": true,
     "locale": [
@@ -38,6 +38,11 @@
       "name": "settings.users",
       "type": "users",
       "required": false
+    },
+    "token": {
+      "name": "settings.token",
+      "type": "text",
+      "required": true
     }
   }
 }

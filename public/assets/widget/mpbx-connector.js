@@ -19,65 +19,10 @@
 /* global define, AMOCRM */
 
 define(function (require) {
-    let self = null;
-    let $ = require('jquery');
-    let eventSource = null;
-    let channels = {};
-
-    let onPbxMessage = function(event) {
-        let currentUser = AMOCRM.constant('user').id;
-        let callData = $.parseJSON(event.data);
-        let n_data = null;
-
-        if( callData.action === 'call' && currentUser === callData.user && typeof channels[callData.uid] === 'undefined'){
-            channels[callData.uid] = 1;
-            let phone = getUserPhone(currentUser);
-            if(phone === callData.src){
-                n_data = {
-                    to: AMOCRM.constant('user').name,
-                    number: callData.dst,
-                    type: 'outgoing'
-                };
-            }else{
-                n_data = {
-                    to: AMOCRM.constant('user').name,
-                    number: callData.src,
-                    type: 'incoming'
-                };
-            }
-            self.findContact(n_data, self.addCallNotify);
-        }else if(callData.action === 'hangup'){
-            delete channels[callData.uid];
-        }
-    };
-    let onPbxMessageError = function(event) {
-        console.log("Error", event);
-    };
-    let checkConnection = function(){
-        if(eventSource.readyState !== 1){
-            console.log('Not connected to PBX', self.eventSource);
-        }
-    };
-
-    let onSaveSettings = function () {
-        let settings     = self.get_settings();
-        let phones       = settings.pbx_users || false;
-        let host         = settings.miko_pbx_host || false;
-        if (typeof phones == 'string') {
-            phones = phones ? $.parseJSON(phones) : false;
-        }
-        if (host && phones) {
-            let postParams = {
-                'users': phones,
-            };
-            $.post(`https://${host}/pbxcore/api/amo-crm/v1/change-settings`, postParams, function( data ) {
-                console.log('result', data);
-            });
-        }else {
-            // Вывести сообщение ош ошибке. self.langs
-        }
-        return true;
-    };
+    let self    = null;
+    let $       = require('jquery');
+    const PubSub= require('pubsub');
+    let pbxHost, iFrame;
 
     let getUserPhone = function (user){
         let phone        = '';
@@ -92,68 +37,59 @@ define(function (require) {
         return phone;
     }
 
-    let onClickPhone = function (params) {
-        let settings     = self.get_settings();
-        let current_user = AMOCRM.constant('user').id;
-        let host         = settings.miko_pbx_host || false;
-        let userPhone = getUserPhone(current_user);
-        if (host && userPhone !== '') {
-            let postParams = {
-                'action': 'call',
-                'number': params.value,
-                'user-number': userPhone,
-                'user-id': current_user
-            };
-            $.post(`https://${host}/pbxcore/api/amo-crm/v1/callback`, postParams, function( data ) {
-                console.log('result', data);
-            });
-        }else {
-            // Вывести сообщение ош ошибке. self.langs
+    let onResize = function (){
+        $('iframe[id="miko-pbx-phone"]').attr('height', $(window).height());
+    }
+
+    let onMessage = function(event) {
+        if(location.protocol+`//${pbxHost}` !== event.origin){
+            return;
         }
+        let data = JSON.parse(event.data);
+        if(data === 'init-done'){
+            let settings = {
+                currentUser:  AMOCRM.constant('user').id,
+                currentPhone: getUserPhone(AMOCRM.constant('user').id),
+                pbxHost:      pbxHost,
+                users:        self.get_settings().pbx_users,
+                token:        self.get_settings().token,
+                time_unit:    self.i18n('settings.time_unit')
+            };
+            iFrame.contentWindow.postMessage({action: 'connect', data: settings}, '*');
+            return;
+        }else if(data.action === 'findContact'){
+            iFrame.contentWindow.postMessage({action: 'updateContact', data: {number: data.number, contact: 'МИКО ООО', id: '23233'} }, '*');
+        }else if(data.action === 'openCard'){
+            // Открыть карточку клиента.
+        }
+        console.debug( "received: ", event);
     };
 
     return function(context) {
         if (!self && context) {
             self = context;
         }
-        self.add_action("phone", onClickPhone);
-        let pbxHost = self.get_settings().miko_pbx_host || false;
+        pbxHost = self.get_settings().miko_pbx_host || false;
         if(pbxHost){
-            eventSource = new EventSource(`https://${pbxHost}/pbxcore/api/nchan/sub/calls?token=test`, {
-                withCredentials: false
-            });
-            eventSource.onmessage = onPbxMessage;
-            eventSource.onerror   = onPbxMessageError;
-            setInterval(checkConnection, 5000);
-
             let href = `//${pbxHost}/webrtc-phone/index.html?random=${(new Date()).getTime()}`;
-            let height = $(window).height();
             if ($('iframe[src="' + href +'"').length < 1) {
                 let css = 'position: fixed; z-index: 99; right: 0;bottom: 0; border: 0;';
                 //  Подключаем файл style.css передавая в качестве параметра версию виджета
-                $("body").prepend(`<iframe id="miko-pbx-phone" src="${href}" width="300" height="${height}" style="${css}"></iframe>`);
+                $("body").prepend(`<iframe id="miko-pbx-phone" src="${href}" width="300" height="${$(window).height()}" style="${css}"></iframe>`);
             }
-            setInterval(function (){
-                $('iframe[id="miko-pbx-phone"]').attr('height', $(window).height());
-            }, 1000);
-
-            let iFrame = document.getElementById('miko-pbx-phone');
-            iFrame.onload = function(){
-                setTimeout(function (){
-                    iFrame.contentWindow.postMessage ('Сообщение, отправленное родительской страницей', '*');
-                }, 2000)
+            onResize();
+            $(window).resize(onResize);
+            iFrame = document.getElementById('miko-pbx-phone');
+            iFrame.onerror = function (){
+                console.debug('MikoPBX', 'Error load iframe');
+                $('#miko-pbx-phone').hide();
             }
-            window.addEventListener("message", function(event) {
-                if(location.protocol+`//${pbxHost}` !== event.origin){
-                    return;
-                }
-                console.log( "received: ", event);
-            });
+            window.addEventListener("message", onMessage);
         }
-        return {
-            'eventSource':    eventSource,
-            'onSaveSettings': onSaveSettings,
-        };
+        PubSub.subscribe(self.ns + ':connector', function (msg, message) {
+            iFrame.contentWindow.postMessage(message, '*');
+        });
+        return {};
     };
 });
 
