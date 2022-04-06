@@ -1,5 +1,5 @@
 define(function (require) {
-  const connector = require('./mpbx-connector.js?v=1.0.39');
+  const connector = require('./mpbx-connector.js?v=1.0.41');
   const $         = require('jquery');
   const PubSub    = require('pubsub');
   let   self;

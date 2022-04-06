@@ -160,15 +160,16 @@ class AmoCrmMain extends PbxExtensionBase
                 return $res;
             }
             foreach ($cdrData as $cdr){
-                if($cdr['UNIQUEID'] !== $request['data']['data']['call-id']){
+                if($cdr['UNIQUEID'] !== $request['data']['call-id']){
                     continue;
                 }
-                if($request['data']['data']['user-phone'] === $cdr['src_num']){
+                if($request['data']['user-phone'] === $cdr['src_num']){
                     $channel = $cdr['src_chan'];
                 }else{
                     $channel = $cdr['dst_chan'];
                 }
                 $am->Hangup($channel);
+                $res->success = true;
             }
         }
         return $res;
