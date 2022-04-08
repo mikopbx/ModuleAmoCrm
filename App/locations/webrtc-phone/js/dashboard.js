@@ -105,7 +105,7 @@ define(function (require) {
             });
 
             setInterval(self.updateDuration, 1000);
-            self.sendMessage('init-done');
+            self.sendMessage({action: 'init-done'});
 
             // create a function to subscribe to topics
             self.token = PubSub.subscribe('CALLS', function (msg, message) {
