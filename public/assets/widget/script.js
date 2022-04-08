@@ -113,11 +113,12 @@ define(function (require) {
       },
       gotoContact: function (id){
           let elId = `mikopbx-a-${id}`;
-          if ($(`#${elId}`).length < 1) {
+          let selector = `#${elId}`;
+          if ($(selector).length < 1) {
               $("body").prepend(`<a href="/contacts/detail/${id}" class="js-navigate-link" id="${elId}"></a>`);
           }
-          $(`#${elId}`).trigger('click');
-          $(`#${elId}`).remove();
+          $(selector).trigger('click');
+          $(selector).remove();
       },
       createContact: function (notifications_data){
         let params = [
