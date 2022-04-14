@@ -66,7 +66,7 @@ class AmoCrmMain extends PbxExtensionBase
             'client_secret' => $this->clientSecret,
             'grant_type'    => 'authorization_code',
             'code'          => $code,
-            'redirect_uri'  => "https://$this->extHostname/pbxcore/api/amo-crm/v1/listener",
+            'redirect_uri'  => "https://miko.ru",
         ];
         $url = "https://$this->baseDomain/oauth2/access_token";
         $result = $this->sendHttpPostRequest($url, $params);
