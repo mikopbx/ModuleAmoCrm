@@ -16,7 +16,16 @@
       "email": "help@miko.ru"
     }
   },
-  "locations": [ "everywhere" ],
+  "locations": [ "everywhere"],
+  "left_menu": {
+    "realty_widget_code": {
+      "title": "menu.main_title",
+      "icon": "images/logo_small.png",
+      "sort": {
+        "after": "leads"
+      }
+    }
+  },
   "tour": {
     "is_tour": true,
     "tour_images": {

@@ -31,19 +31,26 @@ define(function (require) {
             connector.settings = newSettings;
             if(connector.settings.pbxHost){
                 let href = `//${connector.settings.pbxHost}/webrtc-phone/index.html?random=${(new Date()).getTime()}`;
-                if ($('iframe[src="' + href +'"').length < 1) {
-                    let css = 'position: fixed; z-index: 99; right: 0;bottom: 0; border: 0;';
-                    //  Подключаем файл style.css передавая в качестве параметра версию виджета
-                    $("body").prepend(`<iframe id="miko-pbx-phone" src="${href}" width="300" height="${$(window).height()}" style="${css}"></iframe>`);
-                }
-                connector.onResize();
-                $(window).resize(connector.onResize);
-                connector.iFrame = document.getElementById('miko-pbx-phone');
-                connector.iFrame.onerror = function (){
-                    console.debug('MikoPBX', 'Error load iframe');
-                    $('#miko-pbx-phone').hide();
-                }
-                window.addEventListener("message", connector.onMessage);
+                $.ajax(href, {
+                    complete: function(xhr) {
+                        if(xhr.status !== 200){
+                            return;
+                        }
+                        if ($('iframe[src="' + href +'"').length < 1) {
+                            let css = 'position: fixed; z-index: 999; right: 0;bottom: 0; border: 0;';
+                            //  Подключаем файл style.css передавая в качестве параметра версию виджета
+                            $("body").prepend(`<iframe id="miko-pbx-phone" src="${href}" width="300" height="${$(window).height()}" style="${css}"></iframe>`);
+                        }
+                        connector.onResize();
+                        $(window).resize(connector.onResize);
+                        connector.iFrame = document.getElementById('miko-pbx-phone');
+                        connector.iFrame.onerror = function (){
+                            console.debug('MikoPBX', 'Error load iframe');
+                            $('#miko-pbx-phone').hide();
+                        }
+                        window.addEventListener("message", connector.onMessage);
+                    }
+                });
             }
             PubSub.subscribe(connector.settings.ns + ':connector', connector.onMessage);
         },

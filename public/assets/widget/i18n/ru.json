@@ -24,6 +24,9 @@
         "create_contact" : "Создать контакт",
         "call_title": "Вам звонит"
     },
+    "menu": {
+        "main_title" : "Панель телефонии MikoPBX"
+    },
     "salesbot":{
         "button_title":"Заголовок кнопки",
         "button_caption":"Описание кнопки",

@@ -24,6 +24,9 @@
         "create_contact" : "Create a contact",
         "call_title": "New call"
     },
+    "menu": {
+        "main_title" : "Panel MikoPBX"
+    },
     "salesbot":{
         "button_title":"Button title",
         "button_caption":"Button caption",
