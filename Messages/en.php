@@ -21,7 +21,7 @@ return [
     'mod_amo_baseDomain'            => 'Portal AMO (example.amocrm.ru)',
     'mod_amo_clientId'              => 'Client id',
     'mod_amo_clientSecret'          => 'Client secret',
-
+    'mod_amo_Error'                 => 'Error',
     'module_template_AddNewRecord'  => 'Add new',
     'module_amo_crmTextFieldLabel'        => 'Text field example',
     'module_amo_crmTextAreaFieldLabel'    => 'TextArea field example',

@@ -25,6 +25,11 @@
             <label >{{ t._('mod_amo_clientSecret') }}</label>
             {{ form.render('clientSecret') }}
         </div>
+
+        <div id="warning-message" class="ui visible warning message" style="display: none;">
+          <div class="header">ваав</div>
+          <div class="body">выава</div>
+        </div>
     </div>
 
     {{ partial("partials/submitbutton",['indexurl':'pbx-extension-modules/index/']) }}

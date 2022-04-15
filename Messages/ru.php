@@ -23,6 +23,7 @@ return [
     'mod_amo_baseDomain'            => 'Адрес портала (пример: example.amocrm.ru)',
     'mod_amo_clientId'              => 'ID интеграции',
     'mod_amo_clientSecret'          => 'Секретный ключ интеграции',
+    'mod_amo_Error'                 => 'Ошибка',
 
     'module_amo_crmTextAreaFieldLabel'    => 'Пример многостраничного поля',
     'module_amo_crmPasswordFieldLabel'    => 'Пример поля с паролем',

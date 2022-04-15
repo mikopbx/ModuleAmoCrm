@@ -57,9 +57,9 @@ class AmoCrmMain extends PbxExtensionBase
     /**
      * Получение токена из code.
      * @param $code
-     * @return bool
+     * @return PBXAmoResult
      */
-    public function getAccessTokenByCode($code):bool
+    public function getAccessTokenByCode($code):PBXAmoResult
     {
         $params  = [
             'client_id'     => $this->clientId,
@@ -71,11 +71,9 @@ class AmoCrmMain extends PbxExtensionBase
         $url = "https://$this->baseDomain/oauth2/access_token";
         $result = $this->sendHttpPostRequest($url, $params);
         if($result->success){
-            $saveResult = $this->token->saveToken($result->data);
-        }else{
-            $saveResult = false;
+            $result->success = $this->token->saveToken($result->data);
         }
-        return $saveResult;
+        return $result;
     }
 
     /**
@@ -181,25 +179,21 @@ class AmoCrmMain extends PbxExtensionBase
      */
     public function processRequest(array $request): PBXAmoResult
     {
+        $result = new PBXAmoResult();
         $params = $request['data']??[];
         /** @var ModuleAmoCrm $settings */
-        $saveResult = false;
         if(isset($params['error'])) {
             $settings = ModuleAmoCrm::findFirst();
             $settings->authData = '';
             $settings->save();
         }elseif (isset($params['code']) && !empty($params['code'])){
-            $saveResult = $this->getAccessTokenByCode($params['code']);
-        }else{
-            $saveResult = false;
+            $result = $this->getAccessTokenByCode($params['code']);
         }
-        $res = new PBXAmoResult();
-        $res->processor = __METHOD__;
+        $result->processor = __METHOD__;
         if(!isset($params['save-only']) && isset($params['code'])){
-            $res->setHtml($this->moduleDir.'/public/assets/html/auth-ok.html');
+            $result->setHtml($this->moduleDir.'/public/assets/html/auth-ok.html');
         }
-        $res->success = $saveResult;
-        return $res;
+        return $result;
     }
 
     /**
@@ -494,19 +488,6 @@ class AmoCrmMain extends PbxExtensionBase
     {
         $message = implode(' ', $parameters);
         $this->logger->writeInfo($message);
-    }
-
-    /**
-     * Check something and answer over RestAPI
-     *
-     * @return PBXApiResult
-     */
-    public function checkModuleWorkProperly(): PBXApiResult
-    {
-        $res = new PBXApiResult();
-        $res->processor = __METHOD__;
-        $res->success = true;
-        return $res;
     }
 
     /**

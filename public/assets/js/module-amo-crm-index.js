@@ -10,7 +10,7 @@ var idUrl = 'module-amo-crm';
 var idForm = 'module-amo-crm-form';
 var className = 'ModuleAmoCrm';
 var inputClassName = 'mikopbx-module-input';
-/* global globalRootUrl, globalTranslate, Form, Config */
+/* global $, globalRootUrl, globalTranslate, Form, Config */
 
 var ModuleAmoCrm = {
   $formObj: $('#' + idForm),
@@ -112,7 +112,15 @@ var ModuleAmoCrm = {
       'referer': $('#baseDomain').val(),
       'save-only': true
     };
+    $("#warning-message").hide();
     $.post("".concat(Config.pbxUrl, "/pbxcore/api/modules/").concat(className, "/listener"), params, function (data) {
+      if (data.result === false) {
+        var errorText = data.messages['error-data'].hint || '' + " (" + data.messages['error-data'].detail || '' + ").";
+        $("#warning-message div.header").text(globalTranslate.mod_amo_Error);
+        $("#warning-message div.body").text(errorText);
+        $("#warning-message").show();
+      }
+
       console.log('result', data);
     });
   },

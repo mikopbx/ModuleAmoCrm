@@ -98,14 +98,9 @@ class AmoCrmConf extends ConfigClass
         $res->processor = __METHOD__;
         $action = strtoupper($request['action']);
         switch ($action) {
-            case 'CHECK':
-                $amo = new AmoCrmMain();
-                $res          = $amo->checkModuleWorkProperly();
-                break;
             case 'LISTENER':
                 $amo = new AmoCrmMain();
-                $res          = $amo->processRequest($request);
-                $res->success = true;
+                $res = $amo->processRequest($request);
                 break;
             case 'COMMAND':
                 $amo = new AmoCrmMain();

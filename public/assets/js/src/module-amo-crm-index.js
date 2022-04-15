@@ -10,7 +10,7 @@ const idForm    	 = 'module-amo-crm-form';
 const className 	 = 'ModuleAmoCrm';
 const inputClassName = 'mikopbx-module-input';
 
-/* global globalRootUrl, globalTranslate, Form, Config */
+/* global $, globalRootUrl, globalTranslate, Form, Config */
 const ModuleAmoCrm = {
 	$formObj: $('#'+idForm),
 	$checkBoxes: $('#'+idForm+' .ui.checkbox'),
@@ -118,7 +118,14 @@ const ModuleAmoCrm = {
 			'referer': $('#baseDomain').val(),
 			'save-only': true
 		};
+		$("#warning-message").hide();
 		$.post(`${Config.pbxUrl}/pbxcore/api/modules/${className}/listener`, params, function( data ) {
+			if(data.result === false){
+				let errorText = data.messages['error-data'].hint || '' + " ("+ data.messages['error-data'].detail || '' + ").";
+				$("#warning-message div.header").text(globalTranslate.mod_amo_Error)
+				$("#warning-message div.body").text(errorText)
+				$("#warning-message").show();
+			}
 			console.log('result', data);
 		});
 	},
