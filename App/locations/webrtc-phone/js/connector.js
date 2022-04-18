@@ -98,9 +98,6 @@ define(function (require) {
         parseCDRs: function (data){
             let calls = [], IDs=[];
             $.each(data, function (i, cdr){
-                if(cdr.end !== ''){
-                    return;
-                }
                 let number = '', type = '';
                 if(self.settings.currentUser === cdr['user-src']){
                     type = 'out';
@@ -125,6 +122,7 @@ define(function (require) {
                 IDs.push(cdr['uid']);
             });
             PubSub.publish('CALLS', {action: 'CDRs', 'data': calls, 'IDs': IDs});
+            PubSub.publish('USERS', {action: 'calls', 'data': data});
         },
         parseCallEvent: function (data){
             let number, type;

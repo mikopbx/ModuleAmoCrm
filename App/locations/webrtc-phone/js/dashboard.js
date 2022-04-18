@@ -2,6 +2,7 @@ define(function (require) {
     const $         = require('jquery');
     const Twig      = require('twig');
     const connector = require('connector');
+    const users     = require('users');
     const PubSub    = require('pubsub');
     const cache     = require('cache');
     let   self      = undefined;
@@ -28,14 +29,12 @@ define(function (require) {
         },
         resize: function() {
             let calls    = $('#web-rtc-phone-calls');
-            let buttonsH = $('#web-rtc-phone-buttons').height();
-            let statusH  = $('#web-rtc-phone-status').height();
             let cdr      = $('#web-rtc-phone-cdr');
 
-            let delta    = $('body').height() - buttonsH - statusH - calls.height();
+            let delta    = $('body').height() - calls.height();
             let deltaCdr = calls.height() - cdr.height();
 
-            calls.height($( window ).height() - buttonsH - statusH - delta);
+            calls.height($( window ).height() - delta);
             cdr.height(calls.height() - deltaCdr);
             let rowsHeight = 0;
             $('.m-cdr-card').each(function() {
@@ -79,6 +78,26 @@ define(function (require) {
             $('#web-rtc-phone .m-cdr-card[data-callid="'+event.data.call_id+'"]').remove();
             self.resize();
         },
+        onMessage: function (msg, message) {
+            if(message.action === 'CDRs'){
+                $('#web-rtc-phone .m-cdr-card').each(function (index, element) {
+                    if($.inArray( $(element).attr('data-callid'), message.IDs ) < 0){
+                        $(element).remove();
+                    }
+                });
+                $.each(message.data, function (i, cdr){
+                    self.addCall({data: cdr});
+                });
+            }else if(message.action === 'addCall'){
+                self.addCall({data: message.data});
+            }else if(message.action === 'delCall'){
+                self.delCall({data: message.data});
+            }else if(message.action === 'answerCall'){
+                self.answerCall({data: message.data});
+            }else if(message.action === 'resize'){
+                self.resize();
+            }
+        },
         init: function() {
             self = this;
             $(window).resize(self.resize);
@@ -108,91 +127,10 @@ define(function (require) {
 
             setInterval(self.updateDuration, 1000);
             self.sendMessage({action: 'init-done'});
-            self.drawUsers();
-
             // create a function to subscribe to topics
-            self.token = PubSub.subscribe('CALLS', function (msg, message) {
-                if(message.action === 'CDRs'){
-                    $('#web-rtc-phone .m-cdr-card').each(function (index, element) {
-                        if($.inArray( $(element).attr('data-callid'), message.IDs ) < 0){
-                            $(element).remove();
-                        }
-                    });
-                    $.each(message.data, function (i, cdr){
-                        self.addCall({data: cdr});
-                    });
-                }else if(message.action === 'addCall'){
-                    self.addCall({data: message.data});
-                }else if(message.action === 'delCall'){
-                    self.delCall({data: message.data});
-                }else if(message.action === 'answerCall'){
-                    self.answerCall({data: message.data});
-                }
-            });
-        },
-        drawUsers: function (){
-            let translates = {
-                "SIP":   "Сотрудники",
-                "QUEUE": "Группы"
-            };
-            let dataSet = [
-                    {name: 'Отдел продаж', number: '2003', amoId: '', type: 'QUEUE'},
-                    {name: 'Петр', number: '201', amoId: '2222', type: 'SIP'},
-                    {name: 'Фудор', number: '202', amoId: '3333', type: 'SIP'},
-                    {name: 'Никита', number: '203', amoId: '233344', type: 'SIP'},
-                ];
-            let table = $('#users').DataTable( {
-                data: dataSet,
-                ordering: true,
-                paging:   false,
-                scrollY:  '50vh',
-                scrollCollapse: true,
-                dom: 't',
-                columns: [
-                    { data: 'name'},
-                    { data: 'number'},
-                ],
-                rowGroup: {
-                    dataSrc: 'type',
-                    startRender: function ( rows, group ) {
-                        return translates[group];
-                    },
-                },
-                initComplete:function( settings, json ) {
-                    $(this.api().table().header()).hide();
-                    self.resize();
-                },
-                createdRow: function (row, data) {
-                    $(row).attr('data-number', data['number']);
-                    $(row).attr('data-amo-id', data['amoId']);
-                    $(row).attr('role', 'button');
-                },
-                columnDefs: [
-                    {
-                        targets: 0,
-                        className: 'text-start cursor-pointer '
-                    },
-                    {
-                        targets: 1,
-                        width: "25%",
-                        className: 'text-end'
-                    }
-                ],
-                language: {
-                    search: "",
-                    info:           "",
-                    infoEmpty:      "",
-                    infoFiltered:   "",
-                    infoPostFix:    "",
-                    emptyTable:     "",
-                    zeroRecords:    ""
-                }
-            } );
-            $("#searchInput").on('keyup',function(e) {
-                table.search( $("#searchInput").val() );
-                table.draw();
-                self.resize();
-            });
+            self.token = PubSub.subscribe('CALLS', self.onMessage);
+
+            users.init();
         },
         sendMessage: function (msgData){
             window.parent.postMessage(JSON.stringify(msgData), '*')

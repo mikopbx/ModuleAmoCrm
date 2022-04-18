@@ -76,9 +76,14 @@
         <button id='settingsButton' type="button" class="bg-light btn btn-outline-secondary"><i class="fa fa-cog"></i></button>
     </div>
 
-    <div id="users-list" class="container bg-light p-1 shadow rounded position-relative mt-1">
-        <table id="users" data-order='[[ 1, "asc" ]]' class="w-100 table table-hover " > </table>
-        <input class="form-control" id="searchInput" autocomplete="off" aria-describedby="" placeholder="">
+    <div id="users-list" >
+        <div class="container bg-light p-1 shadow rounded position-relative mt-1">
+            <table id="users" data-order='[[ 1, "asc" ]]' class="w-100 table table-hover " > </table>
+        </div>
+        <div class="input-group rounded shadow bg-light mb-2 mt-1">
+            <input class="form-control" id="searchInput" autocomplete="off" aria-describedby="" placeholder="">
+            <button id='hideButton' type="button" class="btn btn-outline-secondary"><i class="fa fa-xmark"></i></button>
+        </div>
     </div>
 
     <div id="web-rtc-phone-status" class="container card p-2 shadow mt-3 bg-light fw-lighter d-none" >
