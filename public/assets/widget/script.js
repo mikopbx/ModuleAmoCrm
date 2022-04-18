@@ -3,6 +3,7 @@ define(function (require) {
   const connector = require('./mpbx-connector.js?v=%WidgetVersion%');
   const $         = require('jquery');
   const PubSub    = require('pubsub');
+  const _         = require('underscore');
 
   return function () {
     self = this;
@@ -26,6 +27,9 @@ define(function (require) {
         connector.init(self.settings);
         return true;
       },
+      initMenuPage: _.bind(function (params) {
+          console.log(params);
+      }),
       bind_actions: function () {
         return true;
       },

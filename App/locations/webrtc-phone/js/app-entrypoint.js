@@ -20,13 +20,15 @@ requirejs.config({
     urlArgs: "bust=" + (new Date()).getTime(),
     baseUrl: 'js',
     paths: {
-        jquery:     'vendors/jquery-3.6.0.min',
-        moment:     'vendors/moment-with-locales.min',
-        twig:       'vendors/twig.min',
-        pubsub:     'vendors/pubsub.min',
-        cache:      'vendors/localstorage-slim',
-        bootstrap:  '../bootstrap/js/bootstrap.bundle.min',
-    }
+        'jquery':         'vendors/jquery-3.6.0.min',
+        'datatables.net': 'vendors/jquery.dataTables-1.11.5.min',
+        'rowGroup':       'vendors/dataTables.rowGroup-1.1.4.min',
+        'moment':         'vendors/moment-with-locales.min',
+        'twig':           'vendors/twig.min',
+        'pubsub':         'vendors/pubsub.min',
+        'cache':          'vendors/localstorage-slim',
+        'bootstrap':      '../bootstrap/js/bootstrap.bundle.min',
+    },
 });
 
 requirejs(['main']);

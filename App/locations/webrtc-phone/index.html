@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- Bootstrap CSS -->
     <link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="bootstrap/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="bootstrap/css/rowGroup.bootstrap5.min.css" rel="stylesheet">
     <title>Web RTC Phone</title>
     <link href="css/all.min.css" rel="stylesheet">
     <link href="css/brands.min.css" rel="stylesheet">
@@ -22,6 +24,10 @@
         .m-max-height {
             height: 300px;
         }
+        #users td, #users tr {
+            border: none;
+        }
+
     </style>
 </head>
 <body style="background: rgba(0, 0, 0, 0);">
@@ -69,6 +75,12 @@
         <input  id="numDisplay" type="text" class="form-control" placeholder="Enter number..." aria-label="" aria-describedby="">
         <button id='settingsButton' type="button" class="bg-light btn btn-outline-secondary"><i class="fa fa-cog"></i></button>
     </div>
+
+    <div id="users-list" class="container bg-light p-1 shadow rounded position-relative mt-1">
+        <table id="users" data-order='[[ 1, "asc" ]]' class="w-100 table table-hover " > </table>
+        <input class="form-control" id="searchInput" autocomplete="off" aria-describedby="" placeholder="">
+    </div>
+
     <div id="web-rtc-phone-status" class="container card p-2 shadow mt-3 bg-light fw-lighter d-none" >
         <div class="row">
             <div id="txtRegStatus" class="col text-start"></div>

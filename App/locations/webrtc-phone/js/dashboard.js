@@ -5,6 +5,8 @@ define(function (require) {
     const PubSub    = require('pubsub');
     const cache     = require('cache');
     let   self      = undefined;
+    require('rowGroup');
+    require('datatables.net');
 
     return {
         hide: function (){
@@ -106,6 +108,7 @@ define(function (require) {
 
             setInterval(self.updateDuration, 1000);
             self.sendMessage({action: 'init-done'});
+            self.drawUsers();
 
             // create a function to subscribe to topics
             self.token = PubSub.subscribe('CALLS', function (msg, message) {
@@ -127,8 +130,72 @@ define(function (require) {
                 }
             });
         },
+        drawUsers: function (){
+            let translates = {
+                "SIP":   "Сотрудники",
+                "QUEUE": "Группы"
+            };
+            let dataSet = [
+                    {name: 'Отдел продаж', number: '2003', amoId: '', type: 'QUEUE'},
+                    {name: 'Петр', number: '201', amoId: '2222', type: 'SIP'},
+                    {name: 'Фудор', number: '202', amoId: '3333', type: 'SIP'},
+                    {name: 'Никита', number: '203', amoId: '233344', type: 'SIP'},
+                ];
+            let table = $('#users').DataTable( {
+                data: dataSet,
+                ordering: true,
+                paging:   false,
+                scrollY:  '50vh',
+                scrollCollapse: true,
+                dom: 't',
+                columns: [
+                    { data: 'name'},
+                    { data: 'number'},
+                ],
+                rowGroup: {
+                    dataSrc: 'type',
+                    startRender: function ( rows, group ) {
+                        return translates[group];
+                    },
+                },
+                initComplete:function( settings, json ) {
+                    $(this.api().table().header()).hide();
+                    self.resize();
+                },
+                createdRow: function (row, data) {
+                    $(row).attr('data-number', data['number']);
+                    $(row).attr('data-amo-id', data['amoId']);
+                    $(row).attr('role', 'button');
+                },
+                columnDefs: [
+                    {
+                        targets: 0,
+                        className: 'text-start cursor-pointer '
+                    },
+                    {
+                        targets: 1,
+                        width: "25%",
+                        className: 'text-end'
+                    }
+                ],
+                language: {
+                    search: "",
+                    info:           "",
+                    infoEmpty:      "",
+                    infoFiltered:   "",
+                    infoPostFix:    "",
+                    emptyTable:     "",
+                    zeroRecords:    ""
+                }
+            } );
+            $("#searchInput").on('keyup',function(e) {
+                table.search( $("#searchInput").val() );
+                table.draw();
+                self.resize();
+            });
+        },
         sendMessage: function (msgData){
-            window.parent.postMessage (JSON.stringify(msgData), '*')
+            window.parent.postMessage(JSON.stringify(msgData), '*')
         },
         updateDuration: function (){
             $('#web-rtc-phone .m-cdr-card').each(function (index, element) {
