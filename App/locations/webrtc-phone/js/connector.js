@@ -43,6 +43,7 @@ define(function (require) {
             });
             self.initEventSource('calls');
             self.initEventSource('active-calls');
+            self.initEventSource('users');
             setInterval(self.checkConnection, 5000);
 
             self.token = PubSub.subscribe('COMMAND', function (msg, message) {
@@ -50,6 +51,14 @@ define(function (require) {
                 let url;
                 if(message.action === 'saveSettings'){
                     url = `${window.location.origin}/pbxcore/api/amo-crm/v1/change-settings`;
+                }else if(message.action === 'call' || message.action === 'transfer'){
+                    message.data = {
+                        'action':       (message.action === 'call') ? 'callback':message.action,
+                        'number':       message.phone,
+                        'user-number':  self.settings.currentPhone,
+                        'user-id':      self.settings.currentUser
+                    };
+                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/callback`;
                 }else if(message.action === 'callback'){
                     url = `${window.location.origin}/pbxcore/api/amo-crm/v1/callback`;
                 }else{
@@ -85,6 +94,8 @@ define(function (require) {
             }else if(callData.action === 'hangup'){
                 delete self.channels[callData.uid];
                 PubSub.publish('CALLS', {action: 'delCall', 'data': {call_id: callData.uid}});
+            }else if(callData.action === 'USERS'){
+                PubSub.publish(callData.action, {action: 'initUsers', 'data': callData.data});
             }
         },
         onPbxMessageError: function(event) {

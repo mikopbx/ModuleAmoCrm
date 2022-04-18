@@ -27,7 +27,8 @@ use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use MikoPBX\Common\Providers\CDRDatabaseProvider;
 use Modules\ModuleAmoCrm\Models\ModuleAmoRequestData;
 use DateTime;
-
+use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
+use MikoPBX\Common\Models\Extensions;
 
 class AmoCdrDaemon extends WorkerBase
 {
@@ -66,9 +67,43 @@ class AmoCdrDaemon extends WorkerBase
         [$this->extensionLength, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
         while (true){
             $this->updateActiveCalls();
+            $this->updateUsers();
             $this->cdrSync();
             sleep(3);
         }
+    }
+
+    /**
+     * @return void
+     */
+    private function updateUsers():void
+    {
+        $filterAmoUsers = ['columns' => 'amoUserId,number'];
+        $amoUsers = ModuleAmoUsers::find($filterAmoUsers);
+        $amoUsersArray = [];
+        foreach ($amoUsers as $user){
+            $amoUsersArray[$user->number] = $user->amoUserId;
+        }
+        unset($amoUsers);
+        $extensionFilter = [
+            'type IN ({types:array})',
+            'bind'    => [
+                'types' => [Extensions::TYPE_SIP, Extensions::TYPE_QUEUE]
+            ],
+            'columns' => 'number,callerid,type'
+        ];
+        $result = [];
+        $extensions = Extensions::find($extensionFilter);
+        foreach ($extensions as $extension){
+            $result[] = [
+                'number' => $extension->number,
+                'name' => $extension->callerid,
+                'amoId' => $amoUsersArray[$extension->number]??'',
+                'type' => $extension->type
+            ];
+        }
+        unset($extensions);
+        $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_USERS_NAME, ['data' => $result, 'action' => 'USERS']);
     }
 
     /**
