@@ -45,6 +45,7 @@ class AmoCdrDaemon extends WorkerBase
 
     private array $cdrRows = [];
     private string $lastCacheCdr = '';
+    private string $lastCacheUsers = '';
 
     /**
      * Начало загрузки истории звонков в Amo.
@@ -103,7 +104,12 @@ class AmoCdrDaemon extends WorkerBase
             ];
         }
         unset($extensions);
-        $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_USERS_NAME, ['data' => $result, 'action' => 'USERS']);
+        $md5Cdr = md5(print_r($result, true));
+        if($md5Cdr !== $this->lastCacheUsers){
+            // Оповещение только если изменилось состояние.
+            $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_USERS_NAME, ['data' => $result, 'action' => 'USERS']);
+            $this->lastCacheUsers = $md5Cdr;
+        }
     }
 
     /**
