@@ -95,6 +95,9 @@ define(function (require) {
                 delete self.channels[callData.uid];
                 PubSub.publish('CALLS', {action: 'delCall', 'data': {call_id: callData.uid}});
             }else if(callData.action === 'USERS'){
+                callData.data = $.grep(callData.data, function(value) {
+                    return value.number !== self.settings.currentPhone;
+                });
                 PubSub.publish(callData.action, {action: 'initUsers', 'data': callData.data});
             }
         },
