@@ -113,6 +113,9 @@ define(function (require) {
             let calls = [], IDs=[];
             $.each(data, function (i, cdr){
                 let number = '', type = '';
+                if(cdr.end !== ''){
+                    return;
+                }
                 if(self.settings.currentUser === cdr['user-src']){
                     type = 'out';
                     number = cdr['dst'];

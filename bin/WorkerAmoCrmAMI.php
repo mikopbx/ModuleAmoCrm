@@ -189,6 +189,9 @@ class WorkerAmoCrmAMI extends WorkerBase
     private function actionCreateCdr($data, $generalNumber):void
     {
         $tmpCalls = [];
+        if(in_array($data['action_extra']??'', ['originate_start', 'originate_end'], true)){
+            return;
+        }
         $this->createCdrCheckInner($tmpCalls, $data, $generalNumber);
         $this->createCdrCheckOutgoing($tmpCalls, $data, $generalNumber);
         $this->createCdrCheckIncoming($tmpCalls, $data, $generalNumber);
