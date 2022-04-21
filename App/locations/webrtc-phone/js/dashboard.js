@@ -69,6 +69,7 @@ define(function (require) {
             let html = template.render(event.data);
             $("#web-rtc-phone-cdr").append(html)
             self.resize();
+            $('#web-rtc-phone').removeClass('invisible');
         },
         answerCall:function (event){
             let element = $('#web-rtc-phone .m-cdr-card[data-callid="'+event.data.call_id+'"]');
@@ -129,6 +130,15 @@ define(function (require) {
             self.sendMessage({action: 'init-done'});
             // create a function to subscribe to topics
             self.token = PubSub.subscribe('CALLS', self.onMessage);
+
+            $("#hideButton").on('click',function() {
+                $('#web-rtc-phone').addClass('invisible');
+            });
+            $( window ).mousemove(function( event ) {
+                if( $("body").width() - event.pageX < 15){
+                    $('#web-rtc-phone').removeClass('invisible');
+                }
+            });
 
             users.init();
         },

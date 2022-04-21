@@ -167,17 +167,17 @@ define(function (require) {
                 if(data === undefined){
                     return;
                 }
-                console.log('dblclick!!!', data, this);
                 self.dialOrTransfer(data.number);
             } );
 
-            $("#hideButton").on('click',function() {
-                $('#users-list').hide();
-            });
-            $( window ).mousemove(function( event ) {
-                if( $("body").width() - event.pageX < 15){
-                    $('#users-list').show();
+            $("#usersButton").on('click',function() {
+                let el = $('#users-list');
+                if(el.hasClass('d-none')){
+                    el.removeClass('d-none');
+                }else{
+                    el.addClass('d-none');
                 }
+                PubSub.publish('CALLS', {action: 'resize', 'data': {}});
             });
         }
     }
