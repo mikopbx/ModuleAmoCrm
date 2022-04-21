@@ -82,6 +82,24 @@ define(function (require) {
             self = this;
             self.token = PubSub.subscribe('USERS', self.onMessage);
         },
+        dialOrTransfer:function (phone){
+            let input = $("#searchInput");
+            let users = $(`#users tr[role="button"]`);
+            if(users.length === 1 || phone !== undefined){
+                if(phone === undefined){
+                    phone = users.attr('data-number');
+                }
+                let calls = $('#web-rtc-phone .m-cdr-card');
+                if(calls.length === 0){
+                    PubSub.publish('COMMAND', {action: 'call', 'phone': phone});
+                }else{
+                    PubSub.publish('COMMAND', {action: 'transfer', 'phone': phone});
+                }
+                input.val('');
+                self.table.search(input.val() );
+                self.table.draw();
+            }
+        },
         initUsers: function (dataSet){
             if(self.table !== undefined){
                 return;
@@ -135,24 +153,24 @@ define(function (require) {
                 }
             } );
             $("#searchInput").on('keyup',function(e) {
-                self.table.search( $("#searchInput").val() );
+                let input = $("#searchInput");
+                self.table.search( input.val() );
                 self.table.draw();
                 PubSub.publish('CALLS', {action: 'resize', 'data': {}});
                 if(e.which === 13) {
-                    let users = $(`#users tr[role="button"]`);
-                    if(users.length === 1){
-                        let calls = $('#web-rtc-phone .m-cdr-card');
-                        if(calls.length === 0){
-                            PubSub.publish('COMMAND', {action: 'call', 'phone': users.attr('data-number')});
-                        }else{
-                            PubSub.publish('COMMAND', {action: 'transfer', 'phone': users.attr('data-number')});
-                        }
-                        $("#searchInput").val('');
-                        self.table.search( $("#searchInput").val() );
-                        self.table.draw();
-                    }
+                    self.dialOrTransfer();
                 }
             });
+
+            $('#users tbody').on('dblclick', 'tr', function () {
+                let data = self.table.row(this).data();
+                if(data === undefined){
+                    return;
+                }
+                console.log('dblclick!!!', data, this);
+                self.dialOrTransfer(data.number);
+            } );
+
             $("#hideButton").on('click',function() {
                 $('#users-list').hide();
             });
