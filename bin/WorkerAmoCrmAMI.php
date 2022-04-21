@@ -28,7 +28,7 @@ class WorkerAmoCrmAMI extends WorkerBase
 {
     public const CHANNEL_CALL_NAME = 'http://127.0.0.1/pbxcore/api/nchan/pub/calls';
     public const CHANNEL_CDR_NAME  = 'http://127.0.0.1/pbxcore/api/amo/pub/active-calls';
-    public const CHANNEL_USERS_NAME  = 'http://127.0.0.1/pbxcore/api/amo/pub/users';
+    public const CHANNEL_USERS_NAME= 'http://127.0.0.1/pbxcore/api/amo/pub/users';
 
     private AmoCrmMain $amoApi;
     private int     $extensionLength = 3;
@@ -113,8 +113,9 @@ class WorkerAmoCrmAMI extends WorkerBase
 
     /**
      * Функция обработки оповещений.
-     *
      * @param $parameters
+     * @return void
+     * @throws \JsonException
      */
     public function callback($parameters):void{
 
@@ -187,53 +188,11 @@ class WorkerAmoCrmAMI extends WorkerBase
      */
     private function actionCreateCdr($data, $generalNumber):void
     {
-        if (isset($this->users[$data['src_num']]) && strlen($generalNumber) <= $this->extensionLength) {
-            // Это исходящий вызов с внутреннего номера.
-            if (strlen($data['dst_num']) > $this->extensionLength && !in_array($data['dst_num'], $this->innerNums, true)) {
-                $call = [
-                    'uid'              => $data['UNIQUEID'],
-                    'id'               => $data['linkedid'],
-                    'date'             => date(\DateTimeInterface::ATOM, strtotime($data['start'])),
-                    'user'             => $this->users[$data['src_num']],
-                    'src'              => $data['src_num'],
-                    'dst'              => $data['dst_num'],
-                    'src-chan'         => $data['src_chan'],
-                    'dst-chan'         => '',
-                    'action'           => 'call',
-                ];
-            }
-        } elseif (isset($this->users[$data['dst_num']])) {
-            // Это входящий вызов на внутренний номер сотрудника.
-            if (strlen($generalNumber) > $this->extensionLength && !in_array($generalNumber, $this->innerNums, true)) {
-                $call = [
-                    'uid'              => $data['UNIQUEID'],
-                    'id'               => $data['linkedid'],
-                    'date'             => date(\DateTimeInterface::ATOM, strtotime($data['start'])),
-                    'user'             => $this->users[$data['dst_num']],
-                    'g-src'            => $generalNumber,
-                    'src'              => $data['src_num'],
-                    'dst'              => $data['dst_num'],
-                    'src-chan'         => $data['src_chan'],
-                    'action'           => 'call',
-                    'dst-chan'         => '',
-                ];
-            } elseif (strlen($data['src_num']) > $this->extensionLength && !in_array($data['src_num'], $this->innerNums, true)) {
-                // Входящий вызов с номера клиента.
-                $call = [
-                    'uid'              => $data['UNIQUEID'],
-                    'id'               => $data['linkedid'],
-                    'date'             => date(\DateTimeInterface::ATOM, strtotime($data['start'])),
-                    'user'             => $this->users[$data['dst_num']],
-                    'src'              => $data['src_num'],
-                    'dst'              => $data['dst_num'],
-                    'action'           => 'call',
-                    'src-chan'         => $data['src_chan'],
-                    'dst-chan'         => '',
-                ];
-
-            }
-        }
-        if(!empty($call)){
+        $tmpCalls = [];
+        $this->createCdrCheckInner($tmpCalls, $data, $generalNumber);
+        $this->createCdrCheckOutgoing($tmpCalls, $data, $generalNumber);
+        $this->createCdrCheckIncoming($tmpCalls, $data, $generalNumber);
+        foreach ($tmpCalls as $call){
             $callFound = false;
             foreach ($this->calls[$data['linkedid']] as $oldCall) {
                 if($call['uid'] === $oldCall['uid']){
@@ -246,6 +205,118 @@ class WorkerAmoCrmAMI extends WorkerBase
             }
             $this->activeChannels[$data['src_chan']] = $data['src_num'];
             $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
+        }
+    }
+
+    /**
+     * Проверка на внутренний вызов.
+     * @param $calls
+     * @param $data
+     * @param $generalNumber
+     * @return void
+     */
+    private function createCdrCheckInner(&$calls, $data, $generalNumber):void
+    {
+        if(strlen($data['src_num']) <= $this->extensionLength
+            && strlen($data['dst_num']) <= $this->extensionLength
+            && strlen($generalNumber) <= $this->extensionLength){
+
+            $srcUser = $this->users[$data['src_num']]??'';
+            $dstUser = $this->users[$data['dst_num']]??'';
+
+            $param = [
+                'uid'              => $data['UNIQUEID'],
+                'id'               => $data['linkedid'],
+                'date'             => date(\DateTimeInterface::ATOM, strtotime($data['start'])),
+                'user'             => $srcUser,
+                'src'              => $data['src_num'],
+                'dst'              => $data['dst_num'],
+                'src-chan'         => $data['src_chan'],
+                'dst-chan'         => '',
+                'action'           => 'call',
+            ];
+
+            $calls[] = $param;
+            if($dstUser !== $srcUser){
+                $param['user'] = $dstUser;
+                $calls[] = $param;
+            }
+
+        }
+    }
+
+    /**
+     * Проверка на входящий вызов.
+     * @param $calls
+     * @param $data
+     * @param $generalNumber
+     * @return void
+     */
+    private function createCdrCheckIncoming(&$calls, $data, $generalNumber):void
+    {
+        if(in_array($data['src_num'], $this->innerNums, true)
+           || in_array($generalNumber, $this->innerNums, true)){
+            // Это точно не входящий. Как вариант - внутренний.
+            return;
+        }
+
+        // Это входящий вызов на внутренний номер сотрудника.
+        if (strlen($generalNumber) > $this->extensionLength && !in_array($generalNumber, $this->innerNums, true)) {
+            // Это переадресация вызова. (консультационная)
+            $calls[] = [
+                'uid'              => $data['UNIQUEID'],
+                'id'               => $data['linkedid'],
+                'date'             => date(\DateTimeInterface::ATOM, strtotime($data['start'])),
+                'user'             => $this->users[$data['dst_num']]??'',
+                'g-src'            => $generalNumber,
+                'src'              => $data['src_num'],
+                'dst'              => $data['dst_num'],
+                'src-chan'         => $data['src_chan'],
+                'action'           => 'call',
+                'dst-chan'         => '',
+            ];
+        } elseif (strlen($data['src_num']) > $this->extensionLength && !in_array($data['src_num'], $this->innerNums, true)) {
+            // Входящий вызов с номера клиента.
+            $calls[] = [
+                'uid'              => $data['UNIQUEID'],
+                'id'               => $data['linkedid'],
+                'date'             => date(\DateTimeInterface::ATOM, strtotime($data['start'])),
+                'user'             => $this->users[$data['dst_num']]??'',
+                'src'              => $data['src_num'],
+                'dst'              => $data['dst_num'],
+                'action'           => 'call',
+                'src-chan'         => $data['src_chan'],
+                'dst-chan'         => '',
+            ];
+        }
+    }
+
+    /**
+     * Проверка на исходящий вызов.
+     * @param $calls
+     * @param $data
+     * @param $generalNumber
+     * @return void
+     */
+    private function createCdrCheckOutgoing(&$calls, $data, $generalNumber):void
+    {
+        if (in_array($data['src_num'], $this->innerNums, true)
+            && strlen($generalNumber) <= $this->extensionLength
+            && strlen($data['dst_num']) > $this->extensionLength
+            && !in_array($data['dst_num'], $this->innerNums, true))
+        {
+            // Это исходящий вызов с внутреннего номера.
+            $calls[] = [
+                'uid'              => $data['UNIQUEID'],
+                'id'               => $data['linkedid'],
+                'date'             => date(\DateTimeInterface::ATOM, strtotime($data['start'])),
+                'user'             => $this->users[$data['src_num']]??'',
+                'src'              => $data['src_num'],
+                'dst'              => $data['dst_num'],
+                'src-chan'         => $data['src_chan'],
+                'dst-chan'         => '',
+                'action'           => 'call',
+            ];
         }
     }
 

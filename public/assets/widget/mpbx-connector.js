@@ -113,7 +113,7 @@ curl 'https://127.0.0.1/pbxcore/api/nchan/sub/active-calls?token=test' \
 curl -k --request POST --data "test message" -H "Accept: text/json" https://172.16.156.223/pbxcore/api/amo/pub/active-calls
 
 
-curl 'http//172.16.156.223/pbxcore/api/nchan/sub/calls?token=test' \
+curl 'http://172.16.156.223/pbxcore/api/nchan/sub/calls?token=test' \
 -X 'GET' \
 -H 'Accept: text/event-stream' \
 -H 'Cache-Control: no-cache' \
