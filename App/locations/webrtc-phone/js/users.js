@@ -53,21 +53,19 @@ define(function (require) {
                 if(cdr.end !== ''){
                     return;
                 }
-                if(cdr.end === ""){
-                    let newState, oldState;
-                    if(cdr.answer === ''){
-                        newState = 'calling';
-                    }else{
-                        newState = 'bridge';
-                    }
-                    oldState = states[cdr.src]||'calling';
-                    if(oldState !== 'bridge'){
-                        states[cdr.src] = newState;
-                    }
-                    oldState = states[cdr.dst]||'calling';
-                    if(oldState !== 'bridge'){
-                        states[cdr.dst] = newState;
-                    }
+                let newState, oldState;
+                if(cdr.answer === ''){
+                    newState = 'calling';
+                }else{
+                    newState = 'bridge';
+                }
+                oldState = states[cdr.src]||'calling';
+                if(oldState !== 'bridge'){
+                    states[cdr.src] = newState;
+                }
+                oldState = states[cdr.dst]||'calling';
+                if(oldState !== 'bridge'){
+                    states[cdr.dst] = newState;
                 }
             });
 
@@ -81,10 +79,22 @@ define(function (require) {
         init: function (){
             self = this;
             self.token = PubSub.subscribe('USERS', self.onMessage);
+
+            $("#usersButton").on('click',function() {
+                let el = $('#users-list');
+                if(el.hasClass('d-none')){
+                    el.removeClass('d-none');
+                }else{
+                    el.addClass('d-none');
+                }
+                PubSub.publish('CALLS', {action: 'resize', 'data': {}});
+            });
         },
         dialOrTransfer:function (phone){
             let input = $("#searchInput");
             let users = $(`#users tr[role="button"]`);
+            let inputVal = input.val();
+
             if(users.length === 1 || phone !== undefined){
                 if(phone === undefined){
                     phone = users.attr('data-number');
@@ -96,7 +106,12 @@ define(function (require) {
                     PubSub.publish('COMMAND', {action: 'transfer', 'phone': phone});
                 }
                 input.val('');
-                self.table.search(input.val() );
+                self.table.search(input.val());
+                self.table.draw();
+            }else if($.isNumeric(inputVal)){
+                PubSub.publish('COMMAND', {action: 'call', 'phone': inputVal});
+                input.val('');
+                self.table.search(input.val());
                 self.table.draw();
             }
         },
@@ -169,16 +184,6 @@ define(function (require) {
                 }
                 self.dialOrTransfer(data.number);
             } );
-
-            $("#usersButton").on('click',function() {
-                let el = $('#users-list');
-                if(el.hasClass('d-none')){
-                    el.removeClass('d-none');
-                }else{
-                    el.addClass('d-none');
-                }
-                PubSub.publish('CALLS', {action: 'resize', 'data': {}});
-            });
         }
     }
 });

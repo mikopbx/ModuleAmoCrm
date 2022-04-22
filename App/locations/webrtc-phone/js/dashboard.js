@@ -68,8 +68,8 @@ define(function (require) {
             }
             let html = template.render(event.data);
             $("#web-rtc-phone-cdr").append(html)
-            self.resize();
             $('#web-rtc-phone').removeClass('invisible');
+            self.resize();
         },
         answerCall:function (event){
             let element = $('#web-rtc-phone .m-cdr-card[data-callid="'+event.data.call_id+'"]');
@@ -141,6 +141,8 @@ define(function (require) {
             });
 
             users.init();
+            self.resize();
+            $('#web-rtc-phone').removeClass('invisible');
         },
         sendMessage: function (msgData){
             window.parent.postMessage(JSON.stringify(msgData), '*')
