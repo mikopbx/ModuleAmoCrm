@@ -9,7 +9,8 @@
 
 namespace Modules\ModuleAmoCrm\Lib;
 
-use MikoPBX\Common\Models\PbxSettings;
+use MikoPBX\Core\System\Processes;
+use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\Cron\WorkerSafeScriptsCore;
 use MikoPBX\Modules\Config\ConfigClass;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
@@ -18,6 +19,7 @@ use Modules\ModuleAmoCrm\bin\WorkerAmoCrmAMI;
 use Modules\ModuleAmoCrm\bin\WorkerAmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\RestAPI\Controllers\ApiController;
 use MikoPBX\PBXCoreREST\Controllers\Cdr\GetController as CdrGetController;
+use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 
 class AmoCrmConf extends ConfigClass
 {
@@ -29,12 +31,16 @@ class AmoCrmConf extends ConfigClass
      */
     public function modelsEventChangeData($data): void
     {
-        if (
-            $data['model'] === PbxSettings::class
-            && $data['recordId'] === 'PBXLanguage'
-        ) {
-            $templateMain = new AmoCrmMain();
-            $templateMain->startAllServices(true);
+        if ($data['model'] === ModuleAmoCrm::class) {
+            if (count($data['changedFields']) === 1 && $data['changedFields'][0] === 'offsetCdr') {
+                return;
+            }
+            if(in_array('tokenForAmo', $data['changedFields'], true)) {
+                $this->makeAuthFiles();
+            }else{
+                $templateMain = new AmoCrmMain();
+                $templateMain->startAllServices(true);
+            }
         }
     }
 
@@ -130,11 +136,37 @@ class AmoCrmConf extends ConfigClass
     }
 
     /**
+     * @return void
+     */
+    private function makeAuthFiles():void
+    {
+        /** @var ModuleAmoCrm $settings */
+        $settings = ModuleAmoCrm::findFirst();
+        if(!$settings){
+            return;
+        }
+        $baseDir = '/var/etc/auth';
+        if(!file_exists($baseDir)){
+            Util::mwMkdir($baseDir, true);
+        }
+        $authFile = $baseDir.'/'.basename($settings->tokenForAmo);
+        if(!file_exists($authFile)){
+            $grepPath = Util::which('grep');
+            $cutPath = Util::which('cut');
+            $xargs = Util::which('xargs');
+            $tokenHash = md5('tokenForAmo');
+            Processes::mwExec("$grepPath -Rn '$tokenHash' /var/etc/auth | $cutPath -d ':' -f 1 | $xargs rm -rf ");
+            file_put_contents($baseDir."/".basename($settings->tokenForAmo), $tokenHash);
+        }
+    }
+
+    /**
      * Create additional Nginx locations from modules
      *
      */
     public function createNginxLocations(): string
     {
+        $this->makeAuthFiles();
         return 'location ~ /pbxcore/api/amo/pub/(.*)$ {'.PHP_EOL."\t".
                     'nchan_publisher;'.PHP_EOL."\t".
                     'allow  127.0.0.1;'.PHP_EOL."\t".

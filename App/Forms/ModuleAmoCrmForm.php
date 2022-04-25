@@ -24,5 +24,6 @@ class ModuleAmoCrmForm extends Form
         $this->add(new Text('baseDomain'));
         $this->add(new Text('clientId'));
         $this->add(new Password('clientSecret'));
+        $this->add(new Text('tokenForAmo'));
     }
 }

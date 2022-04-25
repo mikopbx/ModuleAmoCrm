@@ -53,6 +53,11 @@ class ModuleAmoCrm extends ModulesModelsBase
     public $referenceDate;
 
     /**
+     * @Column(type="string", nullable=true)
+     */
+    public $tokenForAmo;
+
+    /**
      * Toggle
      *
      * @Column(type="integer", default="1", nullable=true)

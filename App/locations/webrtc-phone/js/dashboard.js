@@ -66,6 +66,12 @@ define(function (require) {
             if($('#web-rtc-phone .m-cdr-card[data-callid="'+event.data.call_id+'"]').length !== 0 ){
                 return
             }
+
+            if(event.data.number.length <= 4){
+                // Скроем кнопки для внутренних звонков.
+                event.data.additionalCardClass = 'd-none';
+            }
+
             let html = template.render(event.data);
             $("#web-rtc-phone-cdr").append(html)
             $('#web-rtc-phone').removeClass('invisible');

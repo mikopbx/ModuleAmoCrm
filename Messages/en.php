@@ -34,4 +34,5 @@ return [
     'module_amo_crmConnected'             => 'Module connected',
     'module_amo_crmDisconnected'          => 'Module disconnected',
     'module_amo_crmUpdateStatus'          => 'Update module status',
+    'mod_amo_tokenForAmo'                 => 'Token API MikoPBX',
 ];

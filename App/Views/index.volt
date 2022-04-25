@@ -26,6 +26,11 @@
             {{ form.render('clientSecret') }}
         </div>
 
+        <div class="ten wide field disability">
+            <label >{{ t._('mod_amo_tokenForAmo') }}</label>
+            {{ form.render('tokenForAmo') }}
+        </div>
+
         <div id="warning-message" class="ui visible warning message" style="display: none;">
           <div class="header">ваав</div>
           <div class="body">выава</div>
