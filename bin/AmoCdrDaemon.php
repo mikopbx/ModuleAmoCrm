@@ -158,6 +158,7 @@ class AmoCdrDaemon extends WorkerBase
 
     private function cdrSync():void
     {
+        $oldOffset = $this->offset;
         $this->cdrRows = [];
         $filter = [
             'id>:id: AND start>:referenceDate:',
@@ -245,7 +246,10 @@ class AmoCdrDaemon extends WorkerBase
         }
         unset($rows,$call);
         $this->addCalls($calls);
-        $this->updateOffset();
+
+        if($oldOffset !== $this->offset){
+            $this->updateOffset();
+        }
     }
 
     private function addCalls($calls, bool $mainOnly = false):void
