@@ -119,6 +119,9 @@ define(function (require) {
             if(self.table !== undefined){
                 return;
             }
+            if(dataSet.length !== 0){
+                $('#users-list').removeClass('d-none');
+            }
             self.table = $('#users').DataTable( {
                 data: dataSet,
                 ordering: true,
