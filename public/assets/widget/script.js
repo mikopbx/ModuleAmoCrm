@@ -14,7 +14,7 @@ define(function (require) {
       users:        [],
       token:        '',
       time_unit:    '',
-      ns: ''
+      ns: '',
     };
     self.callbacks = {
       render: function () {
@@ -23,6 +23,7 @@ define(function (require) {
       init: function () {
         // Инициализация виджета. Сбор настроек для коннектора.
         self.api.init();
+        self.settings.heightWindow = $(window).height();
         // Подключение коннектора к АТС.
         connector.init(self.settings);
         return true;
@@ -85,7 +86,7 @@ define(function (require) {
           users:        globalSettings.pbx_users,
           token:        globalSettings.token,
           time_unit:    self.i18n('settings.time_unit'),
-          ns:           self.ns
+          ns:           self.ns,
         };
         $.each(newSettings, function (key, value){
           if(typeof self.settings[key] === 'undefined'){

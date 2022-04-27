@@ -24,8 +24,11 @@ define(function (require) {
     let connector = {
         settings: {},
         iFrame: null,
-        onResize: function (){
-            $('iframe[id="miko-pbx-phone"]').attr('height', $(window).height());
+        resizeFunc: function (height){
+            if(height === undefined){
+                height = $(window).height();
+            }
+            $('iframe[id="miko-pbx-phone"]').attr('height', height);
         },
         init: function(newSettings) {
             connector.settings = newSettings;
@@ -41,14 +44,22 @@ define(function (require) {
                             //  Подключаем файл style.css передавая в качестве параметра версию виджета
                             $("body").prepend(`<iframe id="miko-pbx-phone" src="${href}" width="300" height="${$(window).height()}" style="${css}"></iframe>`);
                         }
-                        connector.onResize();
-                        $(window).resize(connector.onResize);
                         connector.iFrame = document.getElementById('miko-pbx-phone');
                         connector.iFrame.onerror = function (){
                             console.debug('MikoPBX', 'Error load iframe');
                             $('#miko-pbx-phone').hide();
                         }
                         window.addEventListener("message", connector.onMessage);
+
+                        $(window).resize(() => {
+                            connector.resizeFunc();
+                            connector.iFrame.contentWindow.postMessage({action: 'resize', height: $(window).height()}, '*');
+                        });
+                        $(window).mousemove(event => {
+                            if( $(window).width() - event.pageX < 5){
+                                $('#miko-pbx-phone').show();
+                            }
+                        });
                     }
                 });
             }
@@ -61,6 +72,7 @@ define(function (require) {
             }
             let params = message || JSON.parse(event.data);
             if(params.action === 'init-done'){
+                connector.resizeFunc();
                 connector.iFrame.contentWindow.postMessage({action: 'connect', data: connector.settings}, '*');
             }else if(params.action === 'findContact'){
                 PubSub.publish(connector.settings.ns + ':main', params);
@@ -75,6 +87,10 @@ define(function (require) {
             }else if(params.action === 'openCard'){
                 // Открыть карточку клиента.
                 PubSub.publish(connector.settings.ns + ':main', params);
+            }else if(params.action === 'hide-panel'){
+                $('#miko-pbx-phone').hide();
+            }else if(params.action === 'resize'){
+                connector.resizeFunc(params.height);
             }else{
                 connector.iFrame.contentWindow.postMessage(message, '*');
             }

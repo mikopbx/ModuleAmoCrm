@@ -18,24 +18,38 @@
           //  Подключаем файл style.css передавая в качестве параметра версию виджета
           $("body").prepend(`<iframe id="miko-pbx-phone" src="${href}" width="300" height="${height}" style="${css}"></iframe>`);
         }
-        let onResize = function (){
-            $('iframe[id="miko-pbx-phone"]').attr('height', $(window).height());
+        let resizeFunc = function (height){
+            if(height === undefined){
+                height = $(window).height();
+            }
+            $('iframe[id="miko-pbx-phone"]').attr('height', height);
         }
-        onResize();
-        $(window).resize(onResize);
+        $(window).resize(() => {
+            resizeFunc();
+            iFrame.contentWindow.postMessage({action: 'resize', height: $(window).height()}, '*');
+        });
 
         let iFrame = document.getElementById('miko-pbx-phone');
         iFrame.onerror = function (){
             console.debug('MikoPBX', 'Error load iframe');
             $('#miko-pbx-phone').hide();
         }
+
+        $( window ).mousemove(function( event ) {
+            if( $("body").width() - event.pageX < 2){
+                $('#miko-pbx-phone').show();
+            }
+        });
+
         window.addEventListener("message", function(event) {
             if(location.protocol+`//${pbxHost}` !== event.origin){
                 return;
             }
             let data = JSON.parse(event.data);
             if(data.action === 'init-done'){
+                resizeFunc();
                 let settings = {
+                    heightWindow: $(window).height(),
                     currentUser:  480711,
                     currentPhone: '201',
                     pbxHost:      '172.16.156.223',
@@ -52,6 +66,10 @@
                 iFrame.contentWindow.postMessage({action: 'updateContact', data: {number: data.number, contact: 'МИКО ООО', id: '23233'} }, '*');
             }else if(data.action === 'openCard'){
                 // Открыть карточку клиента.
+            }else if(data.action === 'hide-panel'){
+                $('#miko-pbx-phone').hide();
+            }else if(data.action === 'resize'){
+                resizeFunc(data.height);
             }
             console.debug( "received: ", event);
         });

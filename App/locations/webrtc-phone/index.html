@@ -21,9 +21,6 @@
             width: 3.2em;
             border-color: #adb5bd;
         }
-        .m-max-height {
-            height: 300px;
-        }
         #users td, #users tr {
             border: none;
         }
@@ -32,48 +29,36 @@
 </head>
 <body style="background: rgba(0, 0, 0, 0);">
 
-<div id="web-rtc-phone" class="p-3 invisible navbar-fixed-bottom" style="width: 300px">
-    <nav class="d-none">
-        <div class="nav nav-tabs d-none" id="nav-tab" role="tablist">
-            <button class="nav-link active" id="web-rtc-phone-cdr-tab" aria-controls="web-rtc-phone-cdr" data-bs-target="#web-rtc-phone-cdr" data-bs-toggle="tab" type="button" role="tab" aria-selected="true">CDR</button>
-            <button class="nav-link" id="web-rtc-phone-dial-pad-tab" aria-controls="web-rtc-phone-dial-pad" data-bs-target="#web-rtc-phone-dial-pad" data-bs-toggle="tab" type="button" role="tab" aria-selected="false">Dial pad</button>
-            <button class="nav-link" id="web-rtc-phone-settings-tab" aria-controls="web-rtc-phone-settings" data-bs-target="#web-rtc-phone-settings" data-bs-toggle="tab" type="button" role="tab" aria-selected="false">Settings</button>
-        </div>
-    </nav>
-    <div id="web-rtc-phone-calls" class="tab-content m-max-height ">
-        <div id="web-rtc-phone-cdr" class="tab-pane fade show active m-max-height rounded" role="tabpanel" aria-labelledby="web-rtc-phone-cdr-tab" style="overflow-y: scroll;">
-            <div id="empty-row"></div>
-        </div>
-        <div id="web-rtc-phone-dial-pad" class="tab-pane fade container shadow bg-light rounded m-max-height" role="tabpanel" aria-labelledby="web-rtc-phone-dial-pad-tab">
-            <div class="row justify-content-center ">
-                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="1">1</button>
-                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="2">2</button>
-                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="3">3</button>
-            </div>
-            <div class="row justify-content-center">
-                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="4">4</button>
-                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="5" >5</button>
-                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="6" >6</button>
-            </div>
-            <div class="row justify-content-center">
-                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="7" >7</button>
-                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="8" >8</button>
-                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="9" >9</button>
-            </div>
-            <div class="row justify-content-center">
-                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0"  data-digit="*"><i class="fa fa-asterisk"></i></button>
-                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0"  data-digit="0">0</button>
-                <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0"  data-digit="#">#</button>
-            </div>
-            <div class="row justify-content-center">
-                <button type="button" class="btn btn-outline-success rounded-circle m-btn-dial-pad m-1 shadow border-0 m-call-button" ><i class="fa fa-phone-alt"></i></button>
-            </div>
+<div id="web-rtc-phone" class="p-1 invisible fixed-bottom" style="width: 300px">
+    <div id="web-rtc-phone-calls" class="tab-content" style="overflow-y: scroll;">
+        <div id="web-rtc-phone-cdr" class="tab-pane fade show active rounded" role="tabpanel" aria-labelledby="web-rtc-phone-cdr-tab" >
         </div>
     </div>
-    <div id="web-rtc-phone-buttons" class="input-group shadow mb-2 mt-3 d-none" >
-        <button id='dialPadButton' type="button" class="bg-light btn btn-outline-secondary"><i class="fa fa-th"></i></button>
-        <input  id="numDisplay" type="text" class="form-control" placeholder="Enter number..." aria-label="" aria-describedby="">
-        <button id='settingsButton' type="button" class="bg-light btn btn-outline-secondary"><i class="fa fa-cog"></i></button>
+
+    <div id="web-rtc-phone-dial-pad" class="tab-pane fade container shadow bg-light rounded d-none" role="tabpanel" aria-labelledby="web-rtc-phone-dial-pad-tab">
+        <div class="row justify-content-center ">
+            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="1">1</button>
+            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="2">2</button>
+            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="3">3</button>
+        </div>
+        <div class="row justify-content-center">
+            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="4">4</button>
+            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="5" >5</button>
+            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="6" >6</button>
+        </div>
+        <div class="row justify-content-center">
+            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="7" >7</button>
+            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="8" >8</button>
+            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="9" >9</button>
+        </div>
+        <div class="row justify-content-center">
+            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0"  data-digit="*"><i class="fa fa-asterisk"></i></button>
+            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0"  data-digit="0">0</button>
+            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0"  data-digit="#">#</button>
+        </div>
+        <div class="row justify-content-center">
+            <button type="button" class="btn btn-outline-success rounded-circle m-btn-dial-pad m-1 shadow border-0 m-call-button" ><i class="fa fa-phone-alt"></i></button>
+        </div>
     </div>
 
     <div id="users-list" >

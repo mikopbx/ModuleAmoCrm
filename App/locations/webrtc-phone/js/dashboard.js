@@ -10,6 +10,7 @@ define(function (require) {
     require('datatables.net');
 
     return {
+        heightWindow: $(window).height(),
         hide: function (){
             $('#web-rtc-phone').addClass('invisible');
         },
@@ -27,20 +28,26 @@ define(function (require) {
         pbxAction: function (event){
             PubSub.publish('COMMAND', {action: event.data.action, 'data': event.data});
         },
-        resize: function() {
+        resize: function(args) {
+            let webPanel = $("#web-rtc-phone");
             let calls    = $('#web-rtc-phone-calls');
             let cdr      = $('#web-rtc-phone-cdr');
+            let usersList= $('#users-list');
+            if(args !== undefined){
+                self.heightWindow = args.height || self.heightWindow;
+            }
+            usersList.height(self.heightWindow/2);
 
-            let delta    = $('body').height() - calls.height();
-            let deltaCdr = calls.height() - cdr.height();
+            let scrollDiv = $('#users-list .dataTables_scrollBody');
+            if(scrollDiv.length !== 0 ){
+                let delta = $("#users-list .container").outerHeight() - scrollDiv.height();
+                scrollDiv.css('height', self.heightWindow/2 - delta);
+                scrollDiv.css('max-height', self.heightWindow);
+            }
 
-            calls.height($( window ).height() - delta);
-            cdr.height(calls.height() - deltaCdr);
-            let rowsHeight = 0;
-            $('.m-cdr-card').each(function() {
-                rowsHeight += $(this).outerHeight(true);
-            });
-            $('#empty-row').height(calls.outerHeight() - rowsHeight);
+            let availHeight = self.heightWindow - usersList.outerHeight() - $("#web-rtc-phone-status").outerHeight() - 30;
+            calls.height(Math.min(cdr.height(), availHeight));
+            self.sendMessage({action: 'resize', height: webPanel.height()});
         },
         onGetEvent: function (event){
             if(typeof self[event.originalEvent.data.action] !== 'undefined'){
@@ -50,6 +57,7 @@ define(function (require) {
             }
         },
         connect: function (event){
+            self.heightWindow = event.data.heightWindow;
             connector.init(event.data);
         },
         addCall: function (event){
@@ -107,7 +115,6 @@ define(function (require) {
         },
         init: function() {
             self = this;
-            $(window).resize(self.resize);
             $(window).on("message", self.onGetEvent);
             self.show();
             $(document).on('click', 'button', function(){
@@ -135,15 +142,10 @@ define(function (require) {
             setInterval(self.updateDuration, 1000);
             self.sendMessage({action: 'init-done'});
             // create a function to subscribe to topics
-            self.token = PubSub.subscribe('CALLS', self.onMessage);
+            PubSub.subscribe('CALLS', self.onMessage);
 
             $("#hideButton").on('click',function() {
-                $('#web-rtc-phone').addClass('invisible');
-            });
-            $( window ).mousemove(function( event ) {
-                if( $("body").width() - event.pageX < 15){
-                    $('#web-rtc-phone').removeClass('invisible');
-                }
+                self.sendMessage({action: 'hide-panel'});
             });
 
             users.init();
