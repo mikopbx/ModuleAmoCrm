@@ -112,6 +112,7 @@ class AmoCrmConf extends ConfigClass
                 $amo = new AmoCrmMain();
                 $res = $amo->invokeCommand($request);
                 break;
+            case 'TRANSFER':
             case 'CALLBACK':
                 $amo = new AmoCrmMain();
                 $res          = $amo->processCallback($request);

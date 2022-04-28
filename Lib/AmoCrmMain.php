@@ -172,6 +172,7 @@ class AmoCrmMain extends PbxExtensionBase
         }
         return $res;
     }
+
     /**
      * Обработка второго этапа авторизации, ответ от 3ей стороны.
      * @param array $request
@@ -340,13 +341,55 @@ class AmoCrmMain extends PbxExtensionBase
      * @return PBXAmoResult
      * @throws \Exception
      */
-    public function callbackAction($params){
+    public function callbackAction($params):PBXAmoResult
+    {
         $res = new PBXAmoResult();
         $dst = preg_replace("/[^0-9+]/", '', $params['number']);
         Util::amiOriginate($params['user-number'], '', $dst);
         $this->logger->writeInfo(
             "ONEXTERNALCALLSTART: originate from user {$params['user-id']} <{$params['user-number']}> to {$dst})"
         );
+        $res->success = true;
+        return $res;
+    }
+
+    public function transferAction($params):PBXAmoResult
+    {
+        $res     = new PBXAmoResult();
+        $action  = 'Redirect';
+        $cdrData = CDRDatabaseProvider::getCacheCdr();
+        foreach ($cdrData as $cdr){
+            if(!in_array($params['user-number'], [$cdr['src_num'], $cdr['dst_num']], true)){
+                continue;
+            }
+            if( !empty($cdr['endtime']) ){
+                continue;
+            }
+            if(!empty($cdr['answer'])){
+                $action = 'Atxfer';
+                if($cdr['src_num'] === $params['user-number']){
+                    $chanForRedirect = $cdr['src_chan'];
+                }else{
+                    $chanForRedirect = $cdr['dst_chan'];
+                }
+            }elseif($cdr['src_num'] === $params['user-number']){
+                $chanForRedirect = $cdr['dst_chan'];
+            }else{
+                $chanForRedirect = $cdr['src_chan'];
+            }
+        }
+
+        if(empty($chanForRedirect)){
+            return $res;
+        }
+        $am = Util::getAstManager('off');
+        $command = [
+            'Channel'   => $chanForRedirect,
+            'Exten'     => $params['number'],
+            'Context'   => 'internal',
+            'Priority'  => '1'
+        ];
+        $am->sendRequestTimeout($action, $command);
         $res->success = true;
         return $res;
     }
