@@ -386,7 +386,7 @@ class AmoCrmMain extends PbxExtensionBase
         $command = [
             'Channel'   => $chanForRedirect,
             'Exten'     => $params['number'],
-            'Context'   => 'internal',
+            'Context'   => 'internal-transfer',
             'Priority'  => '1'
         ];
         $am->sendRequestTimeout($action, $command);
