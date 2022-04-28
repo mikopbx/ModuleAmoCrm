@@ -46,7 +46,7 @@ define(function (require) {
             }
 
             let availHeight = self.heightWindow - usersList.outerHeight() - $("#web-rtc-phone-status").outerHeight() - 30;
-            calls.height(Math.min(cdr.outerHeight() + 10, availHeight));
+            calls.height(Math.min(cdr.outerHeight() + 20, availHeight));
             self.sendMessage({action: 'resize', height: webPanel.height()});
         },
         onGetEvent: function (event){
