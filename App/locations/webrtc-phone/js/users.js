@@ -93,7 +93,7 @@ define(function (require) {
         dialOrTransfer:function (phone){
             let input = $("#searchInput");
             let users = $(`#users tr[role="button"]`);
-            let inputVal = input.val();
+            let inputVal = input.val().replace(/[^a-zA-Z0-9]/g, "");
 
             if(users.length === 1 || phone !== undefined){
                 if(phone === undefined){

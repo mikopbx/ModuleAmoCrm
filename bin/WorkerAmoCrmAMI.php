@@ -144,6 +144,9 @@ class WorkerAmoCrmAMI extends WorkerBase
             case 'transfer_dial_answer':
                 $this->actionDialAnswer($data);
                 break;
+            case 'dial_end':
+                $this->actionDialEnd($data);
+                break;
             case 'dial':
             case 'transfer_dial':
             case 'sip_transfer':
@@ -498,6 +501,32 @@ class WorkerAmoCrmAMI extends WorkerBase
             break;
         }
         unset($call);
+    }
+
+    /**
+     * Завершение попытки звонка на внутренний номер. Контакт не определн. Dial не был вызван.
+     * @param $data
+     * @return void
+     */
+    private function actionDialEnd($data):void
+    {
+        $src_num = $this->activeChannels[$data['src_chan']];
+        if (isset($this->users[$src_num])) {
+            // Это исходящий вызов.
+            $USER_ID = $this->users[$src_num];
+        } else {
+            return;
+        }
+        $call = [
+            'uid'              => $data['UNIQUEID'],
+            'id'               => $data['linkedid'],
+            'date'             => date(\DateTimeInterface::ATOM, strtotime($data['start'])),
+            'user'             => $USER_ID,
+            'src'              => $src_num,
+            'dst'              => '', // Канал назначения не был создан.
+            'action'           => 'end-dial',
+        ];
+        $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
     }
 
     /**

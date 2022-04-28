@@ -91,7 +91,7 @@ define(function (require) {
                 self.parseCallEvent(callData);
             }else if( callData.action === 'answer' && typeof self.channels[callData.uid] !== 'undefined'){
                 PubSub.publish('CALLS', {action: 'answerCall', 'data': {call_id: callData.uid, answer: (new Date(callData.date)).getTime()/1000 }});
-            }else if(callData.action === 'hangup'){
+            }else if(callData.action === 'hangup' || callData.action === 'end-dial'){
                 delete self.channels[callData.uid];
                 PubSub.publish('CALLS', {action: 'delCall', 'data': {call_id: callData.uid}});
             }else if(callData.action === 'USERS'){
