@@ -36,7 +36,7 @@ define(function (require) {
             if(args !== undefined){
                 self.heightWindow = args.height || self.heightWindow;
             }
-            usersList.height(self.heightWindow/2);
+            usersList.height(Math.min(self.heightWindow/2, $('#users-list div.container').outerHeight()));
 
             let scrollDiv = $('#users-list .dataTables_scrollBody');
             if(scrollDiv.length !== 0 ){

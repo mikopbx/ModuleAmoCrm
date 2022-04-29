@@ -148,6 +148,8 @@ define(function (require) {
                     $(row).attr('data-amo-id', data['amoId']);
                     $(row).attr('role', 'button');
                     $(row).addClass('bg-gradient bg-opacity-10');
+
+                    PubSub.publish('CALLS', {action: 'resize', 'data': {}});
                 },
                 columnDefs: [
                     {
@@ -170,6 +172,11 @@ define(function (require) {
                     zeroRecords:    ""
                 }
             } );
+
+            self.table.on( 'draw.dt', function () {
+                PubSub.publish('CALLS', {action: 'resize', 'data': {}});
+            } );
+
             $("#searchInput").on('keyup',function(e) {
                 let input = $("#searchInput");
                 self.table.search( input.val() );
