@@ -38,7 +38,7 @@ class AuthToken
 
     private function updateToken($authData, bool $isNew = false):void
     {
-        if(!is_array($authData)){
+        if(!is_array($authData) && !empty($authData)){
             try {
                 $authData = json_decode($authData, true, 512, JSON_THROW_ON_ERROR);
             }catch (\Throwable $e){
