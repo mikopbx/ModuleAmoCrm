@@ -6,7 +6,6 @@ use GuzzleHttp;
 use GuzzleHttp\Exception\GuzzleException;
 use MikoPBX\Common\Models\LanInterfaces;
 use MikoPBX\Common\Providers\CDRDatabaseProvider;
-use MikoPBX\Core\Asterisk\AsteriskManager;
 use MikoPBX\Core\System\Processes;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\Cron\WorkerSafeScriptsCore;
@@ -17,7 +16,6 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Common\Models\PbxSettings;
-use Phabel\Exception;
 use Throwable;
 
 class AmoCrmMain extends PbxExtensionBase

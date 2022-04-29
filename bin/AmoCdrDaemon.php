@@ -245,19 +245,24 @@ class AmoCdrDaemon extends WorkerBase
             }
         }
         unset($rows,$call);
-        $this->addCalls($calls);
+        $result = $this->addCalls($calls);
 
-        if($oldOffset !== $this->offset){
+        if($result && $oldOffset !== $this->offset){
             $this->updateOffset();
+        }else{
+            $this->offset = $oldOffset;
         }
     }
 
-    private function addCalls($calls, bool $mainOnly = false):void
+    private function addCalls($calls, bool $mainOnly = false):bool
     {
         if(empty($calls)){
-            return;
+            return false;
         }
         $result = $this->connector->addCalls($calls);
+        if(isset($result->messages['error-code'])){
+            return false;
+        }
         $forUnsorted     = [];
         $validationError = [];
 
@@ -293,6 +298,8 @@ class AmoCdrDaemon extends WorkerBase
             $this->addUnsorted($forUnsorted, $validationError);
         }
         $this->logErrors($validationError);
+
+        return true;
     }
 
     /**
