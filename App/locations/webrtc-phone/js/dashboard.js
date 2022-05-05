@@ -147,7 +147,6 @@ define(function (require) {
             $("#hideButton").on('click',function() {
                 self.sendMessage({action: 'hide-panel'});
             });
-
             users.init();
             self.resize();
             $('#web-rtc-phone').removeClass('invisible');

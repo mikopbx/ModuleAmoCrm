@@ -97,6 +97,20 @@ define(function (require) {
 
         self.add_action("phone", self.api.onClickPhone);
         PubSub.subscribe(self.ns + ':main', self.api.onMessage);
+
+        $(document).on('mousedown',"div.feed-note__call-content a",function() {
+          if($(this).parent().find('a[data-prepare="miko-pbx"]').length === 0){
+            return;
+          }
+          $(this).each(() => {
+            let oldUrl  = $(this).attr('href');
+            let oldHost = (new URL(oldUrl)).hostname;
+            if(oldHost === self.settings.pbxHost){
+              return;
+            }
+            $(this).attr('href', oldUrl.replace(oldHost, self.settings.pbxHost));
+          })
+        });
       },
       onMessage: function (msg, message) {
         if(message.action === 'findContact'){
