@@ -16,7 +16,6 @@ use MikoPBX\Modules\Config\ConfigClass;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\bin\AmoCdrDaemon;
 use Modules\ModuleAmoCrm\bin\WorkerAmoCrmAMI;
-use Modules\ModuleAmoCrm\bin\WorkerAmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\RestAPI\Controllers\ApiController;
 use MikoPBX\PBXCoreREST\Controllers\Cdr\GetController as CdrGetController;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
@@ -52,10 +51,6 @@ class AmoCrmConf extends ConfigClass
     public function getModuleWorkers(): array
     {
         return [
-            [
-                'type'   => WorkerSafeScriptsCore::CHECK_BY_BEANSTALK,
-                'worker' => WorkerAmoCrmMain::class,
-            ],
             [
                 'type'   => WorkerSafeScriptsCore::CHECK_BY_AMI,
                 'worker' => WorkerAmoCrmAMI::class,

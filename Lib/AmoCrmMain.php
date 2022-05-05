@@ -515,28 +515,6 @@ class AmoCrmMain extends PbxExtensionBase
     }
 
     /**
-     * Process something received over AsteriskAMI
-     *
-     * @param array $parameters
-     */
-    public function processAmiMessage(array $parameters): void
-    {
-        $message = implode(' ', $parameters);
-        $this->logger->writeInfo($message);
-    }
-
-    /**
-     * Process something received over Beanstalk queue
-     *
-     * @param array $parameters
-     */
-    public function processBeanstalkMessage(array $parameters): void
-    {
-        $message = implode(' ', $parameters);
-        $this->logger->writeInfo($message);
-    }
-
-    /**
      * Start or restart module workers
      *
      * @param bool $restart

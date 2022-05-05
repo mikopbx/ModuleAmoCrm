@@ -124,7 +124,6 @@ class WorkerAmoCrmAMI extends WorkerBase
         }
         if (stripos($parameters['UserEvent'],'Interception' ) !== false) {
             $this->interception($parameters);
-            $this->amoApi->processAmiMessage($parameters);
             return;
         }
         if ('CdrConnector' !== $parameters['UserEvent']) {
