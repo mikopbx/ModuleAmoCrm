@@ -149,34 +149,38 @@ class AmoCrmMain extends PbxExtensionBase
         return $res;
     }
 
-    public function commandAction(array $request):PBXAmoResult
+    /**
+     * Обработка команды завершения вызова.
+     * @param array $request
+     * @return PBXAmoResult
+     */
+    public function hangupAction(array $request):PBXAmoResult
     {
         $res = new PBXAmoResult();
-        $action = $request['data']['action']??'';
-        if($action === 'hangup'){
-            $cdrData = CDRDatabaseProvider::getCacheCdr();
-            try {
-                $am = Util::getAstManager('off');
-            }catch (\Exception $e){
-                return $res;
-            }
-            foreach ($cdrData as $cdr){
-                if($cdr['UNIQUEID'] !== $request['data']['call-id']){
-                    continue;
-                }
-                if($request['data']['user-phone'] === $cdr['src_num']){
-                    $channel = $cdr['src_chan'];
-                }else{
-                    $channel = $cdr['dst_chan'];
-                }
-                $am->Hangup($channel);
-                $res->success = true;
-            }
+        $cdrData = CDRDatabaseProvider::getCacheCdr();
+        try {
+            $am = Util::getAstManager('off');
+        }catch (\Exception $e){
+            return $res;
         }
+        foreach ($cdrData as $cdr){
+            if($cdr['UNIQUEID'] !== $request['call-id']){
+                continue;
+            }
+            if($request['user-phone'] === $cdr['src_num']){
+                $channel = $cdr['src_chan'];
+            }else{
+                $channel = $cdr['dst_chan'];
+            }
+            $am->Hangup($channel);
+            $res->success = true;
+        }
+
         return $res;
     }
 
     /**
+     * Запуск Originate.
      * @param $params
      * @return PBXAmoResult
      * @throws \Exception
@@ -193,6 +197,12 @@ class AmoCrmMain extends PbxExtensionBase
         return $res;
     }
 
+    /**
+     * Переадресация вызова.
+     * @param $params
+     * @return PBXAmoResult
+     * @throws \Phalcon\Exception
+     */
     public function transferAction($params):PBXAmoResult
     {
         $res     = new PBXAmoResult();
