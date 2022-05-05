@@ -80,18 +80,6 @@ class AmoCrmConf extends ConfigClass
     }
 
     /**
-    curl 'https://127.0.0.1/pbxcore/api/amo-crm/v1/callback' \
-    --data-raw 'action=callback&number=79043332233&user-number=201+&user-id=480711' \
-    --compressed
-
-    curl 'http://127.0.0.1/pbxcore/api/amo-crm/v1/command' \
-    --data-raw 'call-id=mikopbx-1649170490.6_b0691C&user-id=480711&user-phone=201&action=hangup' \
-    --compressed
-
-    curl 'http://127.0.0.1/pbxcore/api/amo-crm/v1/change-settings' \
-    --data-raw 'users%5B480711%5D=201+&users%5B2794642%5D=202&users%5B7689754%5D=203&action=saveSettings'
-    **/
-    /**
      *  Process CoreAPI requests under root rights
      *
      * @param array $request
@@ -105,13 +93,11 @@ class AmoCrmConf extends ConfigClass
         $action = strtoupper($request['action']);
         switch ($action) {
             case 'LISTENER':
+                // Для Oauth2 авторизации.
                 $amo = new AmoCrmMain();
                 $res = $amo->processRequest($request);
                 break;
             case 'COMMAND':
-                $amo = new AmoCrmMain();
-                $res = $amo->invokeCommand($request);
-                break;
             case 'TRANSFER':
             case 'CALLBACK':
                 $amo = new AmoCrmMain();

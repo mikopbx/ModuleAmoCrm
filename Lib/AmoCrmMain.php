@@ -25,6 +25,7 @@ class AmoCrmMain extends PbxExtensionBase
     private string $baseDomain = '';
     private string $extHostname = '';
     private AuthToken $token;
+    private $tokenForAmo = '';
 
     /**
      * Инициализации API клиента.
@@ -41,6 +42,7 @@ class AmoCrmMain extends PbxExtensionBase
             $this->clientSecret = $settings->clientSecret;
             $res = LanInterfaces::findFirst("internet = '1'")->toArray();
             $this->extHostname  = $res['exthostname']??'';
+            $this->tokenForAmo  = $settings->tokenForAmo;
 
             $this->token = new AuthToken($settings->authData);
             $this->refreshToken();
@@ -111,6 +113,9 @@ class AmoCrmMain extends PbxExtensionBase
     {
         $res = new PBXAmoResult();
         $params = $request['data'];
+        if($this->tokenForAmo !== $params['token']){
+            $params = null;
+        }
         if(!is_array($params)){
             return $res;
         }
@@ -144,7 +149,7 @@ class AmoCrmMain extends PbxExtensionBase
         return $res;
     }
 
-    public function invokeCommand(array $request):PBXAmoResult
+    public function commandAction(array $request):PBXAmoResult
     {
         $res = new PBXAmoResult();
         $action = $request['data']['action']??'';
@@ -168,6 +173,64 @@ class AmoCrmMain extends PbxExtensionBase
                 $res->success = true;
             }
         }
+        return $res;
+    }
+
+    /**
+     * @param $params
+     * @return PBXAmoResult
+     * @throws \Exception
+     */
+    public function callbackAction($params):PBXAmoResult
+    {
+        $res = new PBXAmoResult();
+        $dst = preg_replace("/[^0-9+]/", '', $params['number']);
+        Util::amiOriginate($params['user-number'], '', $dst);
+        $this->logger->writeInfo(
+            "ONEXTERNALCALLSTART: originate from user {$params['user-id']} <{$params['user-number']}> to {$dst})"
+        );
+        $res->success = true;
+        return $res;
+    }
+
+    public function transferAction($params):PBXAmoResult
+    {
+        $res     = new PBXAmoResult();
+        $action  = 'Redirect';
+        $cdrData = CDRDatabaseProvider::getCacheCdr();
+        foreach ($cdrData as $cdr){
+            if(!in_array($params['user-number'], [$cdr['src_num'], $cdr['dst_num']], true)){
+                continue;
+            }
+            if( !empty($cdr['endtime']) ){
+                continue;
+            }
+            if(!empty($cdr['answer'])){
+                $action = 'Atxfer';
+                if($cdr['src_num'] === $params['user-number']){
+                    $chanForRedirect = $cdr['src_chan'];
+                }else{
+                    $chanForRedirect = $cdr['dst_chan'];
+                }
+            }elseif($cdr['src_num'] === $params['user-number']){
+                $chanForRedirect = $cdr['dst_chan'];
+            }else{
+                $chanForRedirect = $cdr['src_chan'];
+            }
+        }
+
+        if(empty($chanForRedirect)){
+            return $res;
+        }
+        $am = Util::getAstManager('off');
+        $command = [
+            'Channel'   => $chanForRedirect,
+            'Exten'     => $params['number'],
+            'Context'   => 'internal-transfer',
+            'Priority'  => '1'
+        ];
+        $am->sendRequestTimeout($action, $command);
+        $res->success = true;
         return $res;
     }
 
@@ -332,64 +395,6 @@ class AmoCrmMain extends PbxExtensionBase
             $code = 0;
         }
         return $this->parseResponse($resultHttp, $message, $code);
-    }
-
-    /**
-     * @param $params
-     * @return PBXAmoResult
-     * @throws \Exception
-     */
-    public function callbackAction($params):PBXAmoResult
-    {
-        $res = new PBXAmoResult();
-        $dst = preg_replace("/[^0-9+]/", '', $params['number']);
-        Util::amiOriginate($params['user-number'], '', $dst);
-        $this->logger->writeInfo(
-            "ONEXTERNALCALLSTART: originate from user {$params['user-id']} <{$params['user-number']}> to {$dst})"
-        );
-        $res->success = true;
-        return $res;
-    }
-
-    public function transferAction($params):PBXAmoResult
-    {
-        $res     = new PBXAmoResult();
-        $action  = 'Redirect';
-        $cdrData = CDRDatabaseProvider::getCacheCdr();
-        foreach ($cdrData as $cdr){
-            if(!in_array($params['user-number'], [$cdr['src_num'], $cdr['dst_num']], true)){
-                continue;
-            }
-            if( !empty($cdr['endtime']) ){
-                continue;
-            }
-            if(!empty($cdr['answer'])){
-                $action = 'Atxfer';
-                if($cdr['src_num'] === $params['user-number']){
-                    $chanForRedirect = $cdr['src_chan'];
-                }else{
-                    $chanForRedirect = $cdr['dst_chan'];
-                }
-            }elseif($cdr['src_num'] === $params['user-number']){
-                $chanForRedirect = $cdr['dst_chan'];
-            }else{
-                $chanForRedirect = $cdr['src_chan'];
-            }
-        }
-
-        if(empty($chanForRedirect)){
-            return $res;
-        }
-        $am = Util::getAstManager('off');
-        $command = [
-            'Channel'   => $chanForRedirect,
-            'Exten'     => $params['number'],
-            'Context'   => 'internal-transfer',
-            'Priority'  => '1'
-        ];
-        $am->sendRequestTimeout($action, $command);
-        $res->success = true;
-        return $res;
     }
 
     /**

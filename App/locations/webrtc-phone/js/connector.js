@@ -47,7 +47,6 @@ define(function (require) {
             setInterval(self.checkConnection, 5000);
 
             self.token = PubSub.subscribe('COMMAND', function (msg, message) {
-                message.token = self.settings.token;
                 let url;
                 if(message.action === 'saveSettings'){
                     url = `${window.location.origin}/pbxcore/api/amo-crm/v1/change-settings`;
@@ -58,12 +57,14 @@ define(function (require) {
                         'user-number':  self.settings.currentPhone,
                         'user-id':      self.settings.currentUser
                     };
+
                     url = `${window.location.origin}/pbxcore/api/amo-crm/v1/callback`;
                 }else if(message.action === 'callback'){
                     url = `${window.location.origin}/pbxcore/api/amo-crm/v1/callback`;
                 }else{
                     url = `${window.location.origin}/pbxcore/api/amo-crm/v1/command`;
                 }
+                message.data.token = self.settings.token;
                 $.post(url, message.data, function( response ) {
                     console.log('result', response);
                 });
