@@ -20,12 +20,14 @@ use Throwable;
 
 class AmoCrmMain extends PbxExtensionBase
 {
+    public const   REDIRECT_URL = 'https://miko.ru';
+
     private string $clientId = '';
     private string $clientSecret = '';
     private string $baseDomain = '';
     private string $extHostname = '';
     private AuthToken $token;
-    private $tokenForAmo = '';
+    private string $tokenForAmo = '';
 
     /**
      * Инициализации API клиента.
@@ -42,7 +44,7 @@ class AmoCrmMain extends PbxExtensionBase
             $this->clientSecret = $settings->clientSecret;
             $res = LanInterfaces::findFirst("internet = '1'")->toArray();
             $this->extHostname  = $res['exthostname']??'';
-            $this->tokenForAmo  = $settings->tokenForAmo;
+            $this->tokenForAmo  = (string)$settings->tokenForAmo;
 
             $this->token = new AuthToken($settings->authData);
             $this->refreshToken();
@@ -66,7 +68,7 @@ class AmoCrmMain extends PbxExtensionBase
             'client_secret' => $this->clientSecret,
             'grant_type'    => 'authorization_code',
             'code'          => $code,
-            'redirect_uri'  => "https://miko.ru",
+            'redirect_uri'  => self::REDIRECT_URL,
         ];
         $url = "https://$this->baseDomain/oauth2/access_token";
         $result = $this->sendHttpPostRequest($url, $params);
@@ -96,7 +98,7 @@ class AmoCrmMain extends PbxExtensionBase
             'client_secret' => $this->clientSecret,
             'grant_type' => 'refresh_token',
             'refresh_token' => $refreshToken,
-            'redirect_uri'  => "https://$this->extHostname/pbxcore/api/amo-crm/v1/listener",
+            'redirect_uri'  => self::REDIRECT_URL,
         ];
         $result = $this->sendHttpPostRequest($url, $params);
         if($result->success){
