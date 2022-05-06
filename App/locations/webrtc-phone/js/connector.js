@@ -66,7 +66,7 @@ define(function (require) {
                 }
                 message.data.token = self.settings.token;
                 $.post(url, message.data, function( response ) {
-                    console.log('result', response);
+                    console.debug('result', response);
                 });
             });
         },
