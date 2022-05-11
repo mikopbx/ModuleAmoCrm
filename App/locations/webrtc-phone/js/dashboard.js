@@ -33,7 +33,7 @@ define(function (require) {
             let calls    = $('#web-rtc-phone-calls');
             let cdr      = $('#web-rtc-phone-cdr');
             let usersList= $('#users-list');
-            if(args !== undefined){
+            if(args !== undefined && typeof args.height !== 'undefined'){
                 self.heightWindow = args.height || self.heightWindow;
             }
             usersList.height(Math.min(self.heightWindow/2, $('#users-list div.container').outerHeight()));
@@ -74,15 +74,14 @@ define(function (require) {
             if($('#web-rtc-phone .m-cdr-card[data-callid="'+event.data.call_id+'"]').length !== 0 ){
                 return
             }
-
             if(event.data.number.length <= 4){
                 // Скроем кнопки для внутренних звонков.
                 event.data.additionalCardClass = 'd-none';
             }
 
             let html = template.render(event.data);
-            $("#web-rtc-phone-cdr").append(html)
-            $('#web-rtc-phone').removeClass('invisible');
+            $("#web-rtc-phone-cdr").append(html);
+            self.sendMessage({action: 'show-panel'});
             self.resize();
         },
         answerCall:function (event){
@@ -140,6 +139,7 @@ define(function (require) {
             });
 
             setInterval(self.updateDuration, 1000);
+
             self.sendMessage({action: 'init-done'});
             // create a function to subscribe to topics
             PubSub.subscribe('CALLS', self.onMessage);

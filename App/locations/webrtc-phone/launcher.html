@@ -57,7 +57,7 @@
                         '203': 480711,
                         '204': 480712
                     },
-                    token: 'test',
+                    token: 'test-token',
                     time_unit: 'c.'
                 };
                 iFrame.contentWindow.postMessage({action: 'connect', data: settings}, '*');
@@ -68,6 +68,9 @@
                 // Открыть карточку клиента.
             }else if(data.action === 'hide-panel'){
                 $('#miko-pbx-phone').hide();
+            }else if(data.action === 'show-panel'){
+                $('#miko-pbx-phone').show();
+                iFrame.contentWindow.postMessage({action: 'resize'}, '*');
             }else if(data.action === 'resize'){
                 resizeFunc(data.height);
             }

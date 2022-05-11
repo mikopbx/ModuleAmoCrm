@@ -89,6 +89,10 @@ define(function (require) {
                 PubSub.publish(connector.settings.ns + ':main', params);
             }else if(params.action === 'hide-panel'){
                 $('#miko-pbx-phone').hide();
+            }else if(params.action === 'show-panel'){
+                $('#miko-pbx-phone').show({done: () => {
+                    connector.iFrame.contentWindow.postMessage({action: 'resize'}, '*');
+                }});
             }else if(params.action === 'resize'){
                 connector.resizeFunc(params.height);
             }else{
