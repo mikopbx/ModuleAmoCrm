@@ -47,32 +47,39 @@ class AmoCdrDaemon extends WorkerBase
     private array $cdrRows = [];
     private string $lastCacheCdr = '';
     private string $lastCacheUsers = '';
+    private string $tokenForAmo = '';
 
     /**
      * Начало загрузки истории звонков в Amo.
      */
     public function start($params):void
     {
-        $this->amoApi = new AmoCrmMain();
-
-        /** @var ModuleAmoCrm $settings */
-        $settings = ModuleAmoCrm::findFirst();
-        if($settings){
-            $this->offset = 1*$settings->offsetCdr;
-            $this->offset = max($this->offset,1);
-            $this->referenceDate = $settings->referenceDate;
-        }else{
-            // Настройки не заполенны.
-            return;
-        }
-        $this->connector = new AmoCrmMain();
-        [$this->extensionLength, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
+        $this->updateSettings();
         while (true){
             $this->updateActiveCalls();
             $this->updateUsers();
             $this->cdrSync();
             sleep(3);
         }
+    }
+
+    private function updateSettings():void
+    {
+        $this->amoApi = new AmoCrmMain();
+        /** @var ModuleAmoCrm $settings */
+        $settings = ModuleAmoCrm::findFirst();
+        if($settings){
+            $this->offset       = 1*$settings->offsetCdr;
+            $this->offset        = max($this->offset,1);
+            $this->referenceDate = $settings->referenceDate;
+            $this->tokenForAmo   = $settings->tokenForAmo;
+        }else{
+            // Настройки не заполенны.
+            return;
+        }
+        $this->connector   = new AmoCrmMain();
+        [$this->extensionLength, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
+
     }
 
     /**
@@ -118,7 +125,7 @@ class AmoCdrDaemon extends WorkerBase
      * @param string $name
      * @return bool
      */
-    function checkService( string $name):bool
+    private function checkService( string $name):bool
     {
         $client = new GuzzleHttp\Client();
         $options = [
@@ -128,11 +135,14 @@ class AmoCdrDaemon extends WorkerBase
         $result = '';
         $code   = 408;
         try {
-            $res    = $client->request('GET', "http://127.0.0.1/pbxcore/api/nchan/sub/$name?token=test",$options);
+            $res    = $client->request('GET', "http://127.0.0.1/pbxcore/api/nchan/sub/$name?token={$this->tokenForAmo}",$options);
             $result = $res->getBody();
             $code   = $res->getStatusCode();
         }catch (\Throwable $e){
             Util::sysLogMsg(self::class, $e->getMessage());
+        }
+        if($code === 403){
+            $this->updateSettings();
         }
         return ($code === 200 && !empty($result));
     }
