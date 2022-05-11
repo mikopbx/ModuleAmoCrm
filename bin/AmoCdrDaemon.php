@@ -245,7 +245,6 @@ class AmoCdrDaemon extends WorkerBase
                 'source'              => self::SOURCE_ID,
                 'link'                => $link,
                 'phone'               => $row[$phoneCol],
-                'call_result'         => $row['disposition'],
                 'call_status'         => $call_status,
                 'created_at'          => $created_at,
                 'updated_at'          => $created_at,

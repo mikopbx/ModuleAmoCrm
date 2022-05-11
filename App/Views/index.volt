@@ -9,7 +9,7 @@
         {{ form.render('id') }}
         {{ form.render('referenceDate') }}
         <button class="ui positive basic button" id="simple-login-button">{{ t._("module_amo_crmSimpleLogin") }}</button>
-        <button class="ui positive basic button" id="login-button">{{ t._("module_amo_crmLogin") }}</button>
+<!--         <button class="ui positive basic button" id="login-button">{{ t._("module_amo_crmLogin") }}</button> -->
         <br>
         <br>
         <div class="ten wide field disability">
