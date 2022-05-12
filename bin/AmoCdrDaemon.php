@@ -80,6 +80,8 @@ class AmoCdrDaemon extends WorkerBase
         $this->connector   = new AmoCrmMain();
         [$this->extensionLength, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
 
+        $this->innerNums[] = 'outworktimes';
+        $this->innerNums[] = 'voicemail';
     }
 
     /**
@@ -218,11 +220,11 @@ class AmoCdrDaemon extends WorkerBase
                 continue;
             }
             $phoneCol  = 'src_num';
-            if($this->extensionLength < strlen($srcNum)){
+            if(in_array($dstNum, $this->innerNums, true)){
                 // Это входящий.
                 $direction = 'inbound';
                 $amoUserId = $this->users[$dstNum]??null;
-            }elseif($this->extensionLength < strlen($dstNum)){
+            }elseif(in_array($srcNum, $this->innerNums, true)){
                 // Исходящий.
                 $direction = 'outbound';
                 $phoneCol  = 'dst_num';
@@ -248,6 +250,11 @@ class AmoCdrDaemon extends WorkerBase
                 Util::sysLogMsg(__CLASS__, $row['UNIQUEID'].' : '.$row['start'].' : '.$e->getMessage());
                 continue;
             }
+
+            $this->offset = $row['id'];
+            if(strlen($row[$phoneCol])<5){
+                continue;
+            }
             $call = [
                 'direction'           => $direction,
                 'uniq'                => $row['UNIQUEID'],
@@ -266,7 +273,6 @@ class AmoCdrDaemon extends WorkerBase
                 $call['responsible_user_id'] = $amoUserId;
             }
             $calls[]      = $call;
-            $this->offset = $row['id'];
             $this->cdrRows[$row['UNIQUEID']] = $call;
         }
 
@@ -294,7 +300,8 @@ class AmoCdrDaemon extends WorkerBase
             return false;
         }
         $result = $this->connector->addCalls($calls);
-        if(isset($result->messages['error-code'])){
+        if(($result->messages['error-code']??0) === 401){
+            // Ошибка авторизации.
             return false;
         }
         $forUnsorted     = [];

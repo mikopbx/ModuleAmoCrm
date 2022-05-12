@@ -604,6 +604,9 @@ class AmoCrmMain extends PbxExtensionBase
      */
     public static function getPhoneIndex($number)
     {
+        if(!is_numeric(str_replace('+', '', $number))){
+            return $number;
+        }
         return substr($number, -10);
     }
 
