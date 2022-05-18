@@ -7,8 +7,7 @@
     "interface_version": 2,
     "init_once": true,
     "locale": [
-      "ru",
-      "en"
+      "ru"
     ],
     "installation": true,
     "support": {
@@ -30,28 +29,29 @@
     "is_tour": true,
     "tour_images": {
       "ru": [
-        "/images/logo_main.png",
-        "/images/logo_main.png",
-        "/images/logo_main.png"
+        "/images/tour_1_ru.png",
+        "/images/tour_2_ru.png",
+        "/images/tour_3_ru.png"
       ]
     },
     "tour_description": "widget.tour_description"
   },
+
   "settings": {
     "miko_pbx_host": {
-      "name": "settings.host",
+      "name": "settings.miko_pbx_host",
       "type": "text",
       "required": true
-    },
-    "pbx_users": {
-      "name": "settings.users",
-      "type": "users",
-      "required": false
     },
     "token": {
       "name": "settings.token",
       "type": "text",
       "required": true
+    },
+    "pbx_users": {
+      "name": "settings.pbx_users",
+      "type": "users",
+      "required": false
     }
   }
 }
