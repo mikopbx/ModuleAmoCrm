@@ -35,14 +35,14 @@ define(function (require) {
         return true;
       },
       settings: function () {
-        let ns = self.ns.split(":")[1];
+        let wCode = self.params.widget_code;
         let boldStyle = {
           "font-weight": "bold",
           "color": "#61a0e1"
         };
-        $(`.${ns} div.widget_settings_block__title_field:not(.widget_settings_block_users__title_field)`).css(boldStyle);
-        $(`.${ns} strong`).css(boldStyle);
-        $(`.${ns} a`).css({"color": "#61a0e1"});
+        $(`.${wCode} div.widget_settings_block__title_field:not(.widget_settings_block_users__title_field)`).css(boldStyle);
+        $(`.${wCode} strong`).css(boldStyle);
+        $(`.${wCode} a`).css({"color": "#61a0e1"});
         return true;
       },
       onSave: function (data) {
