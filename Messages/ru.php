@@ -8,10 +8,10 @@
  */
 
 return [
-    'BreadcrumbModuleAmoCrm'        => 'Модуль интеграции с Amo CRM',
-    'SubHeaderModuleAmoCrm'         => 'Интеграция с Amo CRM',
+    'BreadcrumbModuleAmoCrm'        => 'Модуль интеграции с amoCRM',
+    'SubHeaderModuleAmoCrm'         => 'Интеграция с amoCRM',
     'module_template_AddNewRecord'  => 'Добавить',
-    'module_amo_crmLogin'           => 'Авторизация в Amo CRM',
+    'module_amo_crmLogin'           => 'Авторизация в amoCRM',
     'module_amo_crmSimpleLogin'     => 'Ввести код авторизации',
     'mod_amo_authCodeText'          => 'Введите код авторизации',
     'mod_amo_authCodeSave'          => 'Сохранить',

@@ -8,9 +8,9 @@
  */
 
 return [
-	'repModuleAmoCrm'       => 'Module template - %repesent%',
-	'mo_ModuleModuleAmoCrm' => 'Module template',
-    'BreadcrumbModuleAmoCrm'=> 'Template module',
+	'repModuleAmoCrm'       => 'Module amoCRM - %repesent%',
+	'mo_ModuleModuleAmoCrm' => 'Module amoCRM',
+    'BreadcrumbModuleAmoCrm'=> 'Module amoCRM',
     'SubHeaderModuleAmoCrm' => 'Example to create own modules',
     'mod_amo_authCodeText'          => 'Enter auth code',
     'module_amo_crmSimpleLogin'     => 'Enter auth code',
