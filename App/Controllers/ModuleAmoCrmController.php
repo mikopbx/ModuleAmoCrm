@@ -145,11 +145,13 @@ class ModuleAmoCrmController extends BaseController
         }
         $this->db->begin();
         foreach ($record as $key => $value) {
-            if($key === 'id'){
+            if(in_array($key, ['id','offsetCdr','authData'], true)){
                 continue;
             }
             if (array_key_exists($key, $data)) {
-                $record->$key = trim($data[$key]);
+                if($record->$key !== trim($data[$key])){
+                    $record->$key = trim($data[$key]);
+                }
             } else {
                 $record->$key = '';
             }

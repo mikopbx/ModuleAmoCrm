@@ -36,10 +36,12 @@ class AmoCrmConf extends ConfigClass
             }
             if(in_array('tokenForAmo', $data['changedFields'], true)) {
                 $this->makeAuthFiles();
-            }else{
-                $templateMain = new AmoCrmMain();
-                $templateMain->startAllServices(true);
+                if(count($data['changedFields']) === 1){
+                    return;
+                }
             }
+            $templateMain = new AmoCrmMain();
+            $templateMain->startAllServices(true);
         }
     }
 
