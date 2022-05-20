@@ -4,16 +4,19 @@
     <title>MikoPBX oAuth AmoCRM</title>
     <script>
         let parent = undefined;
-        if(window.parent){
-            parent = window.parent;
-        }else if(window.opener){
+        if(window.opener){
             parent = window.opener;
+        }else if(window.parent && window.parent !== window){
+            parent = window.parent;
         }
         if(parent){
-            window.parent.postMessage({'code': '<?php echo $_REQUEST['code']??'undefined'; ?>'}, "*");
+            parent.postMessage({'code': '<?php echo $_REQUEST['code']??'undefined'; ?>'}, "*");
         }else{
             close();
         }
     </script>
 </head>
+<body>
+<?php echo $_REQUEST['code']??'undefined'; ?>
+</body>
 </html>

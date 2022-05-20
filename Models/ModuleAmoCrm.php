@@ -30,16 +30,6 @@ class ModuleAmoCrm extends ModulesModelsBase
     /**
      * @Column(type="string", nullable=true)
      */
-    public $clientId;
-
-    /**
-     * @Column(type="string", nullable=true)
-     */
-    public $clientSecret;
-
-    /**
-     * @Column(type="string", nullable=true)
-     */
     public $authData;
 
     /**

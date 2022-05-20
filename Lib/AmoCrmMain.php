@@ -20,10 +20,10 @@ use Throwable;
 
 class AmoCrmMain extends PbxExtensionBase
 {
-    public const   REDIRECT_URL = 'https://functions.yandexcloud.net/d4eum76t20er96812ksi';
+    public const   REDIRECT_URL  = '%REDIRECT_URL%';
+    public const   CLIENT_SECRET = '%CLIENT_SECRET%';
+    public const   CLIENT_ID     = '%CLIENT_ID%';
 
-    private string $clientId = '';
-    private string $clientSecret = '';
     private string $baseDomain = '';
     private string $extHostname = '';
     private AuthToken $token;
@@ -40,8 +40,6 @@ class AmoCrmMain extends PbxExtensionBase
         $settings = ModuleAmoCrm::findFirst();
         if($settings){
             $this->baseDomain   = $settings->baseDomain;
-            $this->clientId     = $settings->clientId;
-            $this->clientSecret = $settings->clientSecret;
             $res = LanInterfaces::findFirst("internet = '1'")->toArray();
             $this->extHostname  = $res['exthostname']??'';
             $this->tokenForAmo  = (string)$settings->tokenForAmo;
@@ -64,8 +62,8 @@ class AmoCrmMain extends PbxExtensionBase
     public function getAccessTokenByCode($code):PBXAmoResult
     {
         $params  = [
-            'client_id'     => $this->clientId,
-            'client_secret' => $this->clientSecret,
+            'client_id'     => self::CLIENT_ID,
+            'client_secret' => self::CLIENT_SECRET,
             'grant_type'    => 'authorization_code',
             'code'          => $code,
             'redirect_uri'  => self::REDIRECT_URL,
@@ -94,8 +92,8 @@ class AmoCrmMain extends PbxExtensionBase
         }
         $url = "https://$this->baseDomain/oauth2/access_token";
         $params = [
-            'client_id'     => $this->clientId,
-            'client_secret' => $this->clientSecret,
+            'client_id'     => self::CLIENT_ID,
+            'client_secret' => self::CLIENT_SECRET,
             'grant_type' => 'refresh_token',
             'refresh_token' => $refreshToken,
             'redirect_uri'  => self::REDIRECT_URL,

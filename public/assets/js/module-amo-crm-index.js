@@ -51,6 +51,17 @@ var ModuleAmoCrm = {
       }]
     }
   },
+  generatePassword: function generatePassword() {
+    var length = 50,
+        charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+        retVal = "";
+
+    for (var i = 0, n = charset.length; i < length; ++i) {
+      retVal += charset.charAt(Math.floor(Math.random() * n));
+    }
+
+    return retVal;
+  },
 
   /**
    * On page load we init some Semantic UI library
@@ -79,6 +90,11 @@ var ModuleAmoCrm = {
     window[className].checkStatus();
     setInterval(window[className].checkStatus, 5000);
     $(window).bind('message', window[className].updateAuthInfo);
+    $("#createPassword").on('click', function (e) {
+      $("#tokenForAmo").val(window[className].generatePassword()); // Сохраняем изменения.
+
+      $('#submitbutton').removeClass('disabled').trigger('click');
+    });
     $("#login-button").on('click', function (e) {
       var client_id = $('#clientId').val();
       var state = encodeURIComponent(client_id);
@@ -86,33 +102,31 @@ var ModuleAmoCrm = {
       var url = "https://www.amocrm.ru/oauth?client_id=".concat(client_id, "&state=").concat(state, "&redirect_uri=").concat(redirect_uri, "&mode=post_message&scope=&approval_prompt=auto");
       window[className].popup = window.open(url, 'Auth', 'scrollbars, status, resizable, width=750, height=580');
     });
-    $("#simple-login-button").on('click', function (e) {
-      $('#modal-auth-simple').modal({
-        onApprove: window[className].simpleLoginApprove
-      }).modal('show');
-    });
   },
   checkStatus: function checkStatus() {
     $.get(idUrl + '/check', function (result) {
-      var statusOk = $('#status-ok');
-      var statusFail = $('#status-fail');
+      var elStatusAuth = $('#login-button');
+      elStatusAuth.removeClass('red green');
 
       if (result.success === true) {
-        statusFail.hide();
-        statusOk.show();
+        elStatusAuth.addClass('green');
+        elStatusAuth.text(globalTranslate.module_amo_crm_connect_ok);
       } else {
-        statusOk.hide();
-        statusFail.show();
+        elStatusAuth.addClass('red');
+        elStatusAuth.text(globalTranslate.module_amo_crm_connect_fail);
       }
     });
   },
-  simpleLoginApprove: function simpleLoginApprove() {
+  updateAuthInfo: function updateAuthInfo(e) {
     var params = {
-      'code': $('#authCode').val(),
+      'code': e.originalEvent.data.code,
       'referer': $('#baseDomain').val(),
       'save-only': true
     };
     $("#warning-message").hide();
+    var elStatusAuth = $('#login-button');
+    elStatusAuth.removeClass('red green');
+    elStatusAuth.text(globalTranslate.module_amo_crm_connect_refresh);
     $.post("".concat(Config.pbxUrl, "/pbxcore/api/modules/").concat(className, "/listener"), params, function (data) {
       if (data.result === false) {
         var errorText = data.messages['error-data'].hint || '' + " (" + data.messages['error-data'].detail || '' + ").";
@@ -123,8 +137,6 @@ var ModuleAmoCrm = {
 
       console.log('result', data);
     });
-  },
-  updateAuthInfo: function updateAuthInfo(e) {
     window[className].popup.close();
   },
 
