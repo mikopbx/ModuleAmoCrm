@@ -1,0 +1,170 @@
+<!--
+  ~ MikoPBX - free phone system for small business
+  ~ Copyright © 2017-2022 Alexey Portnov and Nikolay Beketov
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU General Public License as published by
+  ~ the Free Software Foundation; either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~ GNU General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU General Public License along with this program.  
+  ~ If not, see <https://www.gnu.org/licenses/>.
+  -->
+
+
+<article class="miko-pbx-desc pt-0">
+    <div class="miko-pbx-desc__block"><strong> MikoPBX – бесплатная АТС на базе Asterisk. Предлагает все возможности современной IP телефонии.</strong>
+    </div>
+
+    <div class="miko-pbx-desc__block"><h3>Основные функции:</h3>
+        <ul>
+            <li>Перехват звонка на ответственного</li>
+            <li>Звонок из карточки</li>
+            <li>Записи телефонных разговоров прикрепляются к карточке клиента / сделке</li>
+            <li>Панель управления вызовами</li>
+            <li>Отображение статусов абонентов АТС</li>
+            <li>Переадресация вызова на другого сотрудника двойным кликом</li>
+            <li>Вызов абонента АТС двойным кликом в панели управления вызовами</li>
+            <li>Пропущенные вызовы попадают в неразобранное</li>
+        </ul>
+        <a href="https://wiki.mikopbx.ru/module-amo-crm">Инструкции по настройке</a>
+    </div>
+</article>
+
+<style>
+    .miko-pbx-desc {
+        font-family: 'Ubuntu', sans-serif;
+        font-size: 15px;
+        line-height: 1.6em;
+        color: #212121;
+        padding-top: 64px;
+    }
+
+    .miko-pbx-desc.pt-0 {
+        padding-top: 0;
+    }
+
+    .miko-pbx-desc__block + .miko-pbx-desc__block {
+        margin-top: 30px;
+    }
+
+    .miko-pbx-desc strong {
+        display: block;
+        background-color: #e0f7ff;
+        padding: 24px;
+    }
+
+    .miko-pbx-desc em {
+        font-weight: bold;
+        color: #0056f5;
+    }
+
+    .miko-pbx-desc p {
+        margin-bottom: 8px;
+    }
+
+    .miko-pbx-desc li {
+        margin-bottom: 8px;
+    }
+
+    .miko-pbx-desc ul li {
+        display: block;
+        margin-left: 20px;
+        position: relative;
+    }
+
+    .miko-pbx-desc ul li:before {
+        content: "";
+        position: absolute;
+        display: inline-flex;
+        flex-shrink: 0;
+        width: 8px;
+        height: 8px;
+        margin-right: 8px;
+        margin-top: 8px;
+        border-radius: 50%;
+        left: -20px;
+        background: #61a0e1;
+    }
+
+    .miko-pbx-desc ol {
+        margin-bottom: 8px;
+    }
+
+    .miko-pbx-desc ol li {
+        list-style-type: decimal;
+    }
+
+    .miko-pbx-desc a {
+        color: #61a0e1;
+    }
+
+    .miko-pbx-desc h3 {
+        font-weight: normal;
+        font-size: 24px;
+        line-height: 32px;
+        margin-bottom: 16px;
+    }
+
+    .miko-pbx-desc i {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 12px;
+        line-height: 16px;
+    }
+
+    .miko-pbx-desc table {
+        width: 100%;
+        margin-bottom: 8px;
+    }
+
+    .miko-pbx-desc table {
+        border-collapse: collapse;
+    }
+
+    .miko-pbx-desc table th {
+        font-size: 12px;
+        line-height: 16px;
+    }
+
+    .miko-pbx-desc table td, .miko-pbx-desc table th {
+        border: 1px solid #FFE0B2;
+        width: 20%;
+        padding: 8px;
+    }
+
+    .miko-pbx-desc table tr:first-child th {
+        border-top: 0;
+    }
+
+    .miko-pbx-desc table tr td:first-child, .miko-pbx-desc table tr th:first-child {
+        border-left: 0;
+    }
+
+    .miko-pbx-desc table tr:not(:nth-child(3)) td:first-child, .miko-pbx-desc table tr th:first-child {
+        padding-left: 0;
+    }
+
+    .miko-pbx-desc table tr td:last-child, .miko-pbx-desc table tr th:last-child {
+        border-right: 0;
+    }
+
+    .miko-pbx-desc table tbody tr:first-child {
+        font-weight: bold;
+    }
+
+    .miko-pbx-desc ul.miko-pbx-desc__icon-list li {
+        display: flex;
+        margin-left: 0;
+        margin-bottom: 8px
+    }
+
+    .miko-pbx-desc ul.miko-pbx-desc__icon-list li::before {
+        content: none;
+    }
+</style>

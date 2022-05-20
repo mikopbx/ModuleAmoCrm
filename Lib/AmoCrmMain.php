@@ -20,7 +20,7 @@ use Throwable;
 
 class AmoCrmMain extends PbxExtensionBase
 {
-    public const   REDIRECT_URL = 'https://miko.ru';
+    public const   REDIRECT_URL = 'https://functions.yandexcloud.net/d4eum76t20er96812ksi';
 
     private string $clientId = '';
     private string $clientSecret = '';
