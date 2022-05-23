@@ -33,12 +33,10 @@ use GuzzleHttp;
 
 class AmoCdrDaemon extends WorkerBase
 {
-    public const SOURCE_ID    = 'miko-pbx';
-    private const   LIMIT   = 50;
-    private int     $offset = 1;
-    private int $extensionLength;
-    public AmoCrmMain $connector;
-    public array $innerNums = [];
+    public const  SOURCE_ID    = 'miko-pbx';
+    private const LIMIT   = 50;
+    private int   $offset = 1;
+    public array  $innerNums = [];
     private array $users = [];
     public string $referenceDate='';
 
@@ -77,8 +75,7 @@ class AmoCdrDaemon extends WorkerBase
             // Настройки не заполенны.
             return;
         }
-        $this->connector   = new AmoCrmMain();
-        [$this->extensionLength, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
+        [, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
 
         $this->innerNums[] = 'outworktimes';
         $this->innerNums[] = 'voicemail';
@@ -208,7 +205,7 @@ class AmoCdrDaemon extends WorkerBase
             'limit'   => self::LIMIT,
         ];
         $rows = CDRDatabaseProvider::getCdr($filter);
-        $extHostname = $this->connector->getExtHostname();
+        $extHostname = $this->amoApi->getExtHostname();
         $calls    = [];
         foreach ($rows as $row){
             $srcNum = AmoCrmMain::getPhoneIndex($row['src_num']);
@@ -299,7 +296,7 @@ class AmoCdrDaemon extends WorkerBase
         if(empty($calls)){
             return false;
         }
-        $result = $this->connector->addCalls($calls);
+        $result = $this->amoApi->addCalls($calls);
         if(($result->messages['error-code']??0) === 401){
             // Ошибка авторизации.
             return false;
@@ -399,13 +396,13 @@ class AmoCdrDaemon extends WorkerBase
             ];
         }
 
-        $this->connector->createContacts($outCalls);
+        $this->amoApi->createContacts($outCalls);
         $this->addCalls($outCalls, true);
 
         if(empty($calls)){
             return;
         }
-        $result = $this->connector->addUnsorted($calls);
+        $result = $this->amoApi->addUnsorted($calls);
         $errorData = $result->messages['error-data']['validation-errors']??[];
         foreach ($errorData as $err){
             $row = $this->cdrRows[$err['request_id']];

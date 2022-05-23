@@ -9,6 +9,7 @@
 
 namespace Modules\ModuleAmoCrm\Lib;
 
+use MikoPBX\Core\System\PBX;
 use MikoPBX\Core\System\Processes;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\Cron\WorkerSafeScriptsCore;
@@ -144,7 +145,11 @@ class AmoCrmConf extends ConfigClass
         }
     }
 
-    /**
+    public function generateIncomingRoutBeforeDial($rout_number): string
+    {
+        return "\t" . 'same => n,UserEvent(InterceptionAMO,CALLERID: ${CALLERID(num)},chan1c: ${CHANNEL},FROM_DID: ${FROM_DID})' . "\n\t";
+    }
+        /**
      * Create additional Nginx locations from modules
      *
      */
@@ -166,5 +171,26 @@ class AmoCrmConf extends ConfigClass
                     "access_log off;".PHP_EOL."\t".
                     "expires 3d;".PHP_EOL.
                 "}".PHP_EOL;
+    }
+
+    /**
+     * Process after disable action in web interface
+     *
+     * @return void
+     */
+    public function onAfterModuleDisable(): void
+    {
+        PBX::dialplanReload();
+    }
+
+    /**
+     * Process after enable action in web interface
+     *
+     * @return void
+     * @throws \Exception
+     */
+    public function onAfterModuleEnable(): void
+    {
+        PBX::dialplanReload();
     }
 }

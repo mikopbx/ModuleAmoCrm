@@ -435,6 +435,33 @@ class AmoCrmMain extends PbxExtensionBase
         return $this->sendHttpPostRequest($url, $calls, $headers);
     }
 
+    public function getContactDataByPhone($phone):PBXApiResult
+    {
+        $url = "https://$this->baseDomain/private/api/v2/json/contacts/list";
+        $headers = [
+            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
+        ];
+        $params = [
+            'query' => $phone
+        ];
+        $response = $this->sendHttpGetRequest($url, $params, $headers);
+        $result   = new PBXApiResult();
+
+        $contact = $response->data['response']['contacts'][0]??false;
+        if($response->success && $contact){
+            $result->data = [
+                'id'     => $contact['id']??'',
+                'name'   => $contact['name']??'',
+                'company'=> $contact['company_name']??'',
+                'userId' => $contact['responsible_user_id']??'',
+                'number' => $phone
+
+            ];
+            $result->success = !empty($result->data['id']);
+        }
+        return $result;
+    }
+
     public function addUnsorted($calls):PBXApiResult
     {
         $url = "https://$this->baseDomain/api/v4/leads/unsorted/sip";

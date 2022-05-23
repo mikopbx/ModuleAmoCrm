@@ -20,6 +20,7 @@
 namespace Modules\ModuleAmoCrm\bin;
 require_once 'Globals.php';
 
+use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
@@ -34,6 +35,8 @@ class WorkerAmoCrmAMI extends WorkerBase
     private int     $extensionLength = 3;
     private array   $users = [];
     private array   $innerNums = [];
+
+    private $beanstalk;
 
     /**
      * Соответстввие Linked ID и сведиений о каналах.
@@ -60,7 +63,8 @@ class WorkerAmoCrmAMI extends WorkerBase
      */
     public function start($params):void
     {
-        $this->amoApi = new AmoCrmMain();
+        $this->amoApi    = new AmoCrmMain();
+        $this->beanstalk = new BeanstalkClient(WorkerAmoContacts::class);
 
         $this->am     = Util::getAstManager();
         $this->setFilter();
@@ -108,7 +112,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'did'     => $data['FROM_DID'],
             'action'  => 'interception'
         ];
-        $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
+        $this->beanstalk->publish(json_encode($params));
     }
 
     /**
@@ -122,7 +126,7 @@ class WorkerAmoCrmAMI extends WorkerBase
         if ($this->replyOnPingRequest($parameters)){
             return;
         }
-        if (stripos($parameters['UserEvent'],'Interception' ) !== false) {
+        if (stripos($parameters['UserEvent'],'InterceptionAMO' ) !== false) {
             $this->interception($parameters);
             return;
         }
@@ -167,6 +171,13 @@ class WorkerAmoCrmAMI extends WorkerBase
      * @param $data
      */
     private function actionDial($data):void {
+        $findContactsParams = [
+            'action'  => 'findContacts',
+            'numbers' => [
+                $data['src_num'],
+                $data['dst_num'],
+            ]
+        ];
         $general_src_num = null;
         if ($data['transfer'] === '1') {
             $history = $this->calls[$data['linkedid']]??[];
@@ -177,8 +188,10 @@ class WorkerAmoCrmAMI extends WorkerBase
                 } else {
                     $general_src_num = $history[0]['src'];
                 }
+                $findContactsParams['numbers'][] = $general_src_num;
             }
         }
+        $this->beanstalk->publish(json_encode($findContactsParams));
         $this->actionCreateCdr($data, $general_src_num);
     }
 
