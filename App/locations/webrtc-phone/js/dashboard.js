@@ -66,7 +66,6 @@ define(function (require) {
                 event.data.contact = contact;
             }else if(cache.get('find:'+event.data.number) === null){
                 cache.set('find:'+event.data.number, '1', { ttl: 5 });
-                self.sendMessage({action: 'findContact', number: event.data.number});
             }
             let template = Twig.twig({
                 data: $('#active-call-twig').html()
@@ -106,6 +105,8 @@ define(function (require) {
                 self.addCall({data: message.data});
             }else if(message.action === 'delCall'){
                 self.delCall({data: message.data});
+            }else if(message.action === 'updateContact'){
+                self.updateContact({data: message.data});
             }else if(message.action === 'answerCall'){
                 self.answerCall({data: message.data});
             }else if(message.action === 'resize'){

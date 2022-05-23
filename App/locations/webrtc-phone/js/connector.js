@@ -95,6 +95,10 @@ define(function (require) {
             }else if(callData.action === 'hangup' || callData.action === 'end-dial'){
                 delete self.channels[callData.uid];
                 PubSub.publish('CALLS', {action: 'delCall', 'data': {call_id: callData.uid}});
+            }else if(callData.action === 'findContact'){
+                $.each(callData.data, function (i, contact){
+                    PubSub.publish('CALLS', {action: 'updateContact', 'data': contact});
+                });
             }else if(callData.action === 'USERS'){
                 callData.data = $.grep(callData.data, function(value) {
                     return value.number !== self.settings.currentPhone;

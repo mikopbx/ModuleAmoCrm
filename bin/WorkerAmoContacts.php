@@ -105,7 +105,7 @@ class WorkerAmoContacts extends WorkerBase
             }
         }
         if(!empty($clientData)){
-            $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, $clientData);
+            $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['action' => 'findContact', 'data' => $clientData]);
         }
     }
 
