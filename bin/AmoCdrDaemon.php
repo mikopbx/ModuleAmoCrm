@@ -297,6 +297,7 @@ class AmoCdrDaemon extends WorkerBase
             return false;
         }
         $result = $this->amoApi->addCalls($calls);
+        usleep(200000);
         if(($result->messages['error-code']??0) === 401){
             // Ошибка авторизации.
             return false;
@@ -397,12 +398,15 @@ class AmoCdrDaemon extends WorkerBase
         }
 
         $this->amoApi->createContacts($outCalls);
+        usleep(200000);
         $this->addCalls($outCalls, true);
-
+        usleep(200000);
         if(empty($calls)){
             return;
         }
         $result = $this->amoApi->addUnsorted($calls);
+        usleep(200000);
+
         $errorData = $result->messages['error-data']['validation-errors']??[];
         foreach ($errorData as $err){
             $row = $this->cdrRows[$err['request_id']];
@@ -422,7 +426,7 @@ class AmoCdrDaemon extends WorkerBase
          * Подгружаем оставшиеся записи.
          */
         $this->addCalls($secondaryCalls, true);
-
+        usleep(200000);
     }
 
     /**
