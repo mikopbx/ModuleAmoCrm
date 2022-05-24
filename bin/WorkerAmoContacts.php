@@ -30,7 +30,6 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 class WorkerAmoContacts extends WorkerBase
 {
 
-    private $beanstalk;
     public  AmoCrmMain $amoApi;
     private array   $users = [];
 
@@ -41,10 +40,9 @@ class WorkerAmoContacts extends WorkerBase
      */
     public function start($params):void
     {
-        $this->amoApi    = new AmoCrmMain();
-        $this->beanstalk = new BeanstalkClient(self::class);
-
-        $amoUsers = ModuleAmoUsers::find('enable=1');
+        $this->amoApi   = new AmoCrmMain();
+        $beanstalk      = new BeanstalkClient(self::class);
+        $amoUsers       = ModuleAmoUsers::find('enable=1');
         foreach ($amoUsers as $user){
             if(!is_numeric($user->amoUserId)){
                 continue;
@@ -52,10 +50,10 @@ class WorkerAmoContacts extends WorkerBase
             $this->users[1*$user->amoUserId] = preg_replace('/[D]/', '', $user->number);
         }
 
-        $this->beanstalk->subscribe(self::class,                [$this, 'onEvents']);
-        $this->beanstalk->subscribe($this->makePingTubeName(self::class), [$this, 'pingCallBack']);
+        $beanstalk->subscribe(self::class, [$this, 'onEvents']);
+        $beanstalk->subscribe($this->makePingTubeName(self::class), [$this, 'pingCallBack']);
         while (true) {
-            $this->beanstalk->wait();
+            $beanstalk->wait();
         }
     }
 
@@ -84,6 +82,7 @@ class WorkerAmoContacts extends WorkerBase
     }
 
     /**
+     * Получение запросов на идентификацию номера телефона.
      * @param $tube
      * @return void
      */
@@ -101,7 +100,11 @@ class WorkerAmoContacts extends WorkerBase
             $clientData = $this->findContact( [$data['phone']] );
             $userId = $clientData[0]['userId']??null;
             if( isset($this->users[$userId])){
-                $this->startInterception($data['channel'], $data['id'], $this->users[$userId], $data['phone']);
+                try {
+                    $this->startInterception($data['channel'], $data['id'], $this->users[$userId], $data['phone']);
+                }catch (\Throwable $e){
+                    Util::sysLogMsg(self::class, $e->getMessage());
+                }
             }
         }
         if(!empty($clientData)){
@@ -109,6 +112,14 @@ class WorkerAmoContacts extends WorkerBase
         }
     }
 
+    /** Запуск звонка "Перехват на ответственного".
+     * @param $interceptionChannel
+     * @param $interceptionLinkedId
+     * @param $src
+     * @param $dest_number
+     * @return void
+     * @throws \Phalcon\Exception
+     */
     private function startInterception($interceptionChannel, $interceptionLinkedId, $src, $dest_number):void{
         $am = Util::getAstManager('off');
         $variable    = "pt1c_cid={$dest_number},ALLOW_MULTY_ANSWER=1,_INTECEPTION_CNANNEL={$interceptionChannel},_OLD_LINKEDID={$interceptionLinkedId}";
@@ -164,9 +175,10 @@ class WorkerAmoContacts extends WorkerBase
                 // Номеров короче 5 символов нет в amoCRM.
                 continue;
             }
-
             // 3. Поиск в AmoCRM.
             $response = $this->amoApi->getContactDataByPhone($phone);
+            // Нельзя слишком часто отправлять запрос.
+            usleep(300000);
             if($response->success){
                 $result[] = $response->data;
                 $this->saveCache(self::class.':'.$phone, $response->data, 60);

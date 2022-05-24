@@ -435,6 +435,11 @@ class AmoCrmMain extends PbxExtensionBase
         return $this->sendHttpPostRequest($url, $calls, $headers);
     }
 
+    /**
+     * Запрос в amoCRM сведений о контакте.
+     * @param $phone
+     * @return PBXApiResult
+     */
     public function getContactDataByPhone($phone):PBXApiResult
     {
         $url = "https://$this->baseDomain/private/api/v2/json/contacts/list";
