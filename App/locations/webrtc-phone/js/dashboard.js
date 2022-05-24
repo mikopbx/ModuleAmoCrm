@@ -19,9 +19,13 @@ define(function (require) {
         },
         updateContact: function (event){
             cache.flush();
-            cache.set('phone:'+event.data.number, event.data.contact, { ttl: 300 });
+            cache.set('phone:'+event.data.number, event.data, { ttl: 300 });
             $('#web-rtc-phone div.m-contact-name[data-phone="'+event.data.number+'"]').each(function() {
-                $(this).text(event.data.contact);
+                $(this).text(event.data.name);
+                $(this).attr('data-contact-id', event.data.id);
+            });
+            $('#web-rtc-phone div.m-company-name[data-phone="'+event.data.number+'"]').each(function() {
+                $(this).text(event.data.company);
                 $(this).attr('data-contact-id', event.data.id);
             });
         },
@@ -63,9 +67,8 @@ define(function (require) {
         addCall: function (event){
             let contact = cache.get('phone:'+event.data.number);
             if(contact !== null){
-                event.data.contact = contact;
-            }else if(cache.get('find:'+event.data.number) === null){
-                cache.set('find:'+event.data.number, '1', { ttl: 5 });
+                event.data.contact = contact.name;
+                event.data.company = contact.company;
             }
             let template = Twig.twig({
                 data: $('#active-call-twig').html()
@@ -77,7 +80,6 @@ define(function (require) {
                 // Скроем кнопки для внутренних звонков.
                 event.data.additionalCardClass = 'd-none';
             }
-
             let html = template.render(event.data);
             $("#web-rtc-phone-cdr").append(html);
             self.sendMessage({action: 'show-panel'});

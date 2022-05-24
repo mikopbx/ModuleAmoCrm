@@ -83,7 +83,12 @@
          data-user-phone="{{ user_phone }}"
          class="container card m-cdr-card p-3 shadow fw-lighter mt-2">
         <div class="row">
-            <div class="col text-start fw-bold text-primary m-contact-name" data-phone="{{ number }}" data-contact-id="">
+            <div class="col text-start fw-bold text-dark m-company-name" data-phone="{{ number }}" data-contact-id="">
+                {{ company }}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col text-start fw-semibold text-muted m-contact-name" data-phone="{{ number }}" data-contact-id="">
                 {{ contact }}
             </div>
         </div>

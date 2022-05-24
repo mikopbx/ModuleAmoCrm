@@ -16,6 +16,7 @@ use MikoPBX\Core\Workers\Cron\WorkerSafeScriptsCore;
 use MikoPBX\Modules\Config\ConfigClass;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\bin\AmoCdrDaemon;
+use Modules\ModuleAmoCrm\bin\WorkerAmoContacts;
 use Modules\ModuleAmoCrm\bin\WorkerAmoCrmAMI;
 use Modules\ModuleAmoCrm\Lib\RestAPI\Controllers\ApiController;
 use MikoPBX\PBXCoreREST\Controllers\Cdr\GetController as CdrGetController;
@@ -61,6 +62,10 @@ class AmoCrmConf extends ConfigClass
             [
                 'type'   => WorkerSafeScriptsCore::CHECK_BY_PID_NOT_ALERT,
                 'worker' => AmoCdrDaemon::class,
+            ],
+            [
+                'type'   => WorkerSafeScriptsCore::CHECK_BY_BEANSTALK,
+                'worker' => WorkerAmoContacts::class,
             ],
         ];
     }

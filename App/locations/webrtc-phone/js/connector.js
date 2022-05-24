@@ -85,8 +85,8 @@ define(function (require) {
                 return;
             }
             if(callData.action === 'CDRs'){
-                self.parseCDRs(callData.data)
                 // Обновим таблицу активных линий.
+                self.parseCDRs(callData.data)
             }else if( callData.action === 'call' && self.settings.currentUser === callData.user && typeof self.channels[callData.uid] === 'undefined'){
                 self.channels[callData.uid] = 1;
                 self.parseCallEvent(callData);
