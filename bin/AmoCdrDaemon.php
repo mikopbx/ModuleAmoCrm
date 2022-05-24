@@ -258,7 +258,7 @@ class AmoCdrDaemon extends WorkerBase
                 'direction'           => $direction,
                 'uniq'                => $row['UNIQUEID'],
                 'duration'            => 1*$row['billsec'],
-                'source'              => '11115583',
+                'source'              => self::SOURCE_ID,
                 'link'                => $link,
                 'phone'               => $row[$phoneCol],
                 'call_status'         => $call_status,
