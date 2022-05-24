@@ -59,6 +59,8 @@ define(function (require) {
                     };
 
                     url = `${window.location.origin}/pbxcore/api/amo-crm/v1/callback`;
+                }else if(message.action === 'findContact'){
+                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/find-contact`;
                 }else if(message.action === 'callback'){
                     url = `${window.location.origin}/pbxcore/api/amo-crm/v1/callback`;
                 }else{

@@ -49,7 +49,7 @@ class WorkerAmoContacts extends WorkerBase
             if(!is_numeric($user->amoUserId)){
                 continue;
             }
-            $this->users[1*$user->amoUserId] = $user->number;
+            $this->users[1*$user->amoUserId] = preg_replace('/[D]/', '', $user->number);
         }
 
         $this->beanstalk->subscribe(self::class,                [$this, 'onEvents']);

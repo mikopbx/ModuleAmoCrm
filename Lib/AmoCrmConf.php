@@ -9,6 +9,7 @@
 
 namespace Modules\ModuleAmoCrm\Lib;
 
+use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\PBX;
 use MikoPBX\Core\System\Processes;
 use MikoPBX\Core\System\Util;
@@ -79,6 +80,7 @@ class AmoCrmConf extends ConfigClass
             [ApiController::class, 'commandAction', '/pbxcore/api/amo-crm/v1/command', 'post', '/', true],
             [CdrGetController::class, 'playbackAction',  '/pbxcore/api/amo-crm/playback', 'get', '/', true],
             [ApiController::class, 'changeSettingsAction', '/pbxcore/api/amo-crm/v1/change-settings', 'post', '/', true],
+            [ApiController::class, 'findContactAction', '/pbxcore/api/amo-crm/v1/find-contact', 'post', '/', true],
         ];
     }
 
@@ -95,6 +97,16 @@ class AmoCrmConf extends ConfigClass
         $res->processor = __METHOD__;
         $action = strtoupper($request['action']);
         switch ($action) {
+            case 'FIND-CONTACT':
+                $findContactsParams = [
+                    'action'  => 'findContacts',
+                    'numbers' => [
+                        $request['data']['phone'],
+                    ]
+                ];
+                $beanstalk = new BeanstalkClient(WorkerAmoContacts::class);
+                $beanstalk->publish(json_encode($findContactsParams));
+                break;
             case 'LISTENER':
                 // Для Oauth2 авторизации.
                 $amo = new AmoCrmMain();

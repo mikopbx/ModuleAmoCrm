@@ -38,6 +38,10 @@ class ApiController extends ModulesControllerBase
     {
         $this->evalFunction('listener');
     }
+    public function findContactAction():void
+    {
+        $this->evalFunction('find-contact');
+    }
 
     public function commandAction():void
     {

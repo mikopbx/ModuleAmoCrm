@@ -23,10 +23,12 @@ define(function (require) {
             $('#web-rtc-phone div.m-contact-name[data-phone="'+event.data.number+'"]').each(function() {
                 $(this).text(event.data.name);
                 $(this).attr('data-contact-id', event.data.id);
+                self.resize();
             });
             $('#web-rtc-phone div.m-company-name[data-phone="'+event.data.number+'"]').each(function() {
                 $(this).text(event.data.company);
                 $(this).attr('data-contact-id', event.data.id);
+                self.resize();
             });
         },
         pbxAction: function (event){
@@ -69,6 +71,8 @@ define(function (require) {
             if(contact !== null){
                 event.data.contact = contact.name;
                 event.data.company = contact.company;
+            }else if(typeof event.data.enableGetContact !== 'undefined') {
+                self.pbxAction({data: {phone: event.data.number, action: 'findContact'}});
             }
             let template = Twig.twig({
                 data: $('#active-call-twig').html()
@@ -101,6 +105,7 @@ define(function (require) {
                     }
                 });
                 $.each(message.data, function (i, cdr){
+                    cdr.enableGetContact = true;
                     self.addCall({data: cdr});
                 });
             }else if(message.action === 'addCall'){
