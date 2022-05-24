@@ -485,6 +485,15 @@ class AmoCrmMain extends PbxExtensionBase
         return $this->sendHttpGetRequest($url, [], $headers);
     }
 
+    public function getSources():PBXApiResult
+    {
+        $url = "https://$this->baseDomain/api/v4/sources";
+        $headers = [
+            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
+        ];
+        return $this->sendHttpGetRequest($url, [], $headers);
+    }
+
     public function patchNote($entity_type, $entity_id, $id, $newRecFile):PBXApiResult
     {
         $url = "https://$this->baseDomain/api/v4/$entity_type/$entity_id/notes/$id";
@@ -522,7 +531,34 @@ class AmoCrmMain extends PbxExtensionBase
             ]
         ];
         return $this->sendHttpPostRequest($url, $notify, $headers);
+    }
 
+    public function addSources($data):PBXApiResult
+    {
+        $sources = [];
+        foreach ($data as $row){
+            $name       = $row['name']??'';
+            $externalID = $row['external_id']??'';
+            if(empty($name) || empty($externalID)){
+                continue;
+            }
+            $source = [
+                'name' => $name,
+                'external_id' => $externalID
+            ];
+            if(isset($row['pipeline_id'])){
+                $source['pipeline_id'] =  $row['pipeline_id'];
+            }
+            if(isset($row['default'])){
+                $source['default'] =  $row['default'];
+            }
+            $sources[] = $source;
+        }
+        $url = "https://$this->baseDomain/api/v4/sources";
+        $headers = [
+            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
+        ];
+        return $this->sendHttpPostRequest($url, $sources, $headers);
     }
 
     /**

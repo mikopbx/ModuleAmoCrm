@@ -214,6 +214,7 @@ class AmoCdrDaemon extends WorkerBase
                 && in_array($dstNum, $this->innerNums, true)){
                 // Это внутренний разговор.
                 // Не переносим его в AMO.
+                $this->offset = $row['id'];
                 continue;
             }
             $phoneCol  = 'src_num';
@@ -227,6 +228,7 @@ class AmoCdrDaemon extends WorkerBase
                 $phoneCol  = 'dst_num';
                 $amoUserId = $this->users[$srcNum]??null;
             }else{
+                $this->offset = $row['id'];
                 continue;
             }
             if($row['billsec'] < 1){
@@ -256,7 +258,7 @@ class AmoCdrDaemon extends WorkerBase
                 'direction'           => $direction,
                 'uniq'                => $row['UNIQUEID'],
                 'duration'            => 1*$row['billsec'],
-                'source'              => self::SOURCE_ID,
+                'source'              => '11115583',
                 'link'                => $link,
                 'phone'               => $row[$phoneCol],
                 'call_status'         => $call_status,
@@ -294,7 +296,7 @@ class AmoCdrDaemon extends WorkerBase
     private function addCalls($calls, bool $mainOnly = false):bool
     {
         if(empty($calls)){
-            return false;
+            return true;
         }
         $result = $this->amoApi->addCalls($calls);
         usleep(200000);
