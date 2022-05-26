@@ -138,7 +138,6 @@ const ModuleAmoCrm = {
 				$("#warning-message div.body").text(errorText)
 				$("#warning-message").show();
 			}
-			console.log('result', data);
 		});
 		window[className].popup.close();
 	},

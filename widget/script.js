@@ -29,7 +29,6 @@ define(function (require) {
         return true;
       },
       initMenuPage: _.bind(function (params) {
-          console.log(params);
       }),
       bind_actions: function () {
         return true;
@@ -53,24 +52,20 @@ define(function (require) {
         return true;
       },
       destroy: function () {
-        console.log('destroy func');
       },
       contacts: {
         //select contacts in list and clicked on widget name
         selected: function () {
-          console.log('contacts');
         }
       },
       leads: {
         //select leads in list and clicked on widget name
         selected: function () {
-          console.log('leads');
         }
       },
       tasks: {
         //select taks in list and clicked on widget name
         selected: function () {
-          console.log('tasks');
         }
       },
     };

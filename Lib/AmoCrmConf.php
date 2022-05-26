@@ -183,7 +183,7 @@ class AmoCrmConf extends ConfigClass
                 PHP_EOL.
                 PHP_EOL.
                 "location ^~ /webrtc-phone/ {".PHP_EOL."\t".
-                    "root {$this->moduleDir}/App/locations/;".PHP_EOL."\t".
+                    "root {$this->moduleDir}/sites/;".PHP_EOL."\t".
                     "index index.html;".PHP_EOL."\t".
                     "access_log off;".PHP_EOL."\t".
                     "expires 3d;".PHP_EOL.
