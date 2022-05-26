@@ -3,7 +3,6 @@ define(function (require) {
   const connector = require('./mpbx-connector.js?v=%WidgetVersion%');
   const $         = require('jquery');
   const PubSub    = require('pubsub');
-  const _         = require('underscore');
 
   return function () {
     self = this;
@@ -28,8 +27,6 @@ define(function (require) {
         connector.init(self.settings);
         return true;
       },
-      initMenuPage: _.bind(function (params) {
-      }),
       bind_actions: function () {
         return true;
       },
@@ -52,21 +49,6 @@ define(function (require) {
         return true;
       },
       destroy: function () {
-      },
-      contacts: {
-        //select contacts in list and clicked on widget name
-        selected: function () {
-        }
-      },
-      leads: {
-        //select leads in list and clicked on widget name
-        selected: function () {
-        }
-      },
-      tasks: {
-        //select taks in list and clicked on widget name
-        selected: function () {
-        }
       },
     };
     self.api = {
