@@ -100,6 +100,8 @@ define(function (require) {
                 $('#miko-pbx-phone').show({done: () => {
                     connector.postToFrame({action: 'resize'});
                 }});
+            }else if(params.action === 'error'){
+                PubSub.publish(connector.settings.ns + ':main', params);
             }else if(params.action === 'resize'){
                 connector.resizeFunc(params.height);
             }else{

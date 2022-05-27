@@ -73,11 +73,20 @@ define(function (require) {
             });
         },
         initEventSource: function (chan){
-            self.eventSource[chan] = new EventSource(`${window.location.origin}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`, {
+            let url = `${window.location.origin}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`;
+            self.eventSource[chan] = new EventSource(url, {
                 withCredentials: true
             });
             self.eventSource[chan].onmessage = self.onPbxMessage;
             self.eventSource[chan].onerror   = self.onPbxMessageError;
+
+            $.ajax(url, {timeout:5000, type: 'GET'})
+            .fail(function(jqXHR, textStatus) {
+                if(jqXHR.status === 403){
+                    delete  self.eventSource[chan];
+                    PubSub.publish('CALLS', {action: "error", code: 'errorAuthAPI'});
+                }
+            });
         },
         onPbxMessage: function(event) {
             let callData = undefined;
@@ -112,7 +121,8 @@ define(function (require) {
             console.debug("Error", event);
         },
         checkConnection: function(){
-            if(self.eventSource['calls'].readyState !== 1){
+            if( typeof self.eventSource['calls'] !== 'undefined'
+                && self.eventSource['calls'].readyState !== 1){
                 console.debug('Not connected to PBX', self.eventSource);
             }
         },

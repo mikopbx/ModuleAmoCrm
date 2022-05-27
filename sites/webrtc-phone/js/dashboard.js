@@ -116,6 +116,8 @@ define(function (require) {
                 self.updateContact({data: message.data});
             }else if(message.action === 'answerCall'){
                 self.answerCall({data: message.data});
+            }else if(message.action === "error"){
+                self.sendMessage(message);
             }else if(message.action === 'resize'){
                 self.resize();
             }
