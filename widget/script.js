@@ -103,6 +103,12 @@ define(function (require) {
             result.action = 'resultFindContact';
             PubSub.publish(self.ns + ':connector', result);
           });
+        }else if(message.action === 'error'){
+          let error_params = {
+            header: self.langs.errors['alert'],
+            text: self.langs.errors[message.code]
+          };
+          AMOCRM.notifications.show_message_error(error_params);
         }else if(message.action === 'openCard'){
           self.api.findContact(message.data, function(data){
             if(data.element.id === ''){
