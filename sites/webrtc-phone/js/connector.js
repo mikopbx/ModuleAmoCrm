@@ -24,6 +24,8 @@ define(function (require) {
     return {
         channels: [],
         eventSource: {},
+        state: 0,
+        startReconnect: 0,
         settings: {
             currentUser:  '',
             currentPhone: '',
@@ -123,7 +125,16 @@ define(function (require) {
         checkConnection: function(){
             if( typeof self.eventSource['calls'] !== 'undefined'
                 && self.eventSource['calls'].readyState !== 1){
-                console.debug('Not connected to PBX', self.eventSource);
+
+                let now = new Date().getTime() / 1000;
+                if(self.state === 1 || ( self.state === 0 && (now - self.startReconnect) > 300 ) ){
+                    self.startReconnect = now;
+                    PubSub.publish('CALLS', {action: "error", code: 'errorAPITimeOut'});
+                }
+                self.state = 0;
+            }else{
+                self.state = 1;
+                self.startReconnect = 0;
             }
         },
         parseCDRs: function (data){
