@@ -44,7 +44,7 @@ class AmoCrmMain extends PbxExtensionBase
             $this->extHostname  = $res['exthostname']??'';
             $this->tokenForAmo  = (string)$settings->tokenForAmo;
 
-            $this->token = new AuthToken($settings->authData);
+            $this->token = new AuthToken((string)$settings->authData);
             $this->refreshToken();
         }
     }

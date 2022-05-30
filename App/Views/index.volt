@@ -3,6 +3,7 @@
         {{ form.render('id') }}
         {{ form.render('referenceDate') }}
         {{ form.render('clientId') }}
+        {{ form.render('redirectUri') }}
         <div class="ten wide field disability">
             <label >{{ t._('mod_amo_baseDomain') }}</label>
             <div class="disability ui fluid action input">

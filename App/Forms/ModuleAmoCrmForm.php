@@ -18,9 +18,10 @@ class ModuleAmoCrmForm extends Form
 {
     public function initialize($entity = null, $options = null) :void
     {
-        $this->add(new Hidden('id', ['value' => $entity->id]));
-        $this->add(new Hidden('referenceDate', ['value' => $entity->id]));
-        $this->add(new Hidden('clientId', ['value' => AmoCrmMain::CLIENT_ID]));
+        $this->add(new Hidden('id',             ['value' => $entity->id]));
+        $this->add(new Hidden('referenceDate',  ['value' => $entity->id]));
+        $this->add(new Hidden('clientId',       ['value' => AmoCrmMain::CLIENT_ID]));
+        $this->add(new Hidden('redirectUri',    ['value' => AmoCrmMain::REDIRECT_URL]));
         $this->add(new Text('baseDomain'));
         $this->add(new Text('tokenForAmo'));
     }

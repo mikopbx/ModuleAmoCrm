@@ -69,8 +69,13 @@ define(function (require) {
                     url = `${window.location.origin}/pbxcore/api/amo-crm/v1/command`;
                 }
                 message.data.token = self.settings.token;
-                $.post(url, message.data, function( response ) {
-                    console.debug('result', response);
+                $.ajax(url, {timeout:5000, type: 'POST', data: message.data})
+                .fail(function(jqXHR, textStatus) {
+                    if(jqXHR.status === 403){
+                        PubSub.publish('CALLS', {action: "error", code: 'errorAuthAPI'});
+                    }else if(jqXHR.status === 0){
+                        PubSub.publish('CALLS', {action: "error", code: 'errorLoadFrame'});
+                    }
                 });
             });
         },
