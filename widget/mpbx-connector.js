@@ -77,7 +77,12 @@ define(function (require) {
                 && location.protocol+`//${connector.settings.pbxHost}` !== event.origin){
                 return;
             }
-            let params = message || JSON.parse(event.data);
+            let params;
+            try {
+                params = message || JSON.parse(event.data);
+            }catch (e) {
+                return;
+            }
             if(params.action === 'init-done'){
                 connector.resizeFunc();
                 connector.postToFrame({action: 'connect', data: connector.settings})

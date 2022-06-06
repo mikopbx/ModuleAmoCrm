@@ -56,6 +56,10 @@ define(function (require) {
             self.sendMessage({action: 'resize', height: webPanel.height()});
         },
         onGetEvent: function (event){
+            if(typeof event.originalEvent.data === 'undefined'){
+                // Не корректные данные.
+                return;
+            }
             if(typeof self[event.originalEvent.data.action] !== 'undefined'){
                 self[event.originalEvent.data.action](event.originalEvent.data);
             }else{
