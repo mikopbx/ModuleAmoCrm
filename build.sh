@@ -21,7 +21,7 @@ dir="$(cd "$(dirname "$0")" || exit; pwd -P)";
 
 tmpDir="$HOME/$(date +%s)";
 mkdir "$tmpDir";
-echo "temp dir: $tmpDir";
+echo "temp dir : $tmpDir";
 
 #############################################
 # Build widget
