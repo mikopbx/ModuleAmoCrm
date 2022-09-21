@@ -112,38 +112,11 @@ class AmoCdrDaemon extends WorkerBase
         }
         unset($extensions);
         $md5Cdr = md5(print_r($result, true));
-        if($md5Cdr !== $this->lastCacheUsers || !$this->checkService('users')){
+        if($md5Cdr !== $this->lastCacheUsers){
             // Оповещение только если изменилось состояние.
-            $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_USERS_NAME, ['data' => $result, 'action' => 'USERS']);
+            $this->amoApi->sendHttpPostRequestAsync(WorkerAmoCrmAMI::CHANNEL_USERS_NAME, ['data' => $result, 'action' => 'USERS']);
             $this->lastCacheUsers = $md5Cdr;
         }
-    }
-
-    /**
-     * Проверка опубликованных данных в сервисе.
-     * @param string $name
-     * @return bool
-     */
-    private function checkService( string $name):bool
-    {
-        $client = new GuzzleHttp\Client();
-        $options = [
-            'timeout'       => 0.5,
-            'http_errors'   => false,
-        ];
-        $result = '';
-        $code   = 408;
-        try {
-            $res    = $client->request('GET', "http://127.0.0.1/pbxcore/api/nchan/sub/$name?token={$this->tokenForAmo}",$options);
-            $result = $res->getBody();
-            $code   = $res->getStatusCode();
-        }catch (\Throwable $e){
-            Util::sysLogMsg(self::class, $e->getMessage());
-        }
-        if($code === 403){
-            $this->updateSettings();
-        }
-        return ($code === 200 && !empty($result));
     }
 
     /**
@@ -183,9 +156,9 @@ class AmoCdrDaemon extends WorkerBase
             ];
         }
         $md5Cdr = md5(print_r($params, true));
-        if($md5Cdr !== $this->lastCacheCdr || !$this->checkService('active-calls')){
+        if($md5Cdr !== $this->lastCacheCdr){
             // Оповещаме только если изменилось состояние.
-            $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CDR_NAME, ['data' => $params, 'action' => 'CDRs']);
+            $this->amoApi->sendHttpPostRequestAsync(WorkerAmoCrmAMI::CHANNEL_CDR_NAME, ['data' => $params, 'action' => 'CDRs']);
             $this->lastCacheCdr = $md5Cdr;
         }
     }

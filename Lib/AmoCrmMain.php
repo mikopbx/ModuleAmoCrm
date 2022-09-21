@@ -16,6 +16,8 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Common\Models\PbxSettings;
+use Psr\Http\Message\ResponseInterface;
+use GuzzleHttp\Exception\RequestException;
 use Throwable;
 
 class AmoCrmMain extends PbxExtensionBase
@@ -298,6 +300,32 @@ class AmoCrmMain extends PbxExtensionBase
             $code = 0;
         }
         return $this->parseResponse($resultHttp, $message, $code);
+    }
+
+    /**
+     * Отправка POST запроса к API.
+     * @param string $url
+     * @param array $params
+     * @param array $headers
+     * @return PBXAmoResult
+     */
+    public function sendHttpPostRequestAsync(string $url, array $params, array $headers=[]):void{
+        $options = [
+            'timeout'       => 5,
+            'http_errors'   => false,
+            'headers'       => $headers,
+            'json'          => $params,
+        ];
+        $client  = new GuzzleHttp\Client($options);
+        $promise = $client->requestAsync('POST', $url);
+        $promise->then(
+            function (ResponseInterface $res) {
+                //
+            },
+            function (RequestException $e) {
+                Util::sysLogMsg('ModuleAmoCrm', $e->getMessage());
+            }
+        );
     }
 
     /**
