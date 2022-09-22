@@ -122,10 +122,9 @@ class WorkerAmoContacts extends WorkerBase
      */
     private function startInterception($interceptionChannel, $interceptionLinkedId, $src, $dest_number):void{
         $am = Util::getAstManager('off');
-        $variable    = "pt1c_cid={$dest_number},ALLOW_MULTY_ANSWER=1,_INTECEPTION_CNANNEL={$interceptionChannel},_OLD_LINKEDID={$interceptionLinkedId}";
-        $channel     = "Local/{$src}@internal-originate";
-        $context     = 'interception-bridge';
-        $am->Originate($channel, $dest_number, $context, '1', null, null, null, $src, $variable);
+        $variable    = "_DST_CONTEXT=interception-bridge,origCidName=I:{$dest_number},ALLOW_MULTY_ANSWER=1,_INTECEPTION_CNANNEL={$interceptionChannel},_OLD_LINKEDID={$interceptionLinkedId}";
+        $channel     = "Local/{$src}@amo-orig-leg-1";
+        $am->Originate($channel, null, null, null,  "Wait", "300", null, "$dest_number <$dest_number>", $variable);
     }
 
     /**
