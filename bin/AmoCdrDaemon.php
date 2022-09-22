@@ -114,7 +114,7 @@ class AmoCdrDaemon extends WorkerBase
         $md5Cdr = md5(print_r($result, true));
         if($md5Cdr !== $this->lastCacheUsers){
             // Оповещение только если изменилось состояние.
-            $this->amoApi->sendHttpPostRequestAsync(WorkerAmoCrmAMI::CHANNEL_USERS_NAME, ['data' => $result, 'action' => 'USERS']);
+            $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_USERS_NAME, ['data' => $result, 'action' => 'USERS']);
             $this->lastCacheUsers = $md5Cdr;
         }
     }
@@ -158,7 +158,7 @@ class AmoCdrDaemon extends WorkerBase
         $md5Cdr = md5(print_r($params, true));
         if($md5Cdr !== $this->lastCacheCdr){
             // Оповещаме только если изменилось состояние.
-            $this->amoApi->sendHttpPostRequestAsync(WorkerAmoCrmAMI::CHANNEL_CDR_NAME, ['data' => $params, 'action' => 'CDRs']);
+            $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CDR_NAME, ['data' => $params, 'action' => 'CDRs']);
             $this->lastCacheCdr = $md5Cdr;
         }
     }

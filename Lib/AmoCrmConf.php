@@ -25,6 +25,48 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 
 class AmoCrmConf extends ConfigClass
 {
+    /**
+
+
+     *
+     */
+
+    /**
+     * Prepares additional contexts sections in the extensions.conf file
+     *
+     * @return string
+     */
+    public function extensionGenContexts(): string
+    {
+        return  '[amo-orig-check-state]'.PHP_EOL.
+                'exten => s,1,Set(INTECEPTION_CNANNEL=${IMPORT(${HOOK_CHANNEL},INTECEPTION_CNANNEL)})'.PHP_EOL."\t".
+                'same => n,ExecIf($[ "${CHANNEL_EXISTS(${INTECEPTION_CNANNEL})}" == "0" ]?ChannelRedirect(${HOOK_CHANNEL},orig-leg-1,h,1))'.PHP_EOL."\t".
+                'same => n,ExecIf($[ "${IMPORT(${INTECEPTION_CNANNEL},M_DIALSTATUS)}" == "ANSWER" ]?ChannelRedirect(${HOOK_CHANNEL},orig-leg-1,h,1))'.PHP_EOL.
+                PHP_EOL.
+                '[amo-orig-leg-1]'.PHP_EOL.
+                'exten => failed,1,Hangup()'.PHP_EOL."\t".
+                'exten => _[0-9*#+a-zA-Z][0-9*#+a-zA-Z]!,1,Answer()'.PHP_EOL."\t".
+                'same => n,Set(_CALLER=${EXTEN})'.PHP_EOL."\t".
+                'same => n,ExecIf($["${origCidName}x" != "x"]?Set(CALLERID(name)=${origCidName}))'.PHP_EOL."\t".
+                'same => n,Set(CONTACTS=${PJSIP_DIAL_CONTACTS(${EXTEN})})'.PHP_EOL."\t".
+                'same => n,Set(_PT1C_SIP_HEADER=${SIPADDHEADER})'.PHP_EOL."\t".
+                'same => n,ExecIf($["${FIELDQTY(CONTACTS,&)}" != "1" && "${ALLOW_MULTY_ANSWER}" != "1"]?Set(__PT1C_SIP_HEADER=${EMPTY_VAR}))'.PHP_EOL."\t".
+                'same => n,GosubIf($["${INTECEPTION_CNANNEL}x" != "x"]?amo-set-periodic-hook,s,1)'.PHP_EOL."\t".
+                'same => n,Dial(${CONTACTS},30,b(originate-create-channel,${EXTEN},1)G(amo-orig-leg-2^${CALLERID(num)}^1))'.PHP_EOL.
+                'exten => h,1,NoOp(=== SPAWN EXTENSION ===)'.PHP_EOL.
+                PHP_EOL.
+                '[amo-set-periodic-hook]'.PHP_EOL.
+                'exten => s,1,Set(BEEPID=${PERIODIC_HOOK(amo-orig-check-state,s,1)})'.PHP_EOL."\t".
+                'same => n,return'.PHP_EOL.
+                PHP_EOL.
+                '[amo-orig-leg-2]'.PHP_EOL.
+                'exten => _[0-9*#+a-zA-Z]!,1,goto(caller)'.PHP_EOL.
+                'exten => _[0-9*#+a-zA-Z]!,1001(caller),Answer()'.PHP_EOL."\t".
+                'same => n,Hangup()'.PHP_EOL.
+                'exten => _[0-9*#+a-zA-Z]!,2,goto(callee)'.PHP_EOL.
+                'exten => _[0-9*#+a-zA-Z]!,2002(callee),Goto(${DST_CONTEXT},${EXTEN},1)'.PHP_EOL.
+                'exten => h,1,NoOp(=== SPAWN EXTENSION ===)'.PHP_EOL;
+    }
 
     /**
      * Receive information about mikopbx main database changes

@@ -16,8 +16,6 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Common\Models\PbxSettings;
-use Psr\Http\Message\ResponseInterface;
-use GuzzleHttp\Exception\RequestException;
 use Throwable;
 
 class AmoCrmMain extends PbxExtensionBase
@@ -191,12 +189,37 @@ class AmoCrmMain extends PbxExtensionBase
     {
         $res = new PBXAmoResult();
         $dst = preg_replace("/[^0-9+]/", '', $params['number']);
-        Util::amiOriginate($params['user-number'], '', $dst);
+        self::amiOriginate($params['user-number'], '', $dst);
         $this->logger->writeInfo(
             "ONEXTERNALCALLSTART: originate from user {$params['user-id']} <{$params['user-number']}> to {$dst})"
         );
         $res->success = true;
         return $res;
+    }
+
+    /**
+     * Инициация телефонного звонка.
+     *
+     * @param $peer_number
+     * @param $peer_mobile
+     * @param $dest_number
+     *
+     * @return array
+     * @throws \Exception
+     */
+    public static function amiOriginate($peer_number, $peer_mobile, $dest_number): array
+    {
+        return Util::getAstManager('off')->Originate(
+            'Local/' . $peer_number . '@amo-orig-leg-1',
+            null,
+            null,
+            null,
+            "Wait",
+            "300",
+            null,
+            "$dest_number <$dest_number>",
+            "_DST_CONTEXT=all_peers,__peer_mobile={$peer_mobile}",
+        );
     }
 
     /**
@@ -300,32 +323,6 @@ class AmoCrmMain extends PbxExtensionBase
             $code = 0;
         }
         return $this->parseResponse($resultHttp, $message, $code);
-    }
-
-    /**
-     * Отправка POST запроса к API.
-     * @param string $url
-     * @param array $params
-     * @param array $headers
-     * @return PBXAmoResult
-     */
-    public function sendHttpPostRequestAsync(string $url, array $params, array $headers=[]):void{
-        $options = [
-            'timeout'       => 5,
-            'http_errors'   => false,
-            'headers'       => $headers,
-            'json'          => $params,
-        ];
-        $client  = new GuzzleHttp\Client($options);
-        $promise = $client->requestAsync('POST', $url);
-        $promise->then(
-            function (ResponseInterface $res) {
-                //
-            },
-            function (RequestException $e) {
-                Util::sysLogMsg('ModuleAmoCrm', $e->getMessage());
-            }
-        );
     }
 
     /**
