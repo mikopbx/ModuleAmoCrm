@@ -26,12 +26,6 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 class AmoCrmConf extends ConfigClass
 {
     /**
-
-
-     *
-     */
-
-    /**
      * Prepares additional contexts sections in the extensions.conf file
      *
      * @return string
@@ -40,8 +34,8 @@ class AmoCrmConf extends ConfigClass
     {
         return  '[amo-orig-check-state]'.PHP_EOL.
                 'exten => s,1,Set(INTECEPTION_CNANNEL=${IMPORT(${HOOK_CHANNEL},INTECEPTION_CNANNEL)})'.PHP_EOL."\t".
-                'same => n,ExecIf($[ "${CHANNEL_EXISTS(${INTECEPTION_CNANNEL})}" == "0" ]?ChannelRedirect(${HOOK_CHANNEL},orig-leg-1,h,1))'.PHP_EOL."\t".
-                'same => n,ExecIf($[ "${IMPORT(${INTECEPTION_CNANNEL},M_DIALSTATUS)}" == "ANSWER" ]?ChannelRedirect(${HOOK_CHANNEL},orig-leg-1,h,1))'.PHP_EOL.
+                'same => n,ExecIf($[ "${CHANNEL_EXISTS(${INTECEPTION_CNANNEL})}" == "0" ]?ChannelRedirect(${HOOK_CHANNEL},amo-orig-leg-1,h,1))'.PHP_EOL."\t".
+                'same => n,ExecIf($[ "${IMPORT(${INTECEPTION_CNANNEL},M_DIALSTATUS)}" == "ANSWER" ]?ChannelRedirect(${HOOK_CHANNEL},amo-orig-leg-1,h,1))'.PHP_EOL.
                 PHP_EOL.
                 '[amo-orig-leg-1]'.PHP_EOL.
                 'exten => failed,1,Hangup()'.PHP_EOL."\t".
@@ -208,7 +202,8 @@ class AmoCrmConf extends ConfigClass
     {
         return "\t" . 'same => n,UserEvent(InterceptionAMO,CALLERID: ${CALLERID(num)},chan1c: ${CHANNEL},FROM_DID: ${FROM_DID})' . "\n\t";
     }
-        /**
+
+    /**
      * Create additional Nginx locations from modules
      *
      */
