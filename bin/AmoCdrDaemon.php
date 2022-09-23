@@ -180,6 +180,8 @@ class AmoCdrDaemon extends WorkerBase
         $rows = CDRDatabaseProvider::getCdr($filter);
         $extHostname = $this->amoApi->getExtHostname();
         $calls    = [];
+
+        $callCounter = [];
         foreach ($rows as $row){
             $srcNum = AmoCrmMain::getPhoneIndex($row['src_num']);
             $dstNum = AmoCrmMain::getPhoneIndex($row['dst_num']);
@@ -248,6 +250,13 @@ class AmoCdrDaemon extends WorkerBase
                 'id'                  => $row['linkedid'],
                 'is_app'              => $row['is_app']
             ];
+
+            if(!isset($callCounter[$row['linkedid']])){
+                $callCounter[$row['linkedid']] = 1;
+            }else{
+                $callCounter[$row['linkedid']]++;
+            }
+
             if(isset($amoUserId)){
                 $call['created_by'] = $amoUserId;
                 $call['responsible_user_id'] = $amoUserId;
@@ -257,6 +266,10 @@ class AmoCdrDaemon extends WorkerBase
         }
 
         foreach ($calls as $index => &$call){
+            if($callCounter[$call['id']] === 1){
+                unset($call['id'],$call['is_app']);
+                continue;
+            }
             if($this->cdrRows[$call['id']]['haveUser'] === 1 && $call['is_app'] === '1') {
                 // Этот вызов был направлен на сотрудника.
                 // Все вызовы на приложения чистим.
@@ -272,7 +285,7 @@ class AmoCdrDaemon extends WorkerBase
                 unset($call['id'],$call['is_app']);
             }
         }
-        unset($rows,$call);
+        unset($rows,$call,$callCounter);
         $result = $this->addCalls($calls);
 
         if($result && $oldOffset !== $this->offset){
