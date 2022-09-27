@@ -599,7 +599,11 @@ class AmoCrmMain extends PbxExtensionBase
         $params = [];
         $phones = [];
         foreach ($data as $contactData){
-            if(in_array($contactData['phone'], $phones, true)){
+            $phone = $contactData['phone']??'';
+            if(empty($phone)){
+                continue;
+            }
+            if(in_array($phone, $phones, true)){
                 continue;
             }
             $phones[] = $contactData['phone'];
@@ -614,7 +618,13 @@ class AmoCrmMain extends PbxExtensionBase
             ];
         }
         unset($phones);
-        return $this->sendHttpPostRequest($url, $params, $headers);
+        if(empty($params)){
+            $result = new PBXAmoResult();
+            $result->success = true;
+        }else{
+            $result = $this->sendHttpPostRequest($url, $params, $headers);
+        }
+        return $result;
     }
 
     /**
