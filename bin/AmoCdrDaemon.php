@@ -22,6 +22,7 @@ require_once('Globals.php');
 
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
+use Modules\ModuleAmoCrm\Lib\Logger;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use MikoPBX\Common\Providers\CDRDatabaseProvider;
@@ -29,12 +30,11 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoRequestData;
 use DateTime;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use MikoPBX\Common\Models\Extensions;
-use GuzzleHttp;
 
 class AmoCdrDaemon extends WorkerBase
 {
     public const  SOURCE_ID    = 'miko-pbx';
-    private const LIMIT   = 50;
+    private const LIMIT_CDR   = 50;
     private int   $offset = 1;
     public array  $innerNums = [];
     private array $users = [];
@@ -45,22 +45,28 @@ class AmoCdrDaemon extends WorkerBase
     private array $cdrRows = [];
     private string $lastCacheCdr = '';
     private string $lastCacheUsers = '';
-    private string $tokenForAmo = '';
+    private Logger $logger;
 
     /**
      * Начало загрузки истории звонков в Amo.
      */
     public function start($params):void
     {
+        $this->logger =  new Logger('cdr-daemon', 'ModuleAmoCrm');
+        $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
         $this->updateSettings();
         while (true){
             $this->updateActiveCalls();
             $this->updateUsers();
             $this->cdrSync();
             sleep(3);
+            $this->logger->rotate();
         }
     }
 
+    /**
+     * @return void
+     */
     private function updateSettings():void
     {
         $this->amoApi = new AmoCrmMain();
@@ -70,12 +76,14 @@ class AmoCdrDaemon extends WorkerBase
             $this->offset       = 1*$settings->offsetCdr;
             $this->offset        = max($this->offset,1);
             $this->referenceDate = $settings->referenceDate;
-            $this->tokenForAmo   = $settings->tokenForAmo;
+            $this->logger->writeInfo("Update settings, Reference date: {$this->referenceDate}, offset: {$this->offset}");
         }else{
+            $this->logger->writeError('Settings not found...');
             // Настройки не заполенны.
             return;
         }
         [, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
+        $this->logger->writeInfo("Count users: ".count($this->users)."");
 
         $this->innerNums[] = 'outworktimes';
         $this->innerNums[] = 'voicemail';
@@ -114,7 +122,9 @@ class AmoCdrDaemon extends WorkerBase
         $md5Cdr = md5(print_r($result, true));
         if($md5Cdr !== $this->lastCacheUsers){
             // Оповещение только если изменилось состояние.
-            $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_USERS_NAME, ['data' => $result, 'action' => 'USERS']);
+            $this->logger->writeInfo("Update user list. Count: ".count($result));
+            $result = $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_USERS_NAME, ['data' => $result, 'action' => 'USERS']);
+            $this->logger->writeInfo("Result: ". json_encode($result, JSON_THROW_ON_ERROR));
             $this->lastCacheUsers = $md5Cdr;
         }
     }
@@ -157,8 +167,10 @@ class AmoCdrDaemon extends WorkerBase
         }
         $md5Cdr = md5(print_r($params, true));
         if($md5Cdr !== $this->lastCacheCdr){
+            $this->logger->writeInfo("Update active call. Count: ".count($params));
             // Оповещаме только если изменилось состояние.
-            $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CDR_NAME, ['data' => $params, 'action' => 'CDRs']);
+            $result = $this->amoApi->sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CDR_NAME, ['data' => $params, 'action' => 'CDRs']);
+            $this->logger->writeInfo("Result: ". json_encode($result, JSON_THROW_ON_ERROR));
             $this->lastCacheCdr = $md5Cdr;
         }
     }
@@ -167,20 +179,34 @@ class AmoCdrDaemon extends WorkerBase
     {
         $oldOffset = $this->offset;
         $this->cdrRows = [];
-        $filter = [
+        $add_query                     = [
+            'columns' => 'id,start,src_num,dst_num,billsec,recordingfile,UNIQUEID,linkedid,disposition,is_app',
+            'linkedid IN ({linkedid:array})',
+            'bind'    => [
+                'linkedid' => null,
+            ],
+            'order'   => 'id',
+        ];
+        $filter                        = [
             'id>:id: AND start>:referenceDate:',
             'bind'    => [
                 'id'  => $this->offset,
                 'referenceDate' => $this->referenceDate
             ],
-            'order'   => 'id',
-            'columns' => 'id,start,src_num,dst_num,billsec,recordingfile,UNIQUEID,linkedid,disposition,is_app',
-            'limit'   => self::LIMIT,
+            'group'   => 'linkedid',
+            'columns' => 'linkedid',
+            'limit'   => self::LIMIT_CDR,
+            'add_pack_query' => $add_query
         ];
+
         $rows = CDRDatabaseProvider::getCdr($filter);
         $extHostname = $this->amoApi->getExtHostname();
         $calls    = [];
 
+        $countCDR = count($rows);
+        if($countCDR>0){
+            $this->logger->writeInfo("Start of CDR synchronization. Count: $countCDR");
+        }
         $callCounter = [];
         foreach ($rows as $row){
             $srcNum = AmoCrmMain::getPhoneIndex($row['src_num']);
@@ -265,6 +291,10 @@ class AmoCdrDaemon extends WorkerBase
             $this->cdrRows[$row['UNIQUEID']] = $call;
         }
 
+        $countCDR = count($calls);
+        if($countCDR>0){
+            $this->logger->writeInfo("CDR synchronization. Step 1. Count: $countCDR");
+        }
         foreach ($calls as $index => &$call){
             if($callCounter[$call['id']] === 1){
                 unset($call['id'],$call['is_app']);
@@ -286,6 +316,11 @@ class AmoCdrDaemon extends WorkerBase
             }
         }
         unset($rows,$call,$callCounter);
+
+        $countCDR = count($calls);
+        if($countCDR>0){
+            $this->logger->writeInfo("CDR synchronization. Step 2. Count: $countCDR");
+        }
         $result = $this->addCalls($calls);
 
         if($result && $oldOffset !== $this->offset){
@@ -304,13 +339,11 @@ class AmoCdrDaemon extends WorkerBase
         usleep(200000);
         if(($result->messages['error-code']??0) === 401){
             // Ошибка авторизации.
+            $this->logger->writeError("Auth: ". json_encode($result->messages));
             return false;
         }
         $this->logResultAddCalls($result);
-
         $forUnsorted     = [];
-        $validationError = [];
-
         $errorData = $result->messages['error-data']['errors']??[];
         foreach ($errorData as $err){
             if(!isset($err['title'])){
@@ -319,20 +352,15 @@ class AmoCdrDaemon extends WorkerBase
             if($err['status'] === 263){
                 // Entity not found
                 $forUnsorted[] = $this->cdrRows[$err['request_id']];
+                $this->logger->writeInfo("Contact not found: ". json_encode($this->cdrRows[$err['request_id']]));
             }else{
                 $row = $this->cdrRows[$err['request_id']];
                 $row['error'] = $err;
-                $validationError[] = $row;
+                $this->logger->writeError("Validation: ". json_encode($row));
             }
         }
-        $errorData = $result->messages['error-data']['validation-errors']??[];
-        foreach ($errorData as $err){
-            $row = $this->cdrRows[$err['request_id']];
-            $row['error'] = $err;
-            $validationError[] = $row;
-        }
         if($mainOnly === false){
-            $this->addUnsorted($forUnsorted, $validationError);
+            $this->addUnsorted($forUnsorted);
         }
         return true;
     }
@@ -359,7 +387,7 @@ class AmoCdrDaemon extends WorkerBase
      * @param $forUnsorted
      * @param $validationError
      */
-    private function addUnsorted($forUnsorted, &$validationError):void
+    private function addUnsorted($forUnsorted):void
     {
         // Создаем "неразобранное". На каждый из номеров телефонов.
         $calls = [];
@@ -409,7 +437,11 @@ class AmoCdrDaemon extends WorkerBase
                 ]
             ];
         }
-        $this->amoApi->createContacts($outCalls);
+        $result = $this->amoApi->createContacts($outCalls);
+        $errorData = $result->messages['error-data']??[];
+        if(!empty($errorData)){
+            $this->logger->writeError("Add contacts: ". json_encode($errorData));
+        }
         usleep(200000);
         $this->addCalls($outCalls, true);
         usleep(200000);
@@ -418,12 +450,11 @@ class AmoCdrDaemon extends WorkerBase
         }
         $result = $this->amoApi->addUnsorted($calls);
         usleep(200000);
-
         $errorData = $result->messages['error-data']['validation-errors']??[];
         foreach ($errorData as $err){
             $row = $this->cdrRows[$err['request_id']];
             $row['error'] = $err;
-            $validationError[] = $row;
+            $this->logger->writeError("Validation: ". json_encode($row));
         }
         $unsorted = $result->data['_embedded']['unsorted']??[];
         foreach ($unsorted as $row){
@@ -463,20 +494,6 @@ class AmoCdrDaemon extends WorkerBase
             $resDb->save();
         }catch (\Throwable $e){
             Util::sysLogMsg(__CLASS__, $e->getMessage());
-        }
-    }
-
-    /**
-     * Сохранение информации об ошибке в базу данных.
-     * @param $validationError
-     */
-    private function logErrors($validationError):void
-    {
-        foreach ($validationError as $row){
-            $call     = $row;
-            $response = $row['error']??[];
-            unset($call['error']);
-            $this->saveResponse($row['request_id'],$call, $response, 1);
         }
     }
 
