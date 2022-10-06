@@ -199,7 +199,11 @@ class AmoCdrDaemon extends WorkerBase
             'add_pack_query' => $add_query
         ];
 
-        $rows = CDRDatabaseProvider::getCdr($filter);
+        try {
+            $rows = CDRDatabaseProvider::getCdr($filter);
+        }catch (\Throwable $e){
+            $rows = [];
+        }
         $extHostname = $this->amoApi->getExtHostname();
         $calls    = [];
 
