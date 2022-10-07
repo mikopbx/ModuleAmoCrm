@@ -23,6 +23,8 @@
           <div class="body">выава</div>
         </div>
     </div>
+    <table id="ModuleAmoPipeLines-table" class="ui small very compact single line table"></table>
+    <br>
     {{ partial("partials/submitbutton",['indexurl':'pbx-extension-modules/index/']) }}
 </form>
 
@@ -40,3 +42,4 @@
         <div class="ui approve positive button"> {{ t._('mod_amo_authCodeSave') }}  </div>
     </div>
 </div>
+

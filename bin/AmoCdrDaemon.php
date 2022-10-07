@@ -46,6 +46,7 @@ class AmoCdrDaemon extends WorkerBase
     private string $lastCacheCdr = '';
     private string $lastCacheUsers = '';
     private Logger $logger;
+    private array $pipeLines = [];
 
     /**
      * Начало загрузки истории звонков в Amo.
@@ -56,6 +57,7 @@ class AmoCdrDaemon extends WorkerBase
         $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
         $this->updateSettings();
         while (true){
+            $this->pipeLines = $this->amoApi->synchPipeLines();
             $this->updateActiveCalls();
             $this->updateUsers();
             $this->cdrSync();
@@ -180,7 +182,7 @@ class AmoCdrDaemon extends WorkerBase
         $oldOffset = $this->offset;
         $this->cdrRows = [];
         $add_query                     = [
-            'columns' => 'id,start,src_num,dst_num,billsec,recordingfile,UNIQUEID,linkedid,disposition,is_app',
+            'columns' => 'id,start,src_num,dst_num,billsec,recordingfile,UNIQUEID,linkedid,disposition,is_app,did',
             'linkedid IN ({linkedid:array})',
             'bind'    => [
                 'linkedid' => null,
@@ -212,6 +214,7 @@ class AmoCdrDaemon extends WorkerBase
             $this->logger->writeInfo("Start of CDR synchronization. Count: $countCDR");
         }
         $callCounter = [];
+        $pipeline = [];
         foreach ($rows as $row){
             $srcNum = AmoCrmMain::getPhoneIndex($row['src_num']);
             $dstNum = AmoCrmMain::getPhoneIndex($row['dst_num']);
@@ -227,11 +230,13 @@ class AmoCdrDaemon extends WorkerBase
                 // Это входящий.
                 $direction = 'inbound';
                 $amoUserId = $this->users[$dstNum]??null;
+                $userPhone = $dstNum;
             }elseif(in_array($srcNum, $this->innerNums, true)){
                 // Исходящий.
                 $direction = 'outbound';
                 $phoneCol  = 'dst_num';
                 $amoUserId = $this->users[$srcNum]??null;
+                $userPhone = $srcNum;
             }else{
                 $this->offset = $row['id'];
                 continue;
@@ -280,6 +285,16 @@ class AmoCdrDaemon extends WorkerBase
                 'id'                  => $row['linkedid'],
                 'is_app'              => $row['is_app']
             ];
+            if(!empty($row['did'])){
+                $pipelineName = $this->pipeLines[$row['did']]['name']??'-';
+                $pipeline[$row['linkedid']] = [
+                    'id' => $this->pipeLines[$row['did']]['id']??'',
+                    'name' => $pipelineName,
+                    'did' => $row['did'],
+                    'dst' => $userPhone
+                ];
+                $call['call_result'] = "| dst: {$userPhone} | {$pipelineName} | did: {$row['did']} |";
+            }
 
             if(!isset($callCounter[$row['linkedid']])){
                 $callCounter[$row['linkedid']] = 1;
@@ -301,7 +316,7 @@ class AmoCdrDaemon extends WorkerBase
         }
         foreach ($calls as $index => &$call){
             if($callCounter[$call['id']] === 1){
-                unset($call['id'],$call['is_app']);
+                unset($call['id'],$call['is_app'],$call['did']);
                 continue;
             }
             if($this->cdrRows[$call['id']]['haveUser'] === 1 && $call['is_app'] === '1') {
@@ -316,7 +331,7 @@ class AmoCdrDaemon extends WorkerBase
                 // Если вызов отвечен, то не следует загружать информацию о пропущенных.
                 unset($calls[$index],$call);
             }else{
-                unset($call['id'],$call['is_app']);
+                unset($call['id'],$call['is_app'],$call['did']);
             }
         }
         unset($rows,$call,$callCounter);
@@ -325,7 +340,7 @@ class AmoCdrDaemon extends WorkerBase
         if($countCDR>0){
             $this->logger->writeInfo("CDR synchronization. Step 2. Count: $countCDR");
         }
-        $result = $this->addCalls($calls);
+        $result = $this->addCalls($calls, false, $pipeline);
 
         if($result && $oldOffset !== $this->offset){
             $this->updateOffset();
@@ -334,7 +349,7 @@ class AmoCdrDaemon extends WorkerBase
         }
     }
 
-    private function addCalls($calls, bool $mainOnly = false):bool
+    private function addCalls($calls, bool $mainOnly = false, array $pipeline = []):bool
     {
         if(empty($calls)){
             return true;
@@ -364,7 +379,7 @@ class AmoCdrDaemon extends WorkerBase
             }
         }
         if($mainOnly === false){
-            $this->addUnsorted($forUnsorted);
+            $this->addUnsorted($forUnsorted, $pipeline);
         }
         return true;
     }
@@ -389,9 +404,10 @@ class AmoCdrDaemon extends WorkerBase
     /**
      * Добавление неразобранного.
      * @param $forUnsorted
+     * @param $pipeline
      * @param $validationError
      */
-    private function addUnsorted($forUnsorted):void
+    private function addUnsorted($forUnsorted, array $pipeline):void
     {
         // Создаем "неразобранное". На каждый из номеров телефонов.
         $calls = [];
@@ -411,7 +427,7 @@ class AmoCdrDaemon extends WorkerBase
                 continue;
             }
             $uniqPhones[] = $call["phone"];
-            $calls[] = [
+            $callData = [
                 'request_id'  => $call['request_id'],
                 'source_name' => self::SOURCE_ID,
                 'source_uid'  => self::SOURCE_ID,
@@ -440,6 +456,12 @@ class AmoCdrDaemon extends WorkerBase
                     ]
                 ]
             ];
+
+            $pipelineID = $pipeline[$call['id']]['id']??'';
+            if(!empty($pipelineID)){
+                $callData['pipeline_id'] =  1*$pipelineID;
+            }
+            $calls[] = $callData;
         }
         $result = $this->amoApi->createContacts($outCalls);
         $errorData = $result->messages['error-data']??[];

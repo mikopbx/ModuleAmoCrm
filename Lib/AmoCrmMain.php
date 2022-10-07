@@ -9,21 +9,17 @@ use MikoPBX\Common\Providers\CDRDatabaseProvider;
 use MikoPBX\Core\System\Processes;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\Cron\WorkerSafeScriptsCore;
-use MikoPBX\Modules\PbxExtensionBase;
 use MikoPBX\Modules\PbxExtensionUtils;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
+use Modules\ModuleAmoCrm\Models\ModuleAmoPipeLines;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Common\Models\PbxSettings;
 use Throwable;
 
-class AmoCrmMain extends PbxExtensionBase
+class AmoCrmMain extends AmoCrmMainBase
 {
-    public const   REDIRECT_URL  = '%REDIRECT_URL%';
-    public const   CLIENT_SECRET = '%CLIENT_SECRET%';
-    public const   CLIENT_ID     = '%CLIENT_ID%';
-
     private string $baseDomain = '';
     private string $extHostname = '';
     private AuthToken $token;
@@ -458,6 +454,64 @@ class AmoCrmMain extends PbxExtensionBase
             'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
         ];
         return $this->sendHttpPostRequest($url, $calls, $headers);
+    }
+
+    /**
+     * Синхронизация воронок продаж.
+     * @return array
+     */
+    public function synchPipeLines():array
+    {
+        $url = "https://$this->baseDomain/api/v4/leads/pipelines";
+        $headers = [
+            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
+        ];
+        $response = $this->sendHttpGetRequest($url, [], $headers);
+        if($response->success){
+            $data = $response->data['_embedded']['pipelines']??[];
+            if(is_array($data)){
+                $lineIds = [];
+                $dbData = ModuleAmoPipeLines::find(['columns' => 'amoId,name']);
+                foreach ($dbData as $lineData){
+                    $lineIds[$lineData->amoId] = $lineData->name;
+                }
+                unset($dbData);
+                foreach ($data as $line){
+                    if(isset($lineIds[$line['id']])){
+                        if($line['name'] !== $lineIds[$line['id']]){
+                            // Отличается наименование у существующей линии.
+                            $dbData = ModuleAmoPipeLines::findFirst("amoId='{$line['id']}'");
+                            $dbData->name  = $line['name'];
+                            $dbData->save();
+                        }
+                    }else{
+                        // Такой линии нет в базе данных.
+                        $dbData = new ModuleAmoPipeLines();
+                        $dbData->amoId = $line['id'];
+                        $dbData->name  = $line['name'];
+                        $dbData->save();
+                    }
+                    unset($lineIds[$line['id']]);
+                }
+                foreach ($lineIds as $id => $name){
+                    /** @var ModuleAmoPipeLines $dbData */
+                    $dbData = ModuleAmoPipeLines::findFirst("amoId='{$id}'");
+                    if($dbData){
+                        // Такой воронки больше нет. удаляем.
+                        $dbData->delete();
+                    }
+                }
+            }
+        }
+        $pipeLines = [];
+        $dbData = ModuleAmoPipeLines::find(['columns' => 'amoId,did,name']);
+        foreach ($dbData as $line){
+            $pipeLines[$line->did] = [
+                'id' => $line->amoId,
+                'name' => $line->name
+            ];
+        }
+        return $pipeLines;
     }
 
     /**

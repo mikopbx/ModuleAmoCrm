@@ -194,7 +194,7 @@ const ModuleAmoCrm = {
 				dataSrc: 'data'
 			},
 			columns: columns,
-			paging: true,
+			paging: false,
 			sDom: 'rtip',
 			deferRender: true,
 			pageLength: 17,
@@ -263,6 +263,9 @@ const ModuleAmoCrm = {
 		let body = $('body');
 		// Клик по полю. Вход для редактирования значения.
 		body.on('focusin', '.'+inputClassName, function (e) {
+			if($(e.target).parents('table').attr('id') === 'ModuleAmoPipeLines-table' && $(e.target).attr('colname') === 'name'){
+				return;
+			}
 			$(e.target).transition('glow');
 			$(e.target).closest('div').removeClass('transparent').addClass('changed-field');
 			$(e.target).attr('readonly', false);
