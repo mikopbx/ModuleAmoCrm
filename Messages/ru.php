@@ -34,4 +34,5 @@ return [
     'module_amo_crmDisconnected'          => 'Модуль отключен',
     'module_amo_crmUpdateStatus'          => 'Обновление статуса',
     'mod_amo_tokenForAmo'                 => 'Ключ доступа к API MikoPBX',
+    'mod_amo_useInterception'             => 'Использовать перехват на ответственного'
 ];

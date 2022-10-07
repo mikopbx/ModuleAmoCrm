@@ -24,6 +24,7 @@ use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
+use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 
 class WorkerAmoCrmAMI extends WorkerBase
 {
@@ -35,6 +36,8 @@ class WorkerAmoCrmAMI extends WorkerBase
     private int     $extensionLength = 3;
     private array   $users = [];
     private array   $innerNums = [];
+    private bool    $useInterception = false;
+    private int     $lastUpdateSettings = 0;
 
     private $beanstalk;
 
@@ -68,7 +71,7 @@ class WorkerAmoCrmAMI extends WorkerBase
 
         $this->am     = Util::getAstManager();
         $this->setFilter();
-        [, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
+        $this->checkUpdateSettings();
 
         $this->am->addEventHandler("userevent", [$this, "callback"]);
         while (true) {
@@ -79,6 +82,19 @@ class WorkerAmoCrmAMI extends WorkerBase
                 $this->am = Util::getAstManager();
                 $this->setFilter();
             }
+        }
+    }
+
+    private function checkUpdateSettings():void
+    {
+        if(time() - $this->lastUpdateSettings <= 10){
+            return;
+        }
+        $this->lastUpdateSettings = time();
+        [, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
+        $settings = ModuleAmoCrm::findFirst();
+        if($settings){
+            $this->useInterception = $settings->useInterception;
         }
     }
 
@@ -104,6 +120,9 @@ class WorkerAmoCrmAMI extends WorkerBase
      */
     private function interception($data):void
     {
+        if(!$this->useInterception){
+            return;
+        }
         $params = [
             'id'      => $data['Linkedid'],
             'date'    => date(\DateTimeInterface::ATOM),
@@ -133,6 +152,7 @@ class WorkerAmoCrmAMI extends WorkerBase
         if ('CdrConnector' !== $parameters['UserEvent']) {
             return;
         }
+        $this->checkUpdateSettings();
 
         $data = json_decode(base64_decode($parameters['AgiData']), true, 512, JSON_THROW_ON_ERROR);
         switch ($data['action']) {

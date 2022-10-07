@@ -148,7 +148,9 @@ class ModuleAmoCrmController extends BaseController
             if(in_array($key, ['id','offsetCdr','authData'], true)){
                 continue;
             }
-            if (array_key_exists($key, $data)) {
+            if('useInterception' === $key){
+                $record->$key = ($data[$key] === 'on') ? '1' : '0';
+            } else if (array_key_exists($key, $data)) {
                 if($record->$key !== trim($data[$key])){
                     $record->$key = trim($data[$key]);
                 }

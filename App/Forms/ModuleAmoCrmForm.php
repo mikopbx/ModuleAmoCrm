@@ -9,6 +9,7 @@
 namespace Modules\ModuleAmoCrm\App\Forms;
 
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
+use Phalcon\Forms\Element\Check;
 use Phalcon\Forms\Form;
 use Phalcon\Forms\Element\Text;
 use Phalcon\Forms\Element\Hidden;
@@ -24,5 +25,12 @@ class ModuleAmoCrmForm extends Form
         $this->add(new Hidden('redirectUri',    ['value' => AmoCrmMain::REDIRECT_URL]));
         $this->add(new Text('baseDomain'));
         $this->add(new Text('tokenForAmo'));
+
+        // Export cdr
+        $useInterception = ['value' => null];
+        if ($entity->useInterception === '1') {
+            $useInterception = ['checked' => 'checked', 'value' => null];
+        }
+        $this->add(new Check('useInterception', $useInterception));
     }
 }
