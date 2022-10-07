@@ -198,7 +198,18 @@ class ModuleAmoCrmController extends BaseController
      */
     private function getTablesDescription():array
     {
-        return [];
+        $description = [];
+        $description['ModuleAmoPipeLines'] = [
+            'cols' => [
+                'name'       => ['header' => 'Pipeline', 'class' => 'two wide collapsing'],
+                'did'        => ['header' => 'DID',  'class' => ''],
+            ],
+            'ajaxUrl' => '/getNewRecords',
+            'icon' => 'user',
+            'needDelButton' => false
+        ];
+
+        return $description;
     }
 
     /**
