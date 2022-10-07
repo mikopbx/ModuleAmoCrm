@@ -18,6 +18,14 @@
                 <button class="ui basic compact icon button green" id="createPassword"><i class="sync icon"></i></button>
             </div>
         </div>
+        <div class="field disability">
+            <div class="ui segment">
+                <div class="ui toggle checkbox ">
+                    {{ form.render('useInterception') }}
+                    <label>{{ t._('mod_amo_useInterception') }}</label>
+                </div>
+            </div>
+        </div>
         <div id="warning-message" class="ui visible warning message" style="display: none;">
           <div class="header">ваав</div>
           <div class="body">выава</div>

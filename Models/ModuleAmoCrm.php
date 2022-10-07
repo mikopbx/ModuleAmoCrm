@@ -55,6 +55,12 @@ class ModuleAmoCrm extends ModulesModelsBase
     public $offsetCdr = 1;
 
     /**
+     * Toggle
+     *
+     * @Column(type="integer", default="1", nullable=true)
+     */
+    public $useInterception = 1;
+    /**
      * Returns dynamic relations between module models and common models
      * MikoPBX check it in ModelsBase after every call to keep data consistent
      *
