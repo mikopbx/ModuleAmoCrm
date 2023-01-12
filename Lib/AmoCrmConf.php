@@ -70,12 +70,13 @@ class AmoCrmConf extends ConfigClass
     public function modelsEventChangeData($data): void
     {
         if ($data['model'] === ModuleAmoCrm::class) {
-            if (count($data['changedFields']) === 1 && $data['changedFields'][0] === 'offsetCdr') {
+            $changedFields = count($data['changedFields']);
+            if ($changedFields === 1 && $data['changedFields'][0] === 'offsetCdr') {
                 return;
             }
             if(in_array('tokenForAmo', $data['changedFields'], true)) {
                 $this->makeAuthFiles();
-                if(count($data['changedFields']) === 1){
+                if($changedFields === 1){
                     return;
                 }
             }

@@ -323,7 +323,7 @@ class AmoCdrDaemon extends WorkerBase
                 // Этот вызов был направлен на сотрудника.
                 // Все вызовы на приложения чистим.
                 unset($calls[$index], $call);
-            }elseif($this->cdrRows[$call['id']]['haveUser'] === 0 && $this->cdrRows[$call['id']]['first'] !== $calls['uniq']){
+            }elseif($this->cdrRows[$call['id']]['haveUser'] === 0 && $this->cdrRows[$call['id']]['first'] !== $call['uniq']){
                 // Этот вызов не попал на сотрудников, только приложения
                 // Оставляем только вызов на первое приложение
                 unset($calls[$index], $call);
