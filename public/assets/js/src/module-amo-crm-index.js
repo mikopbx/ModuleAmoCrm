@@ -95,7 +95,7 @@ const ModuleAmoCrm = {
 		$("#createPassword").on('click', function (e) {
 			$("#tokenForAmo").val(window[className].generatePassword());
 			// Сохраняем изменения.
-			$('#submitbutton').removeClass('disabled').trigger('click');
+			$('#submitbutton').removeClass('disabled');//.trigger('click');
 		});
 		$("#login-button").on('click', function (e) {
 			let client_id 	 = $('#clientId').val();
