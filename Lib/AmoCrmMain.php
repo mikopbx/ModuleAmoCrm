@@ -462,6 +462,9 @@ class AmoCrmMain extends AmoCrmMainBase
      */
     public function synchPipeLines():array
     {
+        if(!isset($this->token)){
+            return [];
+        }
         $url = "https://$this->baseDomain/api/v4/leads/pipelines";
         $headers = [
             'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
