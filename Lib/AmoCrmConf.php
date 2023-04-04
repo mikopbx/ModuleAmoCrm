@@ -115,7 +115,6 @@ class AmoCrmConf extends ConfigClass
             [ApiController::class, 'listenerAction', '/pbxcore/api/amo-crm/v1/listener', 'post', '/', true],
             [ApiController::class, 'listenerAction', '/pbxcore/api/amo-crm/v1/listener', 'get', '/', true],
             [ApiController::class, 'commandAction', '/pbxcore/api/amo-crm/v1/command', 'post', '/', true],
-            [CdrGetController::class, 'playbackAction',  '/pbxcore/api/amo-crm/playback', 'get', '/', true],
             [ApiController::class, 'changeSettingsAction', '/pbxcore/api/amo-crm/v1/change-settings', 'post', '/', true],
             [ApiController::class, 'findContactAction', '/pbxcore/api/amo-crm/v1/find-contact', 'post', '/', true],
         ];
@@ -211,21 +210,60 @@ class AmoCrmConf extends ConfigClass
     public function createNginxLocations(): string
     {
         $this->makeAuthFiles();
-        return 'location ~ /pbxcore/api/amo/pub/(.*)$ {'.PHP_EOL."\t".
-                    'nchan_publisher;'.PHP_EOL."\t".
-                    'allow  127.0.0.1;'.PHP_EOL."\t".
-                    'nchan_channel_id "$1";'.PHP_EOL."\t".
-                    'nchan_message_buffer_length 1;'.PHP_EOL."\t".
-                    'nchan_message_timeout 300m;'.PHP_EOL.
-                '}'.
-                PHP_EOL.
-                PHP_EOL.
-                "location ^~ /webrtc-phone/ {".PHP_EOL."\t".
-                    "root {$this->moduleDir}/sites/;".PHP_EOL."\t".
-                    "index index.html;".PHP_EOL."\t".
-                    "access_log off;".PHP_EOL."\t".
-                    "expires 3d;".PHP_EOL.
-                "}".PHP_EOL;
+        return "location /pbxcore/api/amo-crm/playback {".PHP_EOL.
+            "    root /storage/usbdisk1/mikopbx/astspool/monitor;".PHP_EOL.
+            '    set_by_lua $token_exists \''.PHP_EOL.
+            '        return "ok";'.PHP_EOL.
+            "    ';".PHP_EOL.
+            "    set_by_lua \$result_url '".PHP_EOL.
+            '        local url = "/pbxcore/api/amo/playback"..ngx.var.arg_view;'.PHP_EOL.
+            '        return string.gsub(url,ngx.var.document_root,"");'.PHP_EOL.
+            "    ';".PHP_EOL.
+            '    try_files "${result_url}" "${result_url}";'.PHP_EOL.
+            '}'.PHP_EOL.PHP_EOL.
+            "location /pbxcore/api/amo-crm/v2/media {".PHP_EOL.
+            "    root /storage/usbdisk1/mikopbx/astspool/monitor;".PHP_EOL.
+            '    set_by_lua $token_exists \''.PHP_EOL.
+            '        local file = "/var/etc/auth/"..tostring(ngx.var.arg_token);'.PHP_EOL.
+            '        local f = io.open(file, "rb")'.PHP_EOL.
+            '        local result = "fail";'.PHP_EOL.
+            '        if f then'.PHP_EOL.
+            '            f:close()'.PHP_EOL.
+            '            result = "ok"'.PHP_EOL.
+            '        end'.PHP_EOL.
+            '        return result;'.PHP_EOL.
+            "    ';".PHP_EOL.
+            '    if ( $token_exists != \'ok\' ) {'.PHP_EOL.
+            '        rewrite ^ /pbxcore/api/nchan/auth last;'.PHP_EOL.
+            '    }'.PHP_EOL.
+            "    set_by_lua \$result_url '".PHP_EOL.
+            '        local url = "/pbxcore/api/amo-crm/v2/playback"..ngx.var.arg_view;'.PHP_EOL.
+            '        return string.gsub(url,ngx.var.document_root,"");'.PHP_EOL.
+            "    ';".PHP_EOL.
+            '    try_files "${result_url}" "${result_url}";'.PHP_EOL.
+            '}'.PHP_EOL.PHP_EOL.
+            'location /pbxcore/api/amo-crm/v2/playback {'.PHP_EOL.
+            "    if ( \$token_exists != 'ok' ) {".PHP_EOL.
+            '        rewrite ^ /pbxcore/api/nchan/auth last;'.PHP_EOL.
+            '    }'.PHP_EOL.
+            '    alias /storage/usbdisk1/mikopbx/astspool/monitor;'.PHP_EOL.
+            '    add_header X-debug-message "test" always;'.PHP_EOL.
+            '}'.PHP_EOL.PHP_EOL.
+            'location ~ /pbxcore/api/amo/pub/(.*)$ {'.PHP_EOL."\t".
+            'nchan_publisher;'.PHP_EOL."\t".
+            'allow  127.0.0.1;'.PHP_EOL."\t".
+            'nchan_channel_id "$1";'.PHP_EOL."\t".
+            'nchan_message_buffer_length 1;'.PHP_EOL."\t".
+            'nchan_message_timeout 300m;'.PHP_EOL.
+            '}'.
+            PHP_EOL.
+            PHP_EOL.
+            "location ^~ /webrtc-phone/ {".PHP_EOL."\t".
+            "root {$this->moduleDir}/sites/;".PHP_EOL."\t".
+            "index index.html;".PHP_EOL."\t".
+            "access_log off;".PHP_EOL."\t".
+            "expires 3d;".PHP_EOL.
+            "}".PHP_EOL;
     }
 
     /**
