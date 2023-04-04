@@ -216,7 +216,7 @@ class AmoCrmConf extends ConfigClass
             '        return "ok";'.PHP_EOL.
             "    ';".PHP_EOL.
             "    set_by_lua \$result_url '".PHP_EOL.
-            '        local url = "/pbxcore/api/amo/playback"..ngx.var.arg_view;'.PHP_EOL.
+            '        local url = "/pbxcore/api/amo-crm/v2/playback"..ngx.var.arg_view;'.PHP_EOL.
             '        return string.gsub(url,ngx.var.document_root,"");'.PHP_EOL.
             "    ';".PHP_EOL.
             '    try_files "${result_url}" "${result_url}";'.PHP_EOL.
