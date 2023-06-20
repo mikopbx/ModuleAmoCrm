@@ -538,4 +538,4 @@ class AmoCdrDaemon extends WorkerBase
     }
 }
 
-AmoCdrDaemon::startWorker($argv??null);
+AmoCdrDaemon::startWorker($argv??[]);

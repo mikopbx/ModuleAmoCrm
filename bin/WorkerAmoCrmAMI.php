@@ -616,4 +616,4 @@ class WorkerAmoCrmAMI extends WorkerBase
     }
 }
 
-WorkerAmoCrmAMI::startWorker($argv??null);
+WorkerAmoCrmAMI::startWorker($argv??[]);

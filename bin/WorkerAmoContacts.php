@@ -189,4 +189,4 @@ class WorkerAmoContacts extends WorkerBase
     }
 }
 
-WorkerAmoContacts::startWorker($argv??null);
+WorkerAmoContacts::startWorker($argv??[]);
