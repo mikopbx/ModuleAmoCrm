@@ -9,12 +9,23 @@ namespace Modules\ModuleAmoCrm\App\Controllers;
 use MikoPBX\AdminCabinet\Controllers\BaseController;
 use MikoPBX\Common\Models\CallQueues;
 use MikoPBX\Common\Models\Extensions;
+use MikoPBX\Common\Models\OutgoingRoutingTable;
+use MikoPBX\Common\Models\Users;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Modules\PbxExtensionUtils;
+use Modules\ModuleAmoCrm\App\Forms\ModuleAmoCrmEntitySettingsModifyForm;
 use Modules\ModuleAmoCrm\App\Forms\ModuleAmoCrmForm;
-use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
+use Modules\ModuleAmoCrm\bin\AmoCdrDaemon;
+use Modules\ModuleAmoCrm\bin\WorkerAmoHTTP;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use MikoPBX\Common\Models\Providers;
+use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
+use Modules\ModuleUsersGroups\App\Forms\ModuleUsersGroupsForm;
+use Modules\ModuleUsersGroups\Models\AllowedOutboundRules;
+use Modules\ModuleUsersGroups\Models\GroupMembers;
+use Modules\ModuleUsersGroups\Models\UsersGroups;
+
+use function MikoPBX\Common\Config\appPath;
 
 class ModuleAmoCrmController extends BaseController
 {
@@ -86,10 +97,13 @@ class ModuleAmoCrmController extends BaseController
         }
     }
 
+    /**
+     * Проверка соединения с amoCRM
+     * @return void
+     */
     public function checkAction():void
     {
-        $templateMain = new AmoCrmMain();
-        $result = $templateMain->checkConnection();
+        $result = WorkerAmoHTTP::invokeAmoApi('checkConnection', []);
         $this->view->success = $result->success;
         $this->view->data    = $result->data;
         $this->view->messages= $result->messages;
@@ -131,10 +145,41 @@ class ModuleAmoCrmController extends BaseController
         // Список выбора очередей.
         $this->view->queues = CallQueues::find(['columns' => ['id', 'name']]);
         $this->view->users  = Extensions::find(["type = 'SIP'", 'columns' => ['number', 'callerid']]);
+
+
+        $rules = ModuleAmoEntitySettings::find(['columns' => ['id', 'did', 'type', 'create_lead', 'create_contact', 'create_unsorted', 'create_task']])->toArray();
+        foreach ($rules as &$rule){
+            $rule['type_translate'] = 'mod_amo_type_'.$rule['type'];
+        }
+        $this->view->entitySettings  = $rules;
+    }
+
+
+    /**
+     * The modify action for creating or editing
+     *
+     * @param string|null $id The ID of the user group (optional)
+     *
+     * @return void
+     */
+    public function modifyAction(string $id = null): void
+    {
+        $footerCollection = $this->assets->collection('footerJS');
+        $footerCollection->addJs('js/pbx/main/form.js', true);
+        $footerCollection->addJs("js/cache/{$this->moduleUniqueID}/module-amo-crm-modify-entity-settings.js", true);
+        if($id){
+            $rule = ModuleAmoEntitySettings::findFirst("id='$id'");
+        }else{
+            $rule = new ModuleAmoEntitySettings();
+        }
+        $this->view->form      = new ModuleAmoCrmEntitySettingsModifyForm($rule);
+        $this->view->represent = $rule->getRepresent();
+        $this->view->id        = $id;
+        $this->view->pick("{$this->moduleDir}/App/Views/modify");
     }
 
     /**
-     * Save settings AJAX action
+     * Save settings action
      */
     public function saveAction() :void
     {
@@ -174,18 +219,59 @@ class ModuleAmoCrmController extends BaseController
     }
 
     /**
+     * Save settings entity settings action
+     */
+    public function saveEntitySettingsAction():void
+    {
+        $data= $this->request->getPost();
+        $did = trim($data['did']);
+
+        $record = ModuleAmoEntitySettings::findFirst("did='$did' AND type='{$data['type']}' AND id <> {$data['id']}");
+        if($record){
+            $errorText = Util::translate('mod_amo_rule_for_type_did_exists', false);
+            $this->flash->error($errorText);
+            $this->view->success = false;
+            return;
+        }
+
+        $record = ModuleAmoEntitySettings::findFirstById($data['id']);
+        if ($record === null) {
+            $record = new ModuleAmoEntitySettings();
+        }
+        $this->db->begin();
+        foreach ($record as $key => $value) {
+            if($key === 'id'){
+                continue;
+            }
+            if(in_array($key,['create_contact', 'create_lead', 'create_unsorted', 'create_task'])){
+                $record->$key = ($data[$key] === 'on' || $data[$key] === true) ? '1' : '0';
+            } elseif (array_key_exists($key, $data)) {
+                $record->$key = trim($data[$key]);
+            } else {
+                $record->$key = '';
+            }
+        }
+
+        if (FALSE === $record->save()) {
+            $errors = $record->getMessages();
+            $this->flash->error(implode('<br>', $errors));
+            $this->view->success = false;
+            $this->db->rollback();
+            return;
+        }
+        $this->flash->success($this->translation->_('ms_SuccessfulSaved'));
+        $this->view->success = true;
+        $this->view->id = $record->id;
+        $this->db->commit();
+    }
+
+    /**
      * Delete record
      */
     public function deleteAction(): void
     {
-        $table     = $this->request->get('table');
-        $className = $this->getClassName($table);
-        if(empty($className)) {
-            $this->view->success = false;
-            return;
-        }
         $id     = $this->request->get('id');
-        $record = $className::findFirstById($id);
+        $record = ModuleAmoEntitySettings::findFirstById($id);
         if ($record !== null && ! $record->delete()) {
             $this->flash->error(implode('<br>', $record->getMessages()));
             $this->view->success = false;

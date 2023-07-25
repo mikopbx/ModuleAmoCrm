@@ -1,0 +1,14 @@
+<span class="date_field_wrapper {% if control_class_name %}{{ control_class_name }}{% else %}js-control-date{% endif %} {{class_name}}">
+
+  {% if type == 'range' %}
+    <input type="hidden" class="date_field__range_0" name="{{name.from}}" />
+    <input type="hidden" class="date_field__range_1" name="{{name.to}}" />
+  {% endif %}
+
+  <input class="date_field {{input_class}} {% if not value %}empty{% endif %} {% if type == 'range' %}range{% endif %}" id="{{id}}" type="text" {% if type != 'range' %}maxlength="10"{% endif %} {% if type == 'single' %}name="{{name}}"{% endif %} {% if title_format %}data-title-format="{{title_format}}"{% endif %}{% if data_format %}data-format="{{data_format}}"{% endif %} value="{{value}}" placeholder="{{placeholder}}" {% if disabled %}disabled="disabled"{% endif %} />
+
+  {% if show_icon %}<span class="date_field-js tasks-date__caption__icon"></span>{% endif %}
+  <div class="date_field_wrapper--calendar">
+    <svg class="svg-card-calendar-dims"><use xlink:href="#card-calendar"></use></svg>
+  </div>
+</span>

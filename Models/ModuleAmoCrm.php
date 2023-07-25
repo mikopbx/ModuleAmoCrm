@@ -60,6 +60,25 @@ class ModuleAmoCrm extends ModulesModelsBase
      * @Column(type="integer", default="1", nullable=true)
      */
     public $useInterception = 1;
+
+    /**
+     *
+     * @Column(type="integer", default="1", nullable=true)
+     */
+    public $lastContactsSyncTime = 0;
+
+    /**
+     *
+     * @Column(type="integer", default="1", nullable=true)
+     */
+    public $lastCompaniesSyncTime = 0;
+
+    /**
+     *
+     * @Column(type="integer", default="1", nullable=true)
+     */
+    public $lastLeadsSyncTime = 0;
+
     /**
      * Returns dynamic relations between module models and common models
      * MikoPBX check it in ModelsBase after every call to keep data consistent
@@ -74,22 +93,6 @@ class ModuleAmoCrm extends ModulesModelsBase
      */
     public static function getDynamicRelations(&$calledModelObject): void
     {
-//        if (is_a($calledModelObject, Providers::class)) {
-//            $calledModelObject->belongsTo(
-//                'id',
-//                ModuleAmoCrm::class,
-//                'dropdown_field',
-//                [
-//                    'alias'      => 'ModuleAmoCrmProvider',
-//                    'foreignKey' => [
-//                        'allowNulls' => 0,
-//                        'message'    => 'Models\ModuleAmoCrmProvider',
-//                        'action'     => Relation::ACTION_RESTRICT
-//                        // запретить удалять провайдера если есть ссылки в модуле
-//                    ],
-//                ]
-//            );
-//        }
     }
 
     public function initialize(): void

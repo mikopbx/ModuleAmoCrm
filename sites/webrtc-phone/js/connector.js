@@ -130,8 +130,10 @@ define(function (require) {
         checkConnection: function(){
             if( typeof self.eventSource['calls'] !== 'undefined'
                 && self.eventSource['calls'].readyState !== 1){
-
                 let now = new Date().getTime() / 1000;
+                if(self.startReconnect === 0){
+                    self.startReconnect = now - 60;
+                }
                 if(self.state === 1 || ( self.state === 0 && (now - self.startReconnect) > 300 ) ){
                     self.startReconnect = now;
                     PubSub.publish('CALLS', {action: "error", code: 'errorAPITimeOut'});

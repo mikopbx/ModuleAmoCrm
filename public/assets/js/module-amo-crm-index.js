@@ -16,8 +16,8 @@ var ModuleAmoCrm = {
   $formObj: $('#' + idForm),
   $checkBoxes: $('#' + idForm + ' .ui.checkbox'),
   $dropDowns: $('#' + idForm + ' .ui.dropdown'),
-  saveTableAJAXUrl: globalRootUrl + idUrl + "/saveTableData",
-  deleteRecordAJAXUrl: globalRootUrl + idUrl + "/delete",
+  saveTableAJAXUrl: "".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/saveTableData"),
+  deleteRecordAJAXUrl: "".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/delete"),
   $disabilityFields: $('#' + idForm + '  .disability'),
   $statusToggle: $('#module-status-toggle'),
   $moduleStatus: $('#status'),
@@ -104,7 +104,7 @@ var ModuleAmoCrm = {
     });
   },
   checkStatus: function checkStatus() {
-    $.get(idUrl + '/check', function (result) {
+    $.get("".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/check"), function (result) {
       var elStatusAuth = $('#login-button');
       elStatusAuth.removeClass('red green');
 
@@ -127,7 +127,7 @@ var ModuleAmoCrm = {
     var elStatusAuth = $('#login-button');
     elStatusAuth.removeClass('red green');
     elStatusAuth.text(globalTranslate.module_amo_crm_connect_refresh);
-    $.post("".concat(Config.pbxUrl, "/pbxcore/api/modules/").concat(className, "/listener"), params, function (data) {
+    $.post("".concat(window.location.origin, "/pbxcore/api/modules/").concat(className, "/listener"), params, function (data) {
       if (data.result === false) {
         var errorText = data.messages['error-data'].hint || '' + " (" + data.messages['error-data'].detail || '' + ").";
         $("#warning-message div.header").text(globalTranslate.mod_amo_Error);
@@ -318,7 +318,7 @@ var ModuleAmoCrm = {
     if (priorityWasChanged) {
       $.api({
         on: 'now',
-        url: "".concat(globalRootUrl).concat(idUrl, "/changePriority?table=") + $(table).attr('id').replace('-table', ''),
+        url: "".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/changePriority?table=") + $(table).attr('id').replace('-table', ''),
         method: 'POST',
         data: priorityData
       });
@@ -499,7 +499,7 @@ var ModuleAmoCrm = {
   applyConfigurationChanges: function applyConfigurationChanges() {
     window[className].changeStatus('Updating');
     $.api({
-      url: "".concat(Config.pbxUrl, "/pbxcore/api/modules/") + className + "/reload",
+      url: "".concat(window.location.origin, "/pbxcore/api/modules/") + className + "/reload",
       on: 'now',
       successTest: function successTest(response) {
         // test whether a JSON response is valid
@@ -537,7 +537,7 @@ var ModuleAmoCrm = {
    */
   initializeForm: function initializeForm() {
     Form.$formObj = window[className].$formObj;
-    Form.url = "".concat(globalRootUrl).concat(idUrl, "/save");
+    Form.url = "".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/save");
     Form.validateRules = window[className].validateRules;
     Form.cbBeforeSendForm = window[className].cbBeforeSendForm;
     Form.cbAfterSendForm = window[className].cbAfterSendForm;

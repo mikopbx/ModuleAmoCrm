@@ -1,0 +1,28 @@
+<div id="miko">
+    <form class="ui form" id="miko-sticker-{{ intPhone }}">
+        <input name="phone" id="phone" type="hidden" value="{{ intPhone }}">
+        <input name="contactId" id="contactId" type="hidden">
+        <h3> {{ phonePretty }} </h3>
+        <div class="ui message red hidden">
+            <div class="header">
+                {{ lang.sticker.contact_exists }}
+            </div>
+            <p></p>
+        </div>
+        <div class="field">
+            <h6>{{ lang.sticker.label_contact }}</h6>
+            <input name="client-name" id="client-name" type="text" value="" placeholder="{{ lang.sticker.placeholder_contact }}" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="field">
+            <h6>{{ lang.sticker.label_email }}</h6>
+            <input name="el-adr" id="el-adr" type="text" value="" placeholder="{{ lang.sticker.placeholder_email }}" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="field">
+            <h6>{{ lang.sticker.label_comment }}</h6>
+            <textarea name="comment" id="comment" type="text" value="" placeholder="{{ lang.sticker.placeholder_comment }}" spellcheck="false" autocomplete="off"> </textarea>
+        </div>
+        <button type="button" class="ui primary button miko-save-btn"> {{ lang.sticker.button_save }} </button>
+        <button type="button" class="ui primary button hidden miko-update-btn"> {{ lang.sticker.button_update }} </button>
+        <button type="button" class="ui button miko-close-btn"> {{ lang.sticker.button_close }} </button>
+    </form>
+</div>

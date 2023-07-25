@@ -1,0 +1,15 @@
+<ul class="button-input__context-menu {{ context_menu_class_name }}">
+  {% for item in context_menu %}
+    <li class="button-input__context-menu__item  element__{{ item.icon }} {{ item.class_name }}" id="{{ item.id }}" {{ item.additional_data }}>
+      {% if item.href %}
+        <a href="{{ item.href }}" class="{% if not item._blank %}js-navigate-link{% endif %} button-input__context-menu__item__link button-input__context-menu__item__inner" {% if item._blank %}target="_blank"{% endif %}>
+          {% include 'interface/controls/button/context_menu_inner.twig' with {item: item} %}
+        </a>
+      {% else %}
+        <div class="button-input__context-menu__item__inner">
+          {% include 'interface/controls/button/context_menu_inner.twig' with {item: item} %}
+        </div>
+      {% endif %}
+    </li>
+  {% endfor %}
+</ul>

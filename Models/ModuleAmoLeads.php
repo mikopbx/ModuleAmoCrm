@@ -12,8 +12,14 @@ use MikoPBX\Modules\Models\ModulesModelsBase;
 /**
  * Class ModuleAmoUsers
  * @package Modules\ModuleAmoCrm\Models
+ * @Indexes(
+ *     [name='idAmo', columns=['idAmo'], type=''],
+ *     [name='contactId', columns=['contactId'], type=''],
+ *     [name='companyId', columns=['companyId'], type=''],
+ *     [name='closed_at', columns=['closed_at'], type='']
+ * )
  */
-class ModuleAmoPipeLines extends ModulesModelsBase
+class ModuleAmoLeads extends ModulesModelsBase
 {
     /**
      * @Primary
@@ -25,7 +31,7 @@ class ModuleAmoPipeLines extends ModulesModelsBase
     /**
      * @Column(type="string", nullable=true)
      */
-    public $amoId;
+    public $idAmo;
 
     /**
      * @Column(type="string", nullable=true)
@@ -33,18 +39,41 @@ class ModuleAmoPipeLines extends ModulesModelsBase
     public $name;
 
     /**
-     * Toggle
-     *
      * @Column(type="string", nullable=true)
      */
-    public $did = '';
+    public $responsible_user_id;
 
     /**
-     * Toggle
+     * @Column(type="string", nullable=true)
+     */
+    public $contactId;
+
+    /**
+     * @Column(type="string", nullable=true)
+     */
+    public $companyId;
+
+    /**
      *
      * @Column(type="string", nullable=true)
      */
-    public $statuses = '';
+    public $status_id= '';
+
+    /**
+     *
+     * @Column(type="string", nullable=true)
+     */
+    public $pipeline_id= '';
+
+    /**
+     * @Column(type="integer", nullable=true)
+     */
+    public $isMainContact = 0;
+
+    /**
+     * @Column(type="integer", nullable=true)
+     */
+    public $closed_at = 0;
 
     /**
      * @param $calledModelObject
@@ -56,7 +85,7 @@ class ModuleAmoPipeLines extends ModulesModelsBase
 
     public function initialize(): void
     {
-        $this->setSource('m_ModuleAmoPipeLines');
+        $this->setSource('m_ModuleAmoLeads');
         parent::initialize();
     }
 }

@@ -16,7 +16,7 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global define, AMOCRM */
+/* global define */
 define(function (require) {
     let $       = require('jquery');
     const PubSub= require('pubsub');
@@ -24,21 +24,36 @@ define(function (require) {
     let connector = {
         settings: {},
         iFrame: null,
+        /**
+         * Sending a command to a frame
+         * @param message
+         */
         postToFrame: function (message){
             if(connector.iFrame !== null && typeof connector.iFrame.contentWindow === 'object'){
                 connector.iFrame.contentWindow.postMessage(message, '*');
             }
         },
-        resizeFunc: function (height){
+        /**
+         * Setting the frame height
+         * @param height
+         */
+        setHeightFrame: function (height){
             if(height === undefined){
                 height = $(window).height();
             }
             $('iframe[id="miko-pbx-phone"]').attr('height', height);
         },
+        /**
+         * Initializing the component
+         * @param newSettings
+         */
         init: function(newSettings) {
+            // Initializing the connector to MikoPBX
             connector.settings = newSettings;
             if(connector.settings.pbxHost){
                 let href = `//${connector.settings.pbxHost}/webrtc-phone/index.html?random=${(new Date()).getTime()}`;
+                // Checking the availability of content located remotely
+                // ModuleAmoCrm/sites/webrtc-phone/index.html
                 $.ajax({
                     type : "HEAD",
                     async : true,
@@ -46,32 +61,42 @@ define(function (require) {
                 })
                 .success(function() {
                     if ($('iframe[src="' + href +'"').length < 1) {
+                        // Add iframe
                         let css = 'position: fixed; z-index: 999; right: 0;bottom: 0; border: 0;';
-                        //  Подключаем файл style.css передавая в качестве параметра версию виджета
+                        // We connect the style.css file by passing the widget version as a parameter
                         $("body").prepend(`<iframe id="miko-pbx-phone" src="${href}" width="300" height="${$(window).height()}" style="${css}"></iframe>`);
                     }
                     connector.iFrame = document.getElementById('miko-pbx-phone');
                     connector.iFrame.onload = function (){
-                        $('#miko-pbx-phone').show();
+                        $(connector.iFrame).show();
                         $(window).resize(() => {
-                            connector.resizeFunc();
+                            connector.setHeightFrame();
+                            // Set the size of the frame content. Passing a command to a frame
                             connector.postToFrame({action: 'resize', height: $(window).height()});
                         });
+                        // Show a hidden frame when the mouse hovers over the border of the area
                         $(window).mousemove(event => {
                             if( $(window).width() - event.pageX < 5){
-                                $('#miko-pbx-phone').show();
+                                $(connector.iFrame).show();
                             }
                         });
                     };
+                    // Subscribing to event processing from a frame
                     window.addEventListener("message", connector.onMessage);
                 })
                 .error(function(){
-                    $('#miko-pbx-phone').hide();
+                    $(connector.iFrame).hide();
                     PubSub.publish(connector.settings.ns + ':main', {action: "error", code: 'errorLoadFrame'});
                 })
             }
+            // Subscribing to events from other widget components
             PubSub.subscribe(connector.settings.ns + ':connector', connector.onMessage);
         },
+        /**
+         * Processing notifications from other components and from the frame (MikoPBX)
+         * @param event
+         * @param message
+         */
         onMessage: function(event, message = null) {
             if( typeof event.origin !== 'undefined'
                 && location.protocol+`//${connector.settings.pbxHost}` !== event.origin){
@@ -84,7 +109,8 @@ define(function (require) {
                 return;
             }
             if(params.action === 'init-done'){
-                connector.resizeFunc();
+                // Message from MikoPBX frame
+                connector.setHeightFrame();
                 connector.postToFrame({action: 'connect', data: connector.settings})
             }else if(params.action === 'findContact'){
                 PubSub.publish(connector.settings.ns + ':main', params);
@@ -100,15 +126,15 @@ define(function (require) {
                 // Открыть карточку клиента.
                 PubSub.publish(connector.settings.ns + ':main', params);
             }else if(params.action === 'hide-panel'){
-                $('#miko-pbx-phone').hide();
+                $(connector.iFrame).hide();
             }else if(params.action === 'show-panel'){
-                $('#miko-pbx-phone').show({done: () => {
+                $(connector.iFrame).show({done: () => {
                     connector.postToFrame({action: 'resize'});
                 }});
             }else if(params.action === 'error'){
                 PubSub.publish(connector.settings.ns + ':main', params);
             }else if(params.action === 'resize'){
-                connector.resizeFunc(params.height);
+                connector.setHeightFrame(params.height);
             }else{
                 connector.postToFrame(message);
             }

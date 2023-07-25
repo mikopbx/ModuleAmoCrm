@@ -30,6 +30,18 @@
         "create_contact" : "Создать контакт",
         "call_title": "Вам звонит"
     },
+    "sticker": {
+        "label_comment": "Комментарий",
+        "label_contact": "Контакт",
+        "label_email": "Эл. почта",
+        "placeholder_comment": "Примечание...",
+        "placeholder_contact": "Имя контакта...",
+        "button_save": "Сохранить",
+        "button_close": "Закрыть",
+        "button_update": "Дополнить контакт",
+        "placeholder_email": "Адрес почты...",
+        "contact_exists":  "Контакт уже существует"
+    },
     "menu": {
         "main_title" : "Панель телефонии MikoPBX"
     },

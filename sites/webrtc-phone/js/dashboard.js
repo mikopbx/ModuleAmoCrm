@@ -82,6 +82,7 @@ define(function (require) {
                 data: $('#active-call-twig').html()
             });
             if($('#web-rtc-phone .m-cdr-card[data-callid="'+event.data.call_id+'"]').length !== 0 ){
+                // Звонок существует, уже добавлен ранее.
                 return
             }
             if(event.data.number.length <= 4){
@@ -96,6 +97,15 @@ define(function (require) {
         answerCall:function (event){
             let element = $('#web-rtc-phone .m-cdr-card[data-callid="'+event.data.call_id+'"]');
             element.attr('data-answer', event.data.answer);
+            // Открываем карточку при соединении с клиентом.
+            if(element.attr('data-call-type') !== 'in'){
+                return;
+            }
+            let params = {
+                number: element.find('div.m-company-name').attr('data-phone'),
+                id: element.find('div.m-company-name').attr('data-contact-id'),
+            };
+            self.sendMessage({action: 'openCard', data: params});
         },
         delCall: function (event){
             $('#web-rtc-phone .m-cdr-card[data-callid="'+event.data.call_id+'"]').remove();

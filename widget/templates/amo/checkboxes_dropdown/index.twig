@@ -1,0 +1,102 @@
+
+{% set checked_values_length = 0 %}
+
+<div class="checkboxes_dropdown {{class_name}} {% if control_class_name %}{{ control_class_name }}{% else %}js-control-checkboxes_dropdown{% endif %}">
+  <div class="checkboxes_dropdown__list custom-scroll">
+    <div class="checkboxes_dropdown__list__wrapper__inner">
+      <div class="checkboxes_dropdown__item" >
+        {% include "interface/controls/checkbox.twig" with {
+          name: '',
+          name_is_array: false,
+          id: 'cbx_drop_master_' ~ random(1000),
+          class_name: 'checkboxes_dropdown__label js-master-checkbox-wrapper',
+          input_class_name: 'js-form-changes-skip js-master-checkbox',
+          text_class_name: 'js-select-all-text checkboxes_dropdown__label_title checkboxes_dropdown__label_title-not_active',
+          value: '',
+          disabled: false,
+          text: 'Select all'|i18n
+        } %}
+      </div>
+
+      {% set cb_name = name %}
+
+      {% for item in items %}
+        {% if need_escape %}
+          {% set text = item.option|escape %}
+        {% else %}
+          {% set text = item.option %}
+        {% endif %}
+
+        {% if item.name %}
+          {% set cb_name = item.name %}
+        {% endif %}
+
+        <div class="checkboxes_dropdown__item {% if item.active == 'N' %} checkboxes_dropdown__label_title-not_active{% endif %} {% if item.divider_before %} checkboxes_dropdown__label_title_divider_before{% endif %} {% if item.divider_after %}checkboxes_dropdown__label_title_divider_after{% endif %}" {% if item.divider_before %}data-title-before="{{ item.divider_before.title }}"{% endif %} {% if item.divider_after %} data-title-after="{{ item.divider_after.title }}"{% endif %} style="{% if item.bg_color %}background-color: {{ item.bg_color }}{% endif %}">
+          {% if not item.prefix %}
+            {% set item = item|merge({'prefix' : item.id}) %}
+          {% endif %}
+
+          {% set text_class_name = 'checkboxes_dropdown__label_title' %}
+
+          {% if item.active == 'N' %}
+            {% set text_class_name = text_class_name ~ ' checkboxes_dropdown__label_title-not_active' %}
+          {% endif %}
+
+          {% include "interface/controls/checkbox.twig" with {
+            name: cb_name,
+            id: 'cbx_drop_' ~ item.prefix,
+            class_name: 'checkboxes_dropdown__label',
+            input_class_name: 'js-item-checkbox',
+            text_class_name: text_class_name,
+            checked: item.is_checked,
+            value: item.id,
+            name_is_array: name_is_array,
+            text: text,
+            disabled: false
+          } %}
+        </div>
+
+        {% if item.is_checked %}
+          {% set checked_values_length = checked_values_length + 1 %}
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="checkboxes_dropdown__title_wrapper">
+    {% include 'interface/controls/checkbox.twig' with {
+      class_name: 'checkboxes_dropdown__checkbox_master icon-checkbox js-master-checkbox-wrapper',
+      input_class_name: 'js-form-changes-skip js-master-checkbox',
+      checked: checked_values_length > 0,
+      checked_minus: checked_values_length > 0 and checked_values_length != items|length,
+      name: '',
+      name_is_array: false,
+      value: '',
+      text: '',
+      disabled: false
+    } %}
+
+    <span class="checkboxes_dropdown__title-selected">
+      <span class="checkboxes_dropdown__title" data-numeral="{{title_numeral}}" data-title-empty="{{title_empty}}">
+        {% block title %}
+          {% if checked_values_length %}
+            {% set is_first = true %}
+
+            {% for item in items if item.is_checked %}
+              <div class="checkboxes_dropdown__title-item" {% if is_first and title_before %}data-title-before="{{ title_before }}"{% endif %}>
+                {{ need_escape ? item.option|escape : item.option }}
+              </div>
+              {% set is_first = false %}
+            {% endfor %}
+          {% else %}
+            <div class="checkboxes_dropdown__title-item" {% if title_before %}data-title-before="{{ title_before }}"{% endif %}>
+              {{ title_empty ? title_empty : 'all'|i18n ~ ' ' ~ title_numeral|numeral('all') }}
+            </div>
+          {% endif %}
+        {% endblock %}
+      </span>
+    </span>
+
+    <span class="checkboxes_dropdown_icon icon-v-ico-2"></span>
+  </div>
+</div>

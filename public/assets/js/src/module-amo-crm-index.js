@@ -12,15 +12,15 @@ const inputClassName = 'mikopbx-module-input';
 
 /* global $, globalRootUrl, globalTranslate, Form, Config */
 const ModuleAmoCrm = {
-	$formObj: $('#'+idForm),
-	$checkBoxes: $('#'+idForm+' .ui.checkbox'),
-	$dropDowns: $('#'+idForm+' .ui.dropdown'),
-	saveTableAJAXUrl: globalRootUrl + idUrl + "/saveTableData",
-	deleteRecordAJAXUrl: globalRootUrl + idUrl + "/delete",
-	$disabilityFields: $('#'+idForm+'  .disability'),
-	$statusToggle: $('#module-status-toggle'),
-	$moduleStatus: $('#status'),
-	authWindow: undefined,
+	$formObj: 				$('#'+idForm),
+	$checkBoxes: 			$('#'+idForm+' .ui.checkbox'),
+	$dropDowns: 			$('#'+idForm+' .ui.dropdown'),
+	saveTableAJAXUrl: 		`${window.location.origin}${globalRootUrl}${idUrl}/saveTableData`,
+	deleteRecordAJAXUrl: 	`${window.location.origin}${globalRootUrl}${idUrl}/delete`,
+	$disabilityFields: 		$('#'+idForm+'  .disability'),
+	$statusToggle: 			$('#module-status-toggle'),
+	$moduleStatus: 			$('#status'),
+	authWindow: 			undefined,
 
 	/**
 	/**
@@ -107,7 +107,7 @@ const ModuleAmoCrm = {
 	},
 
 	checkStatus(){
-		$.get( idUrl + '/check', function( result ) {
+		$.get( `${window.location.origin}${globalRootUrl}${idUrl}/check`, function( result ) {
 			let elStatusAuth = $('#login-button');
 			elStatusAuth.removeClass('red green');
 			if(result.success === true){
@@ -131,7 +131,7 @@ const ModuleAmoCrm = {
 		elStatusAuth.removeClass('red green');
 		elStatusAuth.text(globalTranslate.module_amo_crm_connect_refresh);
 
-		$.post(`${Config.pbxUrl}/pbxcore/api/modules/${className}/listener`, params, function( data ) {
+		$.post(`${window.location.origin}/pbxcore/api/modules/${className}/listener`, params, function( data ) {
 			if(data.result === false){
 				let errorText = data.messages['error-data'].hint || '' + " ("+ data.messages['error-data'].detail || '' + ").";
 				$("#warning-message div.header").text(globalTranslate.mod_amo_Error)
@@ -310,7 +310,7 @@ const ModuleAmoCrm = {
 		if (priorityWasChanged) {
 			$.api({
 				on: 'now',
-				url: `${globalRootUrl}${idUrl}/changePriority?table=`+$(table).attr('id').replace('-table', ''),
+				url:`${window.location.origin}${globalRootUrl}${idUrl}/changePriority?table=`+$(table).attr('id').replace('-table', ''),
 				method: 'POST',
 				data: priorityData,
 			});
@@ -476,7 +476,7 @@ const ModuleAmoCrm = {
 	applyConfigurationChanges() {
 		window[className].changeStatus('Updating');
 		$.api({
-			url: `${Config.pbxUrl}/pbxcore/api/modules/`+className+`/reload`,
+			url: `${window.location.origin}/pbxcore/api/modules/`+className+`/reload`,
 			on: 'now',
 			successTest(response) {
 				// test whether a JSON response is valid
@@ -511,7 +511,7 @@ const ModuleAmoCrm = {
 	 */
 	initializeForm() {
 		Form.$formObj = window[className].$formObj;
-		Form.url = `${globalRootUrl}${idUrl}/save`;
+		Form.url = `${window.location.origin}${globalRootUrl}${idUrl}/save`;
 		Form.validateRules = window[className].validateRules;
 		Form.cbBeforeSendForm = window[className].cbBeforeSendForm;
 		Form.cbAfterSendForm = window[className].cbAfterSendForm;

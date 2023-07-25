@@ -53,6 +53,11 @@ class ApiController extends ModulesControllerBase
         $this->evalFunction('change-settings');
     }
 
+    public function amoEntityUpdateAction():void
+    {
+        $this->evalFunction('entity-update');
+    }
+
     private function evalFunction($name):void
     {
         if(!file_exists("/var/etc/auth/".$_REQUEST['token'])){

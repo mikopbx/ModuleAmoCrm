@@ -1,0 +1,27 @@
+<label class="control-checkbox {{class_name}} {% if small %}control-checkbox_small{% endif %} {% if checked %}is-checked{% endif %}">
+  {% if name_is_array == 'yes'%}
+    {% set arr = '[]' %}
+  {% else %}
+    {% set arr = '' %}
+  {% endif %}
+
+  <div class="control-checkbox__body">
+    <input type="checkbox" class="{{input_class_name}}" name="{{name ~ arr}}" id="{{id}}"{% if checked %} checked="checked"{% endif %}{% if disabled %} disabled{% endif %} value="{{value}}" {% if fieldId %} data-field-id="{{fieldId}}" {% endif %} data-value="{{dataValue or value}}" {{additional_data}}/>
+
+    <span class="control-checkbox__helper {% if checked_minus %}control-checkbox__helper_minus{% endif %}"></span>
+  </div>
+
+  {% if text|length %}
+    <div class="control-checkbox__text element__text {{text_class_name}}" title="{{text}}">
+      {% if note_text %}
+        <span class="control-checkbox__main-text">{{text}}</span> <span class="control-checkbox__note-text">{{note_text}}</span>
+      {% else %}
+        {{text}}
+      {% endif %}
+    </div>
+  {% elseif note_text %}
+    <div class="control-checkbox__text element__text {{text_class_name}}" title="{{note_text}}">
+      <span class="control-checkbox__note-text">{{note_text}}</span>
+    </div>
+  {% endif %}
+</label>

@@ -36,6 +36,78 @@
     {{ partial("partials/submitbutton",['indexurl':'pbx-extension-modules/index/']) }}
 </form>
 
+
+<!-- 'id', 'did', 'type', 'create_lead', 'create_contact', 'create_unsorted', 'create_task' -->
+{% for rule in entitySettings %}
+    {% if loop.first %}
+        <table class="ui selectable compact unstackable table" id="entitySettingsTable">
+        <thead>
+        <tr>
+            <th>{{ t._('mod_amo_entitySettingsTableDid') }}</th>
+            <th>{{ t._('mod_amo_entitySettingsTableType') }}</th>
+            <th>{{ t._('mod_amo_entitySettingsTableCreateContact') }}</th>
+            <th>{{ t._('mod_amo_entitySettingsTableCreateLead') }}</th>
+            <th>{{ t._('mod_amo_entitySettingsTableCreateTask') }}</th>
+            <th>{{ t._('mod_amo_entitySettingsTableCreateUnsorted') }}</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+    {% endif %}
+
+    <tr class="rule-row " id="{{ rule['id'] }}">
+        <td class="">{{ rule['did'] }}</td>
+        <td class="">{{ t._(rule['type_translate']) }}</td>
+        <td class="">
+            <i class="icons">
+            {% if (rule['create_contact'] === '1') %}
+                <i class="icon checkmark green" data-value="on"></i>
+            {% else %}
+                <i class="icon close red" data-value="off"></i>
+            {% endif %}
+            </i>
+        </td>
+        <td class="">
+            <i class="icons">
+            {% if (rule['create_lead'] === '1') %}
+                <i class="icon checkmark green" data-value="on"></i>
+            {% else %}
+                <i class="icon close red" data-value="off"></i>
+            {% endif %}
+            </i>
+        </td>
+        <td class="">
+            <i class="icons">
+            {% if (rule['create_task'] === '1') %}
+                <i class="icon checkmark green" data-value="on"></i>
+            {% else %}
+                <i class="icon close red" data-value="off"></i>
+            {% endif %}
+            </i>
+        </td>
+        <td class="">
+            <i class="icons">
+            {% if (rule['create_unsorted'] === '1') %}
+                <i class="icon checkmark green" data-value="on"></i>
+            {% else %}
+                <i class="icon close red" data-value="off"></i>
+            {% endif %}
+            </i>
+        </td>
+        {{ partial("partials/tablesbuttons",
+            [
+                'id': rule['id'],
+                'edit' : 'module-amo-crm/modify/',
+                'delete': 'module-amo-crm/delete/'
+            ])
+        }}
+    </tr>
+
+    {% if loop.last %}
+        </tbody>
+        </table>
+    {% endif %}
+{% endfor %}
 <div class="ui long modal"  id="modal-auth-simple">
     <div class="header"> {{ t._('mod_amo_authCodeText') }} </div>
     <div class="content">

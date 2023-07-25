@@ -12,8 +12,14 @@ use MikoPBX\Modules\Models\ModulesModelsBase;
 /**
  * Class ModuleAmoUsers
  * @package Modules\ModuleAmoCrm\Models
+ * @Indexes(
+ *     [name='idEntity', columns=['idEntity'], type=''],
+ *     [name='linked_company_id', columns=['linked_company_id'], type=''],
+ *     [name='entityType', columns=['entityType'], type=''],
+ *     [name='idPhone', columns=['idPhone'], type='']
+ * )
  */
-class ModuleAmoPipeLines extends ModulesModelsBase
+class ModuleAmoPhones extends ModulesModelsBase
 {
     /**
      * @Primary
@@ -25,7 +31,32 @@ class ModuleAmoPipeLines extends ModulesModelsBase
     /**
      * @Column(type="string", nullable=true)
      */
-    public $amoId;
+    public $idEntity;
+
+    /**
+     * @Column(type="string", nullable=true)
+     */
+    public $idPhone;
+
+    /**
+     * @Column(type="string", nullable=true)
+     */
+    public $phone;
+
+    /**
+     * @Column(type="string", nullable=true)
+     */
+    public $responsible_user_id;
+
+    /**
+     * @Column(type="string", nullable=true)
+     */
+    public $linked_company_id;
+
+    /**
+     * @Column(type="string", nullable=true)
+     */
+    public $company_name;
 
     /**
      * @Column(type="string", nullable=true)
@@ -33,18 +64,9 @@ class ModuleAmoPipeLines extends ModulesModelsBase
     public $name;
 
     /**
-     * Toggle
-     *
      * @Column(type="string", nullable=true)
      */
-    public $did = '';
-
-    /**
-     * Toggle
-     *
-     * @Column(type="string", nullable=true)
-     */
-    public $statuses = '';
+    public $entityType;
 
     /**
      * @param $calledModelObject
@@ -56,7 +78,7 @@ class ModuleAmoPipeLines extends ModulesModelsBase
 
     public function initialize(): void
     {
-        $this->setSource('m_ModuleAmoPipeLines');
+        $this->setSource('m_ModuleAmoPhones');
         parent::initialize();
     }
 }
