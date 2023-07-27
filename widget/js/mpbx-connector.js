@@ -68,7 +68,12 @@ define(function (require) {
                     }
                     connector.iFrame = document.getElementById('miko-pbx-phone');
                     connector.iFrame.onload = function (){
-                        $(connector.iFrame).show();
+                        let frameVisibility= localStorage.getItem('frameVisibility');
+                        if(frameVisibility === '1'){
+                            $(connector.iFrame).show();
+                        }else{
+                            $(connector.iFrame).hide();
+                        }
                         $(window).resize(() => {
                             connector.setHeightFrame();
                             // Set the size of the frame content. Passing a command to a frame
@@ -127,10 +132,12 @@ define(function (require) {
                 PubSub.publish(connector.settings.ns + ':main', params);
             }else if(params.action === 'hide-panel'){
                 $(connector.iFrame).hide();
+                localStorage.setItem('frameVisibility', '0')
             }else if(params.action === 'show-panel'){
                 $(connector.iFrame).show({done: () => {
                     connector.postToFrame({action: 'resize'});
                 }});
+                localStorage.setItem('frameVisibility', '1')
             }else if(params.action === 'error'){
                 PubSub.publish(connector.settings.ns + ':main', params);
             }else if(params.action === 'resize'){

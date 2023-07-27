@@ -25,7 +25,7 @@ return [
     'mod_amo_Error'                 => 'Ошибка',
 
     'mod_amo_entitySettingsTableDid'            => 'DID',
-    'mod_amo_entitySettingsTableType'           => 'Тип',
+    'mod_amo_entitySettingsTableType'           => 'Тип звонка',
     'mod_amo_entitySettingsTableCreateContact'  => 'Контакт',
     'mod_amo_entitySettingsTableCreateLead'     => 'Сделка',
     'mod_amo_entitySettingsTableCreateUnsorted' => 'Неразобранное',
@@ -76,5 +76,9 @@ return [
     'module_amo_crmDisconnected'          => 'Модуль отключен',
     'module_amo_crmUpdateStatus'          => 'Обновление статуса',
     'mod_amo_tokenForAmo'                 => 'Ключ доступа к API MikoPBX',
-    'mod_amo_useInterception'             => 'Использовать перехват на ответственного'
+    'mod_amo_useInterception'             => 'Использовать перехват на ответственного',
+
+    'mod_amo_rules'                       => 'Создание сущностей',
+    'mod_amo_settingsConnection'          => 'Настройки подключения',
+
 ];

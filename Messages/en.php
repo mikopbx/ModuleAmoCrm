@@ -18,6 +18,8 @@ return [
     'module_amo_crm_connect_ok'     => 'Connected',
     'module_amo_crm_connect_fail'   => 'Disconnected',
 
+    'mod_amo_rules'                 => 'Rules for creating entities',
+    'mod_amo_settingsConnection'    => 'Connection Settings',
     'mod_amo_baseDomain'            => 'Portal AMO (example.amocrm.ru)',
     'mod_amo_Error'                 => 'Error',
     'module_template_AddNewRecord'  => 'Add new',
