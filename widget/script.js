@@ -6,7 +6,7 @@ define(function (require) {
   const Modal     = require('lib/components/base/modal');
 
   return function () {
-    mikopbx_w = this;
+    // mikopbx_w = this;
     let self = this;
 
     self.stickers = [];
