@@ -70,19 +70,25 @@ define(function (require) {
                     connector.iFrame.onload = function (){
                         let frameVisibility= localStorage.getItem('frameVisibility');
                         if(frameVisibility === '1'){
-                            $(connector.iFrame).show();
+                            $(connector.iFrame).show({duration: 400});
                         }else{
                             $(connector.iFrame).hide();
                         }
                         $(window).resize(() => {
-                            connector.setHeightFrame();
                             // Set the size of the frame content. Passing a command to a frame
                             connector.postToFrame({action: 'resize', height: $(window).height()});
+                            connector.setHeightFrame();
                         });
                         // Show a hidden frame when the mouse hovers over the border of the area
                         $(window).mousemove(event => {
                             if( $(window).width() - event.pageX < 5){
-                                $(connector.iFrame).show();
+                                $(connector.iFrame).show({
+                                    duration: 400,
+                                    done: () => {
+                                        connector.postToFrame({action: 'resize', height: $(window).height()});
+                                        connector.setHeightFrame();                                    }
+                                });
+
                             }
                         });
                     };
@@ -134,9 +140,13 @@ define(function (require) {
                 $(connector.iFrame).hide();
                 localStorage.setItem('frameVisibility', '0')
             }else if(params.action === 'show-panel'){
-                $(connector.iFrame).show({done: () => {
-                    connector.postToFrame({action: 'resize'});
-                }});
+                connector.postToFrame({action: 'resize'});
+                $(connector.iFrame).show({
+                    duration: 400,
+                    done: () => {
+                        connector.postToFrame({action: 'resize'});
+                    }
+                });
                 localStorage.setItem('frameVisibility', '1')
             }else if(params.action === 'error'){
                 PubSub.publish(connector.settings.ns + ':main', params);

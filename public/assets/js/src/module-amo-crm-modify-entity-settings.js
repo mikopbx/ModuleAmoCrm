@@ -182,8 +182,13 @@ const ModuleAmoCrmEntityEdit = {
 	/**
 	 * Some actions after forms send
 	 */
-	cbAfterSendForm() {
-
+	cbAfterSendForm(response) {
+		console.log(response);
+		if(response.success === true && $('#id').val() === ''){
+			$('#id').val(response.id);
+			let title = $('head title').html();
+			window.history.pushState({page: title}, title, `${window.location.href}${response.id}`);
+		}
 	},
 
 	/**

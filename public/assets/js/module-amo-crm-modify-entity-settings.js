@@ -205,7 +205,17 @@ var ModuleAmoCrmEntityEdit = {
   /**
    * Some actions after forms send
    */
-  cbAfterSendForm: function cbAfterSendForm() {},
+  cbAfterSendForm: function cbAfterSendForm(response) {
+    console.log(response);
+
+    if (response.success === true && $('#id').val() === '') {
+      $('#id').val(response.id);
+      var title = $('head title').html();
+      window.history.pushState({
+        page: title
+      }, title, "".concat(window.location.href).concat(response.id));
+    }
+  },
 
   /**
    * Initialize form parameters

@@ -100,13 +100,13 @@ class ModuleAmoEntitySettings extends ModulesModelsBase
      * Шаблон Заполнения задачи
      * @Column(type="string", nullable=true)
      */
-    public $template_task_text = 0;
+    public $template_task_text;
 
     /**
      * Срок выполнения задачи в часах.
      * @Column(type="integer", nullable=true)
      */
-    public $deadline_task = 0;
+    public $deadline_task = 1;
 
     public function initialize(): void
     {

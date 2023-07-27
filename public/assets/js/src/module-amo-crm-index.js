@@ -104,8 +104,36 @@ const ModuleAmoCrm = {
 			let url = `https://www.amocrm.ru/oauth?client_id=${client_id}&state=${state}&redirect_uri=${redirect_uri}&mode=post_message&scope=&approval_prompt=auto`;
 			window[className].popup = window.open(url, 'Auth', 'scrollbars, status, resizable, width=750, height=580');
 		});
-	},
 
+		$('body').on('click', 'a.delete', (e) => {
+			e.preventDefault();
+			const id = $(e.target).closest('tr').attr('id');
+			ModuleAmoCrm.deleteRule(id);
+		});
+	},
+	/**
+	 * Deletes an extension with the given ID.
+	 * @param {string} id - The ID of the rule to delete.
+	 */
+	deleteRule(id) {
+		$('.message.ajax').remove();
+		$.api({
+			url: `${globalRootUrl}module-amo-crm/delete/${id}`,
+			on: 'now',
+			successTest(response) {
+				// test whether a JSON response is valid
+				return response !== undefined
+					&& Object.keys(response).length > 0;
+			},
+			onSuccess(response) {
+				if (response.success === true) {
+					$('#entitySettingsTable').find(`tr[id=${id}]`).remove();
+				} else {
+					UserMessage.showError(response.message.error, globalTranslate.ex_ImpossibleToDeleteExtension);
+				}
+			},
+		});
+	},
 	checkStatus(){
 		$.get( `${window.location.origin}${globalRootUrl}${idUrl}/check`, function( result ) {
 			let elStatusAuth = $('#login-button');

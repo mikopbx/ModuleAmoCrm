@@ -167,9 +167,11 @@ class ModuleAmoCrmController extends BaseController
         $footerCollection = $this->assets->collection('footerJS');
         $footerCollection->addJs('js/pbx/main/form.js', true);
         $footerCollection->addJs("js/cache/{$this->moduleUniqueID}/module-amo-crm-modify-entity-settings.js", true);
+        $rule = null;
         if($id){
             $rule = ModuleAmoEntitySettings::findFirst("id='$id'");
-        }else{
+        }
+        if(!$rule){
             $rule = new ModuleAmoEntitySettings();
         }
         $this->view->form      = new ModuleAmoCrmEntitySettingsModifyForm($rule);
@@ -226,7 +228,15 @@ class ModuleAmoCrmController extends BaseController
         $data= $this->request->getPost();
         $did = trim($data['did']);
 
-        $record = ModuleAmoEntitySettings::findFirst("did='$did' AND type='{$data['type']}' AND id <> {$data['id']}");
+        $filter = [
+            "did=:did: AND type=:type: AND id<>:id:",
+            'bind'    => [
+                'did' => $did,
+                'type'=> $data['type']??'',
+                'id'  => $data['id']
+            ]
+        ];
+        $record = ModuleAmoEntitySettings::findFirst($filter);
         if($record){
             $errorText = Util::translate('mod_amo_rule_for_type_did_exists', false);
             $this->flash->error($errorText);
@@ -234,7 +244,10 @@ class ModuleAmoCrmController extends BaseController
             return;
         }
 
-        $record = ModuleAmoEntitySettings::findFirstById($data['id']);
+        $record = null;
+        if(!empty($data['id'])){
+            $record = ModuleAmoEntitySettings::findFirstById($data['id']);
+        }
         if ($record === null) {
             $record = new ModuleAmoEntitySettings();
         }
@@ -268,15 +281,15 @@ class ModuleAmoCrmController extends BaseController
     /**
      * Delete record
      */
-    public function deleteAction(): void
+    public function deleteAction($id): void
     {
-        $id     = $this->request->get('id');
         $record = ModuleAmoEntitySettings::findFirstById($id);
         if ($record !== null && ! $record->delete()) {
             $this->flash->error(implode('<br>', $record->getMessages()));
             $this->view->success = false;
             return;
         }
+        $this->view->id     = $id;
         $this->view->success = true;
     }
 

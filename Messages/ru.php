@@ -11,7 +11,7 @@ return [
     'BreadcrumbModuleAmoCrm'        => 'Модуль интеграции с amoCRM',
     'BreadcrumbModuleAmoCrmModify'  => 'Модуль интеграции с amoCRM. Редактирование правила создания сущностей',
     'SubHeaderModuleAmoCrm'         => 'Интеграция с amoCRM',
-    'module_template_AddNewRecord'  => 'Добавить',
+    'mod_amo_AddRules'          => 'Добавить правило',
     'module_amo_crmSimpleLogin'     => 'Ввести код авторизации',
     'mod_amo_authCodeText'          => 'Введите код авторизации',
     'mod_amo_authCodeSave'          => 'Сохранить',

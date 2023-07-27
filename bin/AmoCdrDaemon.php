@@ -651,7 +651,7 @@ class AmoCdrDaemon extends WorkerBase
             if($settings['create_contact'] === '1' && !$contactExists){
                 $this->newContacts[$indexAction] = [
                     'phone'       => $call['phone'],
-                    'contactName' => str_replace(['<НомерТелефона>',],[$call['phone'],],$settings['template_contact_name']),
+                    'contactName' => $this->replaceTagTemplate($settings['template_contact_name'], $call),
                     'request_id'  => $indexAction,
                     'responsible_user_id' =>  $responsible,
                 ];
@@ -686,7 +686,7 @@ class AmoCdrDaemon extends WorkerBase
                     "_embedded" => [
                         'contacts' => [
                             [
-                                'name' => str_replace(['<НомерТелефона>',],[$call['phone'],],$settings['template_contact_name']),
+                                'name' => $this->replaceTagTemplate($settings['template_contact_name'], $call),
                                 'custom_fields_values' => [
                                     [
                                         'field_code' => 'PHONE',
@@ -696,7 +696,7 @@ class AmoCdrDaemon extends WorkerBase
                             ]
                         ],
                         'leads' => [[
-                            'name' => str_replace(['<НомерТелефона>'],[$call['phone'],],$settings['template_lead_name']),
+                            'name' => $this->replaceTagTemplate($settings['template_lead_name'], $call)
                         ]],
                     ]
                 ];
@@ -704,7 +704,7 @@ class AmoCdrDaemon extends WorkerBase
             }
             if($settings['create_task'] === '1'){
                 $this->newTasks[$indexAction] = [
-                    'text'                =>  str_replace(['<НомерТелефона>',],[$call['phone'],],$settings['template_task_text']),
+                    'text'                =>  $this->replaceTagTemplate($settings['template_task_text'], $call),
                     'complete_till'       =>  time()+3600,
                     'responsible_user_id' =>  $responsible,
                 ];
@@ -726,6 +726,17 @@ class AmoCdrDaemon extends WorkerBase
     }
 
     /**
+     * @param string $template
+     * @param array  $data
+     * @return string
+     */
+    private function replaceTagTemplate(string $template, array $data):string
+    {
+        return str_replace(['<НомерТелефона>','<PhoneNumber>'],[$data['phone'],$data['phone']],$template);
+
+    }
+
+    /**
      * Создание структуры контакта по шаблону.
      * @param $call
      * @param $contData
@@ -735,7 +746,7 @@ class AmoCdrDaemon extends WorkerBase
     private function getLeadByTemplate($call, $contData, $settings):array
     {
         $leadData = [
-            'name'        =>  str_replace(['<НомерТелефона>'],[$call['phone'],],$settings['template_lead_name']),
+            'name'        =>  $this->replaceTagTemplate($settings['template_lead_name'], $call),
             'status_id'   => (int) $settings['lead_pipeline_status_id'],
             'pipeline_id' =>  (int)$settings['lead_pipeline_id'],
             'price'       =>  0,

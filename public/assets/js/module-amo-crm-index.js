@@ -102,6 +102,34 @@ var ModuleAmoCrm = {
       var url = "https://www.amocrm.ru/oauth?client_id=".concat(client_id, "&state=").concat(state, "&redirect_uri=").concat(redirect_uri, "&mode=post_message&scope=&approval_prompt=auto");
       window[className].popup = window.open(url, 'Auth', 'scrollbars, status, resizable, width=750, height=580');
     });
+    $('body').on('click', 'a.delete', function (e) {
+      e.preventDefault();
+      var id = $(e.target).closest('tr').attr('id');
+      ModuleAmoCrm.deleteRule(id);
+    });
+  },
+
+  /**
+   * Deletes an extension with the given ID.
+   * @param {string} id - The ID of the rule to delete.
+   */
+  deleteRule: function deleteRule(id) {
+    $('.message.ajax').remove();
+    $.api({
+      url: "".concat(globalRootUrl, "module-amo-crm/delete/").concat(id),
+      on: 'now',
+      successTest: function successTest(response) {
+        // test whether a JSON response is valid
+        return response !== undefined && Object.keys(response).length > 0;
+      },
+      onSuccess: function onSuccess(response) {
+        if (response.success === true) {
+          $('#entitySettingsTable').find("tr[id=".concat(id, "]")).remove();
+        } else {
+          UserMessage.showError(response.message.error, globalTranslate.ex_ImpossibleToDeleteExtension);
+        }
+      }
+    });
   },
   checkStatus: function checkStatus() {
     $.get("".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/check"), function (result) {
