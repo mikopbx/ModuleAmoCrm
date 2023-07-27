@@ -90,8 +90,8 @@
     </div>
 </div>
 <div class="ui bottom attached tab segment" data-tab="settings">
-    <form class="ui large grey segment form" id="module-amo-crm-form">
-        <div class="ui segment">
+    <form class="ui large grey form" id="module-amo-crm-form">
+        <div class="ui">
             {{ form.render('id') }}
             {{ form.render('referenceDate') }}
             {{ form.render('clientId') }}
@@ -115,6 +115,30 @@
                     <div class="ui toggle checkbox ">
                         {{ form.render('useInterception') }}
                         <label>{{ t._('mod_amo_useInterception') }}</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field disability">
+                <div class="ui segment">
+                    <div class="ui toggle checkbox">
+                        {{ form.render('isPrivateWidget') }}
+                        <label>{{ t._('mod_amo_isPrivateWidget') }}</label>
+                    </div>
+                    <div id="private-fields">
+                        <div class="ten wide field disability">
+                            <br>
+                            <label >{{ t._('mod_amo_privateClientId') }}</label>
+                            <div class="disability ui fluid input">
+                                 {{ form.render('privateClientId') }}
+                            </div>
+                        </div>
+                        <div class="ten wide field disability">
+                            <label >{{ t._('mod_amo_privateClientSecret') }}</label>
+                            <div class="disability ui fluid input">
+                                 {{ form.render('privateClientSecret') }}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

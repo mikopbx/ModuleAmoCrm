@@ -17,6 +17,10 @@ class AmoCrmMain extends AmoCrmMainBase
     private string $baseDomain = '';
     private AuthToken $token;
 
+    public bool   $isPrivateWidget;
+    public string $privateClientId;
+    public string $privateClientSecret;
+
     public const ENTITY_CONTACTS = 'contacts';
     public const ENTITY_COMPANIES = 'companies';
 
@@ -32,8 +36,27 @@ class AmoCrmMain extends AmoCrmMainBase
         if($settings){
             $this->baseDomain   = $settings->baseDomain;
             $this->token = new AuthToken((string)$settings->authData);
+
+            $this->isPrivateWidget     = $settings->isPrivateWidget === '1';
+            $this->privateClientId     = ''.$settings->privateClientId;
+            $this->privateClientSecret = ''.$settings->privateClientSecret;
             $this->refreshToken();
         }
+    }
+
+    private function getClientId():string
+    {
+        if($this->isPrivateWidget) {
+            return $this->privateClientId;
+        }
+        return self::CLIENT_ID;
+    }
+    private function getClientSecret():string
+    {
+        if($this->isPrivateWidget){
+            return $this->privateClientSecret;
+        }
+        return self::CLIENT_SECRET;
     }
 
     /**
@@ -44,8 +67,8 @@ class AmoCrmMain extends AmoCrmMainBase
     public function getAccessTokenByCode($code):PBXAmoResult
     {
         $params  = [
-            'client_id'     => self::CLIENT_ID,
-            'client_secret' => self::CLIENT_SECRET,
+            'client_id'     => $this->getClientId(),
+            'client_secret' => $this->getClientSecret(),
             'grant_type'    => 'authorization_code',
             'code'          => $code,
             'redirect_uri'  => self::REDIRECT_URL,

@@ -80,6 +80,22 @@ class ModuleAmoCrm extends ModulesModelsBase
     public $lastLeadsSyncTime = 0;
 
     /**
+     *
+     * @Column(type="integer", default="1", nullable=true)
+     */
+    public $isPrivateWidget = 0;
+
+    /**
+     * @Column(type="string", nullable=true)
+     */
+    public $privateClientId;
+
+    /**
+     * @Column(type="string", nullable=true)
+     */
+    public $privateClientSecret;
+
+    /**
      * Returns dynamic relations between module models and common models
      * MikoPBX check it in ModelsBase after every call to keep data consistent
      *

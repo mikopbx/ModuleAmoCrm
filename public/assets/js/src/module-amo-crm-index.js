@@ -70,7 +70,12 @@ const ModuleAmoCrm = {
 	 */
 	initialize() {
 		// инициализируем чекбоксы и выподающие менюшки
-		window[className].$checkBoxes.checkbox();
+		window[className].$checkBoxes.checkbox(
+			{
+				onChange: window[className].onChangeSettings
+			}
+		);
+		window[className].onChangeSettings()
 		window[className].$dropDowns.dropdown();
 		window[className].checkStatusToggle();
 		window.addEventListener('ModuleStatusChanged', window[className].checkStatusToggle);
@@ -94,11 +99,13 @@ const ModuleAmoCrm = {
 		$(window).bind('message',  window[className].updateAuthInfo);
 		$("#createPassword").on('click', function (e) {
 			$("#tokenForAmo").val(window[className].generatePassword());
-			// Сохраняем изменения.
-			$('#submitbutton').removeClass('disabled');//.trigger('click');
+			$('#submitbutton').removeClass('disabled');
 		});
 		$("#login-button").on('click', function (e) {
 			let client_id 	 = $('#clientId').val();
+			if($('#isPrivateWidget').parent().checkbox('is checked')){
+				client_id = $('#privateClientId').val();
+			}
 			let state 		 = encodeURIComponent(client_id);
 			let redirect_uri = encodeURIComponent($('#redirectUri').val());
 			let url = `https://www.amocrm.ru/oauth?client_id=${client_id}&state=${state}&redirect_uri=${redirect_uri}&mode=post_message&scope=&approval_prompt=auto`;
@@ -110,6 +117,13 @@ const ModuleAmoCrm = {
 			const id = $(e.target).closest('tr').attr('id');
 			ModuleAmoCrm.deleteRule(id);
 		});
+	},
+	onChangeSettings() {
+		if($('#isPrivateWidget').parent().checkbox('is checked')) {
+			$('#private-fields').show();
+		}else{
+			$('#private-fields').hide();
+		}
 	},
 	/**
 	 * Deletes an extension with the given ID.

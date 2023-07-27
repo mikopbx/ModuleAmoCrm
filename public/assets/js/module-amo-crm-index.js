@@ -68,7 +68,10 @@ var ModuleAmoCrm = {
    */
   initialize: function initialize() {
     // инициализируем чекбоксы и выподающие менюшки
-    window[className].$checkBoxes.checkbox();
+    window[className].$checkBoxes.checkbox({
+      onChange: window[className].onChangeSettings
+    });
+    window[className].onChangeSettings();
     window[className].$dropDowns.dropdown();
     window[className].checkStatusToggle();
     window.addEventListener('ModuleStatusChanged', window[className].checkStatusToggle);
@@ -91,12 +94,16 @@ var ModuleAmoCrm = {
     setInterval(window[className].checkStatus, 5000);
     $(window).bind('message', window[className].updateAuthInfo);
     $("#createPassword").on('click', function (e) {
-      $("#tokenForAmo").val(window[className].generatePassword()); // Сохраняем изменения.
-
-      $('#submitbutton').removeClass('disabled'); //.trigger('click');
+      $("#tokenForAmo").val(window[className].generatePassword());
+      $('#submitbutton').removeClass('disabled');
     });
     $("#login-button").on('click', function (e) {
       var client_id = $('#clientId').val();
+
+      if ($('#isPrivateWidget').parent().checkbox('is checked')) {
+        client_id = $('#privateClientId').val();
+      }
+
       var state = encodeURIComponent(client_id);
       var redirect_uri = encodeURIComponent($('#redirectUri').val());
       var url = "https://www.amocrm.ru/oauth?client_id=".concat(client_id, "&state=").concat(state, "&redirect_uri=").concat(redirect_uri, "&mode=post_message&scope=&approval_prompt=auto");
@@ -107,6 +114,13 @@ var ModuleAmoCrm = {
       var id = $(e.target).closest('tr').attr('id');
       ModuleAmoCrm.deleteRule(id);
     });
+  },
+  onChangeSettings: function onChangeSettings() {
+    if ($('#isPrivateWidget').parent().checkbox('is checked')) {
+      $('#private-fields').show();
+    } else {
+      $('#private-fields').hide();
+    }
   },
 
   /**
