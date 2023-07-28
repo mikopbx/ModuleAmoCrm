@@ -128,7 +128,7 @@ const ModuleAmoCrmEntityEdit = {
 					{name: globalTranslate['mod_amo_action_none'], 		   	value: 'none', selected: (create_contact===false && create_lead===false && create_unsorted===false)},
 					{name: globalTranslate['mod_amo_action_unsorted'],	   	value: 'unsorted', selected: (create_unsorted===true)},
 					{name: globalTranslate['mod_amo_action_contact'], 	   	value: 'contact', selected: (create_contact===true && create_lead===false && create_unsorted===false)},
-					{name: globalTranslate['mod_amo_action_contact_lead'], 	value: 'contact_lead', selected: (create_contact===false && create_lead===true && create_unsorted===false)},
+					{name: globalTranslate['mod_amo_action_contact_lead'], 	value: 'contact_lead', selected: (create_contact===true && create_lead===true && create_unsorted===false)},
 				];
 			}else if(type === 'INCOMING_KNOWN' || type === 'MISSING_KNOWN' || type === 'OUTGOING_KNOWN_FAIL' || type === 'OUTGOING_KNOWN'){
 				entityActionVariants = [

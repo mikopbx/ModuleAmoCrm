@@ -91,7 +91,10 @@ define(function (require) {
             }
             let html = template.render(event.data);
             $("#web-rtc-phone-cdr").append(html);
-            self.sendMessage({action: 'show-panel'});
+            // let frameVisibility = localStorage.getItem('frameVisibility');
+            // if(frameVisibility === '1'){
+            //     self.sendMessage({action: 'show-panel'});
+            // }
             self.resize();
         },
         answerCall:function (event){

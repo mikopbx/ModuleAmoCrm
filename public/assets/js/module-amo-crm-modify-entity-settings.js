@@ -133,7 +133,7 @@ var ModuleAmoCrmEntityEdit = {
         }, {
           name: globalTranslate['mod_amo_action_contact_lead'],
           value: 'contact_lead',
-          selected: create_contact === false && create_lead === true && create_unsorted === false
+          selected: create_contact === true && create_lead === true && create_unsorted === false
         }];
       } else if (type === 'INCOMING_KNOWN' || type === 'MISSING_KNOWN' || type === 'OUTGOING_KNOWN_FAIL' || type === 'OUTGOING_KNOWN') {
         entityActionVariants = [{

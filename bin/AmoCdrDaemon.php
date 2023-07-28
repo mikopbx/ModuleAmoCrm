@@ -346,6 +346,7 @@ class AmoCdrDaemon extends WorkerBase
         ////
         // Обработка и создание контактов
         ////
+
         $this->prepareDataCreatingEntities($calls, $pipeline);
         ////
         // Создание сущностей amoCRM
@@ -482,6 +483,11 @@ class AmoCdrDaemon extends WorkerBase
 
         $contactsData = WorkerAmoContacts::invoke('getContactsData', [array_unique(array_column($calls, 'phone'))]);
         foreach ($calls as $index => $call) {
+            if($this->cdrRows[$call['id']]['answered'] === 1 && $call['duration'] === 0){
+                unset($calls[$index]);
+                continue;
+            }
+
             if (isset($this->cdrRows[$call['id']]['type'])) {
                 continue;
             }
@@ -527,8 +533,6 @@ class AmoCdrDaemon extends WorkerBase
                 $this->newLeads[$indexAction] = $leadData;
             }
             if($settings['create_unsorted'] === '1'){
-                // Звонок будет добавлен через неразобранное.
-                unset($calls[$index]);
                 // Наполняем неразобранное.
                 $this->newUnsorted[$indexAction] = [
                     'request_id'  => $indexAction,
@@ -538,9 +542,10 @@ class AmoCdrDaemon extends WorkerBase
                     'created_at'  => $call['created_at'],
                     "metadata" => [
                         "is_call_event_needed"  => true,
+                        "call_responsible"      => $call['responsible_user_id'],
                         "uniq"                  => $call['uniq'],
                         'duration'              => $call['duration'],
-                        "service_code"          => "CkAvbEwPam6sad",
+                        "service_code"          => self::SOURCE_ID, // "CkAvbEwPam6sad",
                         "link"                  => $call["link"],
                         "phone"                 => $call["phone"],
                         "called_at"             => $call['created_at'],
@@ -563,7 +568,8 @@ class AmoCdrDaemon extends WorkerBase
                         ]],
                     ]
                 ];
-
+                // Звонок будет добавлен через неразобранное.
+                unset($calls[$index]);
             }
             if($settings['create_task'] === '1'){
                 $this->newTasks[$indexAction] = [
