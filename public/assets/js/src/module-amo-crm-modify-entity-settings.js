@@ -86,6 +86,11 @@ const ModuleAmoCrmEntityEdit = {
 			$("#lead_pipeline_status_id").parents('div.field').first().show();
 			$("#lead_pipeline_id").parents('div.field').first().show();
 		}
+
+		let type = window[className].$typeDropdown.parent().dropdown('get value');
+		if(type === 'MISSING_UNKNOWN' || type === 'MISSING_KNOWN'){
+			$("#responsible").parents('div.field').first().hide();
+		}
 		window[className].setVisibilityElements();
 	},
 	onChangePipelineStatusId(value, text, $selectedItem) {
