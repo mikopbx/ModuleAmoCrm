@@ -113,5 +113,4 @@ class ModuleAmoEntitySettings extends ModulesModelsBase
         $this->setSource('m_ModuleAmoEntitySettings');
         parent::initialize();
     }
-
 }

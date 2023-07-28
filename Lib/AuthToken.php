@@ -84,7 +84,7 @@ class AuthToken
         return $this->accessToken;
     }
 
-    public function saveToken($authData): bool
+    public function saveToken($authData, $portalId = 0): bool
     {
         $this->updateToken($authData, true);
         $settings = ModuleAmoCrm::findFirst();
@@ -98,6 +98,9 @@ class AuthToken
             $settings->authData = json_encode($authData, JSON_THROW_ON_ERROR);
         }catch (Throwable $e){
             $settings->authData = '';
+        }
+        if($portalId > 0){
+            $settings->portalId = $portalId;
         }
         return $settings->save();
     }

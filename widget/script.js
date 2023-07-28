@@ -48,7 +48,9 @@ define(function (require) {
       onSave: function (data) {
         let phones = data.fields.pbx_users || false;
         if (phones) {
-          PubSub.publish(self.ns + ':connector', {'users': phones , action: 'saveSettings'});
+          $.get( "/api/v2/account", function( data ) {
+            PubSub.publish(self.ns + ':connector', {'users': phones , 'portalId': data.id, action: 'saveSettings'});
+          });
         }
         return true;
       },

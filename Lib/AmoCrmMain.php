@@ -5,12 +5,11 @@ namespace Modules\ModuleAmoCrm\Lib;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Modules\PbxExtensionUtils;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
+use Modules\ModuleAmoCrm\bin\WorkerAmoContacts;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoPipeLines;
-use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Common\Models\PbxSettings;
-use Throwable;
 
 class AmoCrmMain extends AmoCrmMainBase
 {
@@ -76,7 +75,9 @@ class AmoCrmMain extends AmoCrmMainBase
         $url = "https://$this->baseDomain/oauth2/access_token";
         $result = ClientHTTP::sendHttpPostRequest($url, $params);
         if($result->success){
-            $result->success = $this->token->saveToken($result->data);
+            $connectionData = $this->checkConnection();
+            $id = $connectionData->data['id']??0;
+            $result->success = $this->token->saveToken($result->data, $id);
         }
         return $result;
     }
@@ -163,7 +164,6 @@ class AmoCrmMain extends AmoCrmMainBase
     }
 
     /**
-     * Синхронизация воронок продаж.
      * @return array
      */
     public function syncPipeLines():array
@@ -500,17 +500,12 @@ class AmoCrmMain extends AmoCrmMainBase
     public static function updateUsers():array
     {
         $users = [];
-        try {
-            /** @var ModuleAmoUsers $user */
-            $amoUsers = ModuleAmoUsers::find('enable=1');
-            foreach ($amoUsers as $user){
-                if(!is_numeric($user->amoUserId)){
-                    continue;
-                }
-                $users[$user->number] = 1*$user->amoUserId;
+        $amoUsers = WorkerAmoContacts::invoke('getPortalUsers', [1]);
+        foreach ($amoUsers as $user){
+            if(!is_numeric($user['amoUserId'])){
+                continue;
             }
-        }catch (Throwable $e){
-            Util::sysLogMsg(__CLASS__, $e->getMessage());
+            $users[$user['number']] = 1*$user['amoUserId'];
         }
         $extensionLength = 1*PbxSettings::getValueByKey('PBXInternalExtensionLength');
         $userList   = [];

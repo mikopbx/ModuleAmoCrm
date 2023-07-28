@@ -10,11 +10,12 @@ namespace Modules\ModuleAmoCrm\Models;
 use MikoPBX\Modules\Models\ModulesModelsBase;
 
 /**
- * Class ModuleAmoUsers
+ * Class ModuleAmoPhones
  * @package Modules\ModuleAmoCrm\Models
  * @Indexes(
  *     [name='idEntity', columns=['idEntity'], type=''],
  *     [name='linked_company_id', columns=['linked_company_id'], type=''],
+ *     [name='portalId', columns=['portalId'], type=''],
  *     [name='entityType', columns=['entityType'], type=''],
  *     [name='idPhone', columns=['idPhone'], type='']
  * )
@@ -67,6 +68,11 @@ class ModuleAmoPhones extends ModulesModelsBase
      * @Column(type="string", nullable=true)
      */
     public $entityType;
+
+    /**
+     * @Column(type="integer", nullable=true)
+     */
+    public $portalId = 0;
 
     /**
      * @param $calledModelObject

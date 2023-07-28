@@ -39,10 +39,11 @@ class RestHandlers extends AmoCrmMainBase
         $users = $request['data']['users']??[];
         if(is_array($users)){
             foreach ($users as $amoUserId => $number){
-                $dbData = ModuleAmoUsers::findFirst("amoUserId='$amoUserId'");
+                $dbData = ModuleAmoUsers::findFirst("amoUserId='$amoUserId' AND portalId='{$request['data']['portalId']}'");
                 if(!$dbData){
                     $dbData = new ModuleAmoUsers();
                     $dbData->amoUserId = $amoUserId;
+                    $dbData->portalId  = $request['data']['portalId'];
                 }
                 $dbData->number = trim($number);
                 $dbData->save();

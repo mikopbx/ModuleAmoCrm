@@ -96,6 +96,12 @@ class ModuleAmoCrm extends ModulesModelsBase
     public $privateClientSecret;
 
     /**
+     *
+     * @Column(type="integer", default="0", nullable=true)
+     */
+    public $portalId = 0;
+
+    /**
      * Returns dynamic relations between module models and common models
      * MikoPBX check it in ModelsBase after every call to keep data consistent
      *

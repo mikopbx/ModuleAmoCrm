@@ -41,6 +41,11 @@ class ModuleAmoUsers extends ModulesModelsBase
     public $enable = 1;
 
     /**
+     * @Column(type="integer", nullable=true)
+     */
+    public $portalId = 0;
+
+    /**
      * @param $calledModelObject
      * @return void
      */

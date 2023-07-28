@@ -31,7 +31,6 @@ use MikoPBX\Common\Providers\CDRDatabaseProvider;
 use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
 use Modules\ModuleAmoCrm\Models\ModuleAmoRequestData;
 use DateTime;
-use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use MikoPBX\Common\Models\Extensions;
 use Throwable;
 
@@ -129,13 +128,11 @@ class AmoCdrDaemon extends WorkerBase
      */
     private function updateUsers():void
     {
-        $filterAmoUsers = ['columns' => 'amoUserId,number'];
-        $amoUsers = ModuleAmoUsers::find($filterAmoUsers);
+        $usersAmo = WorkerAmoContacts::invoke('getPortalUsers', [1]);
         $amoUsersArray = [];
-        foreach ($amoUsers as $user){
-            $amoUsersArray[$user->number] = $user->amoUserId;
+        foreach ($usersAmo as $user){
+            $amoUsersArray[$user['number']] = $user['amoUserId'];
         }
-        unset($amoUsers);
         $extensionFilter = [
             'type IN ({types:array})',
             'bind'    => [

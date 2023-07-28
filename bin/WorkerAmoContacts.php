@@ -41,6 +41,7 @@ class WorkerAmoContacts extends WorkerBase
     private int     $lastContactsSyncTime;
     private int     $lastCompaniesSyncTime;
     private int     $lastLeadsSyncTime;
+    private int     $portalId = 0;
 
     public function getSettings():void
     {
@@ -52,6 +53,7 @@ class WorkerAmoContacts extends WorkerBase
             $this->lastContactsSyncTime  = (int)$settings->lastContactsSyncTime;
             $this->lastCompaniesSyncTime = (int)$settings->lastCompaniesSyncTime;
             $this->lastLeadsSyncTime     = (int)$settings->lastLeadsSyncTime;
+            $this->portalId              = (int)$settings->portalId;
         }else{
             $this->lastContactsSyncTime  = 0;
             $this->lastCompaniesSyncTime = 0;
@@ -191,6 +193,7 @@ class WorkerAmoContacts extends WorkerBase
                     foreach ($field['values'] as $value){
                         /** @var ModuleAmoPhones $newRecord */
                         $newRecord = new ModuleAmoPhones();
+                        $newRecord->portalId            = $this->portalId;
                         $newRecord->entityType          = $entity['type'];
                         $newRecord->responsible_user_id = $entity['responsible_user_id'];
                         $newRecord->phone               = $value['value'];
@@ -379,6 +382,7 @@ class WorkerAmoContacts extends WorkerBase
                 $company  = $lead['_embedded']['companies'][0]['id']??'';
                 foreach ($contacts as $contact){
                     $newRecord = new ModuleAmoLeads();
+                    $newRecord->portalId            = $this->portalId;
                     $newRecord->idAmo               = $lead['id'];
                     $newRecord->name                = $lead['name'];
                     $newRecord->responsible_user_id = $lead['responsible_user_id'];
@@ -392,6 +396,7 @@ class WorkerAmoContacts extends WorkerBase
                 }
                 if(!empty($company) && count($contacts) === 0){
                     $newRecord = new ModuleAmoLeads();
+                    $newRecord->portalId            = $this->portalId;
                     $newRecord->idAmo               = $lead['id'];
                     $newRecord->name                = $lead['name'];
                     $newRecord->responsible_user_id = $lead['responsible_user_id'];
@@ -419,6 +424,7 @@ class WorkerAmoContacts extends WorkerBase
         $oldData = ModuleAmoLeads::findFirst("idAmo='{$leadId}'");
         if(!$oldData){
             $newRecord = new ModuleAmoLeads();
+            $newRecord->portalId            = $this->portalId;
             $newRecord->idAmo               = $leadId;
             $newRecord->contactId           = $contactId;
             $newRecord->isMainContact       = '1';
@@ -430,6 +436,7 @@ class WorkerAmoContacts extends WorkerBase
         if(!$oldData){
             /** @var ModuleAmoPhones $newRecord */
             $newRecord = new ModuleAmoPhones();
+            $newRecord->portalId            = $this->portalId;
             $newRecord->entityType          = 'contact';
             $newRecord->idPhone             = $phone;
             $newRecord->idEntity            = $contactId;
@@ -458,9 +465,10 @@ class WorkerAmoContacts extends WorkerBase
             'models'     => [
                 'ModuleAmoPhones' => ModuleAmoPhones::class,
             ],
-            'conditions' => 'idPhone IN ({idPhone:array})',
+            'conditions' => 'ModuleAmoPhones.portalId = :portalId: AND ModuleAmoPhones.idPhone IN ({idPhone:array})',
             'bind'  => [
-                'idPhone' => array_values($phones)
+                'idPhone' => array_values($phones),
+                'portalId' => $this->portalId
             ],
             'columns'    => [
                 'idPhone'            => 'ModuleAmoPhones.idPhone',
@@ -476,7 +484,7 @@ class WorkerAmoContacts extends WorkerBase
             'joins'      => [
                 'ModuleAmoLeads' => [
                     0 => ModuleAmoLeads::class,
-                    1 => '((ModuleAmoPhones.idEntity <> "" AND ModuleAmoPhones.idEntity = ModuleAmoLeads.contactId) OR (ModuleAmoLeads.companyId <> "" AND ModuleAmoLeads.companyId = ModuleAmoPhones.linked_company_id)) AND ModuleAmoLeads.closed_at = 0',
+                    1 => '((ModuleAmoPhones.idEntity <> "" AND ModuleAmoPhones.idEntity = ModuleAmoLeads.contactId) OR (ModuleAmoLeads.companyId <> "" AND ModuleAmoLeads.companyId = ModuleAmoPhones.linked_company_id)) AND ModuleAmoLeads.closed_at = 0 AND ModuleAmoLeads.portalId = :portalId:',
                     2 => 'ModuleAmoLeads',
                     3 => 'LEFT',
                 ]
@@ -499,6 +507,42 @@ class WorkerAmoContacts extends WorkerBase
             }
         }
         return $data;
+    }
+
+    /**
+     * @param int $enable
+     * @return array
+     */
+    public function getPortalUsers(int $enable = 1):array
+    {
+        /** @var Manager $manager */
+        $manager = $this->di->get('modelsManager');
+        $parameters = [
+            'models'     => [
+                'ModuleAmoCrm'   => ModuleAmoCrm::class,
+            ],
+            'bind'  => [
+                'enable' => $enable
+             ],
+            'columns'    => [
+                'portalId'  => 'ModuleAmoCrm.portalId',
+                'amoUserId' => 'ModuleAmoUsers.amoUserId',
+                'number'    => 'ModuleAmoUsers.number',
+                'id'        => 'ModuleAmoUsers.id',
+                'enable'    => 'ModuleAmoUsers.enable',
+            ],
+            'order'      => 'ModuleAmoUsers.amoUserId',
+            'joins'      => [
+                'ModuleAmoUsers' => [
+                    0 => ModuleAmoUsers::class,
+                    1 => 'ModuleAmoUsers.portalId = ModuleAmoCrm.portalId AND ModuleAmoUsers.enable = :enable:',
+                    2 => 'ModuleAmoUsers',
+                    3 => 'INNER',
+                ]
+            ],
+        ];
+        $query  = $manager->createBuilder($parameters)->getQuery();
+        return $query->execute()->toArray();
     }
 
     /**

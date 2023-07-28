@@ -10,7 +10,7 @@ namespace Modules\ModuleAmoCrm\Models;
 use MikoPBX\Modules\Models\ModulesModelsBase;
 
 /**
- * Class ModuleAmoUsers
+ * Class ModuleAmoPipeLines
  * @package Modules\ModuleAmoCrm\Models
  */
 class ModuleAmoPipeLines extends ModulesModelsBase

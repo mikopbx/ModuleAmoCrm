@@ -10,7 +10,7 @@ namespace Modules\ModuleAmoCrm\Models;
 use MikoPBX\Modules\Models\ModulesModelsBase;
 
 /**
- * Class ModuleAmoUsers
+ * Class ModuleAmoRequestData
  * @package Modules\ModuleAmoCrm\Models
  * @Indexes(
  *     [name='UNIQUEID', columns=['UNIQUEID'], type='']
