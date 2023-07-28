@@ -108,6 +108,11 @@ class ModuleAmoEntitySettings extends ModulesModelsBase
      */
     public $deadline_task = 1;
 
+    /**
+     * @Column(type="integer", nullable=true)
+     */
+    public $portalId = 0;
+
     public function initialize(): void
     {
         $this->setSource('m_ModuleAmoEntitySettings');

@@ -1,6 +1,7 @@
 <form class="ui large grey form" id="module-amo-crm-entity-settings-form">
     {{ form.render('id') }}
     {{ form.render('pipeLineStatuses') }}
+    {{ form.render('portalId') }}
     <div class="one field">
         <label for="did">{{ t._('mod_amo_entitySettingsTableDid') }}</label>
         {{ form.render('did') }}

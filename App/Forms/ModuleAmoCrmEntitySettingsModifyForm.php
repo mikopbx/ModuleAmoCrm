@@ -26,6 +26,7 @@ class ModuleAmoCrmEntitySettingsModifyForm extends Form
     public function initialize($entity = null, $options = null) :void
     {
         $this->add(new Hidden('id',             ['value' => $entity->id]));
+        $this->add(new Hidden('portalId',       ['value' => $entity->portalId]));
         $this->add(new Text('did'));
 
         $this->add(new Text('template_contact_name'));
@@ -90,7 +91,7 @@ class ModuleAmoCrmEntitySettingsModifyForm extends Form
         );
         $this->add($type);
 
-        $pipeLinesData    = ModuleAmoPipeLines::find();
+        $pipeLinesData    = ModuleAmoPipeLines::find("'$entity->portalId'=portalId",);
         $pipeLineStatuses = [];
         $pipeLinesList    = [];
         foreach ($pipeLinesData as $pipeLine){

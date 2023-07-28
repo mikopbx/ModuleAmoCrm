@@ -47,6 +47,11 @@ class ModuleAmoPipeLines extends ModulesModelsBase
     public $statuses = '';
 
     /**
+     * @Column(type="integer", nullable=true)
+     */
+    public $portalId = 0;
+
+    /**
      * @param $calledModelObject
      * @return void
      */

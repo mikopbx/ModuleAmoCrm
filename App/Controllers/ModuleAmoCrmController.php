@@ -9,23 +9,14 @@ namespace Modules\ModuleAmoCrm\App\Controllers;
 use MikoPBX\AdminCabinet\Controllers\BaseController;
 use MikoPBX\Common\Models\CallQueues;
 use MikoPBX\Common\Models\Extensions;
-use MikoPBX\Common\Models\OutgoingRoutingTable;
-use MikoPBX\Common\Models\Users;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Modules\PbxExtensionUtils;
 use Modules\ModuleAmoCrm\App\Forms\ModuleAmoCrmEntitySettingsModifyForm;
 use Modules\ModuleAmoCrm\App\Forms\ModuleAmoCrmForm;
-use Modules\ModuleAmoCrm\bin\AmoCdrDaemon;
 use Modules\ModuleAmoCrm\bin\WorkerAmoHTTP;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use MikoPBX\Common\Models\Providers;
 use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
-use Modules\ModuleUsersGroups\App\Forms\ModuleUsersGroupsForm;
-use Modules\ModuleUsersGroups\Models\AllowedOutboundRules;
-use Modules\ModuleUsersGroups\Models\GroupMembers;
-use Modules\ModuleUsersGroups\Models\UsersGroups;
-
-use function MikoPBX\Common\Config\appPath;
 
 class ModuleAmoCrmController extends BaseController
 {
@@ -146,14 +137,12 @@ class ModuleAmoCrmController extends BaseController
         $this->view->queues = CallQueues::find(['columns' => ['id', 'name']]);
         $this->view->users  = Extensions::find(["type = 'SIP'", 'columns' => ['number', 'callerid']]);
 
-
-        $rules = ModuleAmoEntitySettings::find(['columns' => ['id', 'did', 'type', 'create_lead', 'create_contact', 'create_unsorted', 'create_task']])->toArray();
-        foreach ($rules as &$rule){
-            $rule['type_translate'] = 'mod_amo_type_'.$rule['type'];
+        $rules = ModuleAmoEntitySettings::find(["portalId='$settings->portalId'", 'columns' => ['id', 'did', 'type', 'create_lead', 'create_contact', 'create_unsorted', 'create_task']])->toArray();
+        foreach ($rules as $index => $rule){
+            $rules[$index]['type_translate'] = 'mod_amo_type_'.$rule['type'];
         }
         $this->view->entitySettings  = $rules;
     }
-
 
     /**
      * The modify action for creating or editing
@@ -173,6 +162,10 @@ class ModuleAmoCrmController extends BaseController
         }
         if(!$rule){
             $rule = new ModuleAmoEntitySettings();
+            $settings = ModuleAmoCrm::findFirst();
+            if ($settings) {
+                $rule->portalId = $settings->portalId;
+            }
         }
         $this->view->form      = new ModuleAmoCrmEntitySettingsModifyForm($rule);
         $this->view->represent = $rule->getRepresent();
@@ -300,16 +293,6 @@ class ModuleAmoCrmController extends BaseController
     private function getTablesDescription():array
     {
         $description = [];
-        $description['ModuleAmoPipeLines'] = [
-            'cols' => [
-                'name'       => ['header' => 'Pipeline', 'class' => 'two wide collapsing'],
-                'did'        => ['header' => 'DID',  'class' => ''],
-            ],
-            'ajaxUrl' => '/getNewRecords',
-            'icon' => 'user',
-            'needDelButton' => false
-        ];
-
         return $description;
     }
 

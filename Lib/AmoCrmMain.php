@@ -166,7 +166,7 @@ class AmoCrmMain extends AmoCrmMainBase
     /**
      * @return array
      */
-    public function syncPipeLines():array
+    public function syncPipeLines($portalId):array
     {
         if(!isset($this->token)){
             return [];
@@ -180,18 +180,18 @@ class AmoCrmMain extends AmoCrmMainBase
             $data = $response->data['_embedded']['pipelines']??[];
             if(is_array($data)){
                 $lineIds = [];
-                $dbData = ModuleAmoPipeLines::find(['columns' => 'amoId,name']);
+                $dbData = ModuleAmoPipeLines::find(["'$portalId'=portalId",'columns' => 'amoId,name']);
                 foreach ($dbData as $lineData){
                     $lineIds[$lineData->amoId] = $lineData->name;
                 }
-                unset($dbData);
                 foreach ($data as $line){
                     if(isset($lineIds[$line['id']])){
-                        $dbData = ModuleAmoPipeLines::findFirst("amoId='{$line['id']}'");
+                        $dbData = ModuleAmoPipeLines::findFirst("'$portalId'=portalId AND amoId='{$line['id']}'");
                     }else{
                         // Такой линии нет в базе данных.
                         $dbData = new ModuleAmoPipeLines();
-                        $dbData->amoId = $line['id'];
+                        $dbData->amoId    = $line['id'];
+                        $dbData->portalId = $portalId;
                     }
                     $dbData->name  = $line['name'];
                     $dbData->statuses = json_encode($line['_embedded']['statuses'], JSON_THROW_ON_ERROR);
@@ -200,7 +200,7 @@ class AmoCrmMain extends AmoCrmMainBase
                 }
                 foreach ($lineIds as $id => $name){
                     /** @var ModuleAmoPipeLines $dbData */
-                    $dbData = ModuleAmoPipeLines::findFirst("amoId='{$id}'");
+                    $dbData = ModuleAmoPipeLines::findFirst("'$portalId'=portalId AND amoId='{$id}'");
                     if($dbData){
                         // Такой воронки больше нет. удаляем.
                         $dbData->delete();
@@ -209,7 +209,7 @@ class AmoCrmMain extends AmoCrmMainBase
             }
         }
         $pipeLines = [];
-        $dbData = ModuleAmoPipeLines::find(['columns' => 'amoId,did,name']);
+        $dbData = ModuleAmoPipeLines::find(["'$portalId'=portalId", 'columns' => 'amoId,did,name']);
         foreach ($dbData as $line){
             $pipeLines[$line->did] = [
                 'id' => $line->amoId,

@@ -47,6 +47,7 @@ class AmoCdrDaemon extends WorkerBase
     private array $pipeLines = [];
     private string $extHostname = '';
     private int $lastSyncTime = 0;
+    private int $portalId = 0;
     private array $entitySettings = [];
 
     private array $newContacts = [];
@@ -100,6 +101,7 @@ class AmoCdrDaemon extends WorkerBase
         if($settings){
             $this->offset        = max(1*$settings->offsetCdr,1);
             $this->referenceDate = $settings->referenceDate;
+            $this->portalId      = (int)$settings->portalId;
             $this->logger->writeInfo("Update settings, Reference date: {$this->referenceDate}, offset: {$this->offset}");
         }else{
             $this->logger->writeError('Settings not found...');
@@ -111,7 +113,7 @@ class AmoCdrDaemon extends WorkerBase
         $this->innerNums[] = 'outworktimes';
         $this->innerNums[] = 'voicemail';
 
-        $this->pipeLines = WorkerAmoHTTP::invokeAmoApi('syncPipeLines', []);
+        $this->pipeLines = WorkerAmoHTTP::invokeAmoApi('syncPipeLines', [$this->portalId]);
         $this->lastSyncTime = time();
         /** @var ModuleAmoEntitySettings $entSetting */
         $this->entitySettings = [];
