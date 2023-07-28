@@ -515,7 +515,7 @@ class AmoCdrDaemon extends WorkerBase
                 $settings['create_lead'] = '0';
             }
             // Получим ответственного.
-            $responsible = 1*$this->cdrRows[$call['id']][$settings['responsible']."AnswerUser"]??$settings['def_responsible'];
+            $responsible = 1*($this->cdrRows[$call['id']][$settings['responsible']."AnswerUser"]??$settings['def_responsible']);
             $indexAction = AmoCrmMain::getPhoneIndex($call['phone']);
             if($settings['create_contact'] === '1' && !$contactExists){
                 $this->newContacts[$indexAction] = [
@@ -542,10 +542,10 @@ class AmoCdrDaemon extends WorkerBase
                     'created_at'  => $call['created_at'],
                     "metadata" => [
                         "is_call_event_needed"  => true,
-                        "call_responsible"      => $call['responsible_user_id'],
+                        "call_responsible"      => $responsible,
                         "uniq"                  => $call['uniq'],
                         'duration'              => $call['duration'],
-                        "service_code"          => self::SOURCE_ID, // "CkAvbEwPam6sad",
+                        "service_code"          => self::SOURCE_ID,
                         "link"                  => $call["link"],
                         "phone"                 => $call["phone"],
                         "called_at"             => $call['created_at'],
