@@ -67,6 +67,19 @@ class AmoCdrDaemon extends WorkerBase
     public const OUTGOING_KNOWN_FAIL= 'OUTGOING_KNOWN_FAIL';
 
     /**
+     * Handles the received signal.
+     *
+     * @param int $signal The signal to handle.
+     *
+     * @return void
+     */
+    public function signalHandler(int $signal): void
+    {
+        parent::signalHandler($signal);
+        cli_set_process_title('SHUTDOWN_'.cli_get_process_title());
+    }
+
+    /**
      * Начало загрузки истории звонков в Amo.
      */
     public function start($params):void
@@ -75,7 +88,7 @@ class AmoCdrDaemon extends WorkerBase
         $this->extHostname  = $res['exthostname']??'';
         $this->logger =  new Logger('cdr-daemon', 'ModuleAmoCrm');
         $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
-        while (true){
+        while ($this->needRestart === false){
             if(time() - $this->lastSyncTime > 30){
                 WorkerAmoContacts::invoke('syncContacts', [AmoCrmMain::ENTITY_COMPANIES]);
                 WorkerAmoContacts::invoke('syncContacts', [AmoCrmMain::ENTITY_CONTACTS]);

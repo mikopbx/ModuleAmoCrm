@@ -60,6 +60,19 @@ class WorkerAmoCrmAMI extends WorkerBase
     private array $activeChannels = [];
 
     /**
+     * Handles the received signal.
+     *
+     * @param int $signal The signal to handle.
+     *
+     * @return void
+     */
+    public function signalHandler(int $signal): void
+    {
+        parent::signalHandler($signal);
+        cli_set_process_title('SHUTDOWN_'.cli_get_process_title());
+    }
+
+    /**
      * Старт работы листнера.
      *
      * @param $params
@@ -73,7 +86,7 @@ class WorkerAmoCrmAMI extends WorkerBase
         $this->checkUpdateSettings();
 
         $this->am->addEventHandler("userevent", [$this, "callback"]);
-        while (true) {
+        while ($this->needRestart === false) {
             $result = $this->am->waitUserEvent(true);
             if (!$result) {
                 // Нужен реконнект.

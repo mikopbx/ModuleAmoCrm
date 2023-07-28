@@ -34,6 +34,19 @@ class WorkerAmoHTTP extends WorkerBase
     public float $counterStartTime = 0;
 
     /**
+     * Handles the received signal.
+     *
+     * @param int $signal The signal to handle.
+     *
+     * @return void
+     */
+    public function signalHandler(int $signal): void
+    {
+        parent::signalHandler($signal);
+        cli_set_process_title('SHUTDOWN_'.cli_get_process_title());
+    }
+
+    /**
      * Старт работы листнера.
      *
      * @param $params
@@ -44,7 +57,7 @@ class WorkerAmoHTTP extends WorkerBase
         $beanstalk      = new BeanstalkClient(self::class);
         $beanstalk->subscribe(self::class, [$this, 'onEvents']);
         $beanstalk->subscribe($this->makePingTubeName(self::class), [$this, 'pingCallBack']);
-        while (true) {
+        while ($this->needRestart === false) {
             $beanstalk->wait();
         }
     }
