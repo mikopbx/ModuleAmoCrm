@@ -596,7 +596,6 @@ class AmoCdrDaemon extends WorkerBase
     private function replaceTagTemplate(string $template, array $data):string
     {
         return str_replace(['<НомерТелефона>','<PhoneNumber>'],[$data['phone'],$data['phone']],$template);
-
     }
 
     /**

@@ -222,10 +222,11 @@ class ModuleAmoCrmController extends BaseController
         $did = trim($data['did']);
 
         $filter = [
-            "did=:did: AND type=:type: AND id<>:id:",
+            "did=:did: AND type=:type: AND id<>:id: AND portalId=:portalId:",
             'bind'    => [
                 'did' => $did,
                 'type'=> $data['type']??'',
+                'portalId'=> $data['portalId']??'',
                 'id'  => $data['id']
             ]
         ];

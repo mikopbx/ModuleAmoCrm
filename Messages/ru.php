@@ -43,9 +43,9 @@ return [
     'mod_amo_entitySettingsCreateTypeField'     => 'Тип звонка',
     'mod_amo_entitySettingsLeadPipelineIdField' => 'Воронка',
     'mod_amo_entitySettingsLeadPipelineStatusIdField' => 'Этап воронки',
-    'mod_amo_entitySettingsTemplateContactNameField' => 'Шаблон имени контакта',
-    'mod_amo_entitySettingsTemplateLeadNameField' => 'Шаблон наименования сделки',
-    'mod_amo_entitySettingsTemplateTaskNameField' => 'Шаблон наименования задачи',
+    'mod_amo_entitySettingsTemplateContactNameField' => 'Шаблон имени контакта, пример: "Новый контакт &lt;PhoneNumber&gt;"',
+    'mod_amo_entitySettingsTemplateLeadNameField' => 'Шаблон наименования сделки, пример: "Новая сделка &lt;PhoneNumber&gt;"',
+    'mod_amo_entitySettingsTemplateTaskNameField' => 'Шаблон наименования задачи, пример: "Перезвонить по номеру &lt;PhoneNumber&gt;"',
     'mod_amo_entitySettingsTemplateTaskDeadlineField' => 'Крайний срок выполнения задачи в часах',
 
     'mod_amo_type_INCOMING_UNKNOWN'             => 'Входящий с неизвестного номера',
