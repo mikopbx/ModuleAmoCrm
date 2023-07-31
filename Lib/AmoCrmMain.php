@@ -35,8 +35,7 @@ class AmoCrmMain extends AmoCrmMainBase
         if($settings){
             $this->baseDomain   = $settings->baseDomain;
             $this->token = new AuthToken((string)$settings->authData);
-
-            $this->isPrivateWidget     = $settings->isPrivateWidget === '1';
+            $this->isPrivateWidget     = (string)$settings->isPrivateWidget === '1';
             $this->privateClientId     = ''.$settings->privateClientId;
             $this->privateClientSecret = ''.$settings->privateClientSecret;
             $this->refreshToken();
@@ -98,8 +97,8 @@ class AmoCrmMain extends AmoCrmMainBase
         }
         $url = "https://$this->baseDomain/oauth2/access_token";
         $params = [
-            'client_id'     => self::CLIENT_ID,
-            'client_secret' => self::CLIENT_SECRET,
+            'client_id'     => $this->getClientId(),
+            'client_secret' => $this->getClientSecret(),
             'grant_type' => 'refresh_token',
             'refresh_token' => $refreshToken,
             'redirect_uri'  => self::REDIRECT_URL,
