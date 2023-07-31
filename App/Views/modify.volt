@@ -73,6 +73,10 @@
             <label>{{ t._('mod_amo_entitySettingsTemplateTaskNameField') }}</label>
             {{ form.render('template_task_text') }}
         </div>
+        <div class="six wide field">
+            <label>{{ t._('mod_amo_task_responsible_type') }}</label>
+            {{ form.render('task_responsible_type') }}
+        </div>
         <div class="field ten wide">
             <label>{{ t._('mod_amo_entitySettingsTemplateTaskDeadlineField') }}</label>
             {{ form.render('deadline_task') }}

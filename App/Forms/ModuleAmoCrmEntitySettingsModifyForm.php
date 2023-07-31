@@ -165,5 +165,16 @@ class ModuleAmoCrmEntitySettingsModifyForm extends Form
                              ]
         );
         $this->add($entityAction);
+
+        $taskResponsibleType = [
+            $entity->task_responsible_type => Util::translate('mod_amo_task_responsible_type_'.$entity->task_responsible_type)
+        ];
+        $taskResponsibleTypeAction = new Select(
+            'task_responsible_type', $taskResponsibleType, [
+                                 'useEmpty' => false,
+                                 'class' => 'ui selection dropdown search',
+                             ]
+        );
+        $this->add($taskResponsibleTypeAction);
     }
 }

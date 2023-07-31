@@ -53,8 +53,17 @@ return [
     'mod_amo_type_MISSING_UNKNOWN'              => 'Пропущенный с неизвестного номера',
     'mod_amo_type_MISSING_KNOWN'                => 'Пропущенный с известного номера',
     'mod_amo_type_OUTGOING_UNKNOWN'             => 'Исходящий на неизвестный номер',
-    'mod_amo_type_OUTGOING_KNOWN'               => 'Исходящий отвечен',
+    'mod_amo_type_OUTGOING_KNOWN'               => 'Удачный исходящий на известный номер',
     'mod_amo_type_OUTGOING_KNOWN_FAIL'          => 'Неудачный исходящий на известный номер',
+
+    'mod_amo_task_responsible_type'                  => 'Ответственный по задаче',
+    'mod_amo_task_responsible_type_'                 => 'Не выбран',
+    'mod_amo_task_responsible_type_firstMissedUser'  => 'Первый, кто пропустил вызов',
+    'mod_amo_task_responsible_type_lastMissedUser'   => 'Последний, кто пропустил вызов',
+    'mod_amo_task_responsible_type_lastAnswerUser'   => 'Последний, кто ответил на вызов',
+    'mod_amo_task_responsible_type_firstAnswerUser'  => 'Первый, кто ответил на вызов',
+    'mod_amo_task_responsible_type_clientResponsible'=> 'Ответственный по клиенту',
+    'mod_amo_task_responsible_type_def_responsible'  => 'Ответственный по умолчанию',
 
     'mod_amo_entitySettingsEntityActionField'   => 'Действие со сделками и контактами',
     'mod_amo_action_none'                       => 'Ничего не делать',

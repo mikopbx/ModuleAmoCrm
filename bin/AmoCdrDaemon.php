@@ -300,6 +300,7 @@ class AmoCdrDaemon extends WorkerBase
                 $call_status = 6;
                 $link = '';
                 $this->cdrRows[$row['linkedid']]['answered'] |= false;
+                $this->setMissedData($row['linkedid'], $row['start'], $amoUserId);
             }else{
                 // Это точно не пропущенный вызов.
                 $this->cdrRows[$row['linkedid']]['answered'] |= true;
@@ -418,6 +419,30 @@ class AmoCdrDaemon extends WorkerBase
             $this->cdrRows[$linkedId]["firstAnswerUser"]  = $amoUserId;
         }
     }
+    /**
+     * Опеределение первого и последнего пропустившего вызов.
+     * @param string      $linkedId
+     * @param int         $start
+     * @param string|null $amoUserId
+     * @return void
+     */
+    private function setMissedData(string $linkedId, int $start, ?string $amoUserId):void
+    {
+        if(!$amoUserId){
+            return;
+        }
+        $start     = $this->getTimestamp($start, $linkedId);
+        $dataIsSet = isset($this->cdrRows[$linkedId]["lastMissedData"]);
+        if(!$dataIsSet || ($this->cdrRows[$linkedId]["lastMissedData"] < $start)){
+            $this->cdrRows[$linkedId]["lastMissedData"]  = $start;
+            $this->cdrRows[$linkedId]["lastMissedUser"]  = $amoUserId;
+        }
+        $dataIsSet = isset($this->cdrRows[$linkedId]["firstAnswerData"]);
+        if(!$dataIsSet || ($this->cdrRows[$linkedId]["firstAnswerData"] > $start)){
+            $this->cdrRows[$linkedId]["firstAnswerData"]  = $start;
+            $this->cdrRows[$linkedId]["firstMissedUser"]  = $amoUserId;
+        }
+    }
 
     /**
      * Добавление информации о звонках сущностям amoCRM
@@ -500,7 +525,6 @@ class AmoCdrDaemon extends WorkerBase
                 unset($calls[$index]);
                 continue;
             }
-
             if (isset($this->cdrRows[$call['id']]['type'])) {
                 continue;
             }
@@ -538,13 +562,9 @@ class AmoCdrDaemon extends WorkerBase
                     'responsible_user_id' =>  $responsible,
                 ];
             }
-            if($settings['create_lead'] === '1' && empty($lead)){
-                $leadData = $this->getLeadByTemplate($call, $contData, $settings);
-                $leadData['responsible_user_id'] = $responsible;
-                $leadData['request_id']          = $indexAction;
 
-                $this->newLeads[$indexAction] = $leadData;
-            }
+            $this->addNewLead($call, $contData, $settings, $responsible);
+
             if($settings['create_unsorted'] === '1'){
                 // Наполняем неразобранное.
                 $this->newUnsorted[$indexAction] = [
@@ -586,30 +606,12 @@ class AmoCdrDaemon extends WorkerBase
                 // Звонок будет добавлен через неразобранное.
                 unset($calls[$index]);
             }
-            if($settings['create_task'] === '1'){
-                $this->newTasks[$indexAction] = [
-                    'text'                =>  $this->replaceTagTemplate($settings['template_task_text'], $call),
-                    'complete_till'       =>  time()+3600,
-                    'responsible_user_id' =>  $responsible,
-                ];
-                if(!empty($lead)){
-                    $this->newTasks[$indexAction]['entity_type'] = 'leads';
-                    $this->newTasks[$indexAction]['entity_id'] = (int) $lead;
-                }elseif ($contactExists){
-                    if(!empty($contData['contactId'])){
-                        $this->newTasks[$indexAction]['entity_type'] = 'contact';
-                        $this->newTasks[$indexAction]['entity_id']    = (int) $contData['contactId'];
-                    }else{
-                        $this->newTasks[$indexAction]['entity_type'] = 'companies';
-                        $this->newTasks[$indexAction]['entity_id']    = (int) $contData['companyId'];
-                    }
-                }
-
-            }
+            $this->addNewTask($settings, $call, $contData);
         }
     }
 
     /**
+     * Замена тегов в шаблоне.
      * @param string $template
      * @param array  $data
      * @return string
@@ -620,14 +622,66 @@ class AmoCdrDaemon extends WorkerBase
     }
 
     /**
+     * Добавление новой задачи в пулл для отправки на сервер amo.
+     * @param $settings
+     * @param $call
+     * @param $contData
+     * @return void
+     */
+    private function addNewTask($settings, $call, $contData):void
+    {
+        if($settings['create_task'] !== '1'){
+            return;
+        }
+        $indexAction = AmoCrmMain::getPhoneIndex($call['phone']);
+        $contactExists = !empty($contData);
+        $lead          = $contData['leadId']??'';
+        $responsibleArray = [
+            'lastMissedUser'    => $this->cdrRows[$call['id']]['lastMissedUser'],
+            'firstMissedUser'   => $this->cdrRows[$call['id']]['firstMissedUser'],
+            'lastAnswerUser'    => $this->cdrRows[$call['id']]['lastAnswerUser'],
+            'firstAnswerUser'   => $this->cdrRows[$call['id']]['firstAnswerUser'],
+            'clientResponsible' => $contData['responsible_user_id'],
+            'def_responsible'   => $settings['def_responsible'],
+        ];
+
+        $taskResponsible = (int)($responsibleArray[$settings['task_responsible_type']]??0);
+        if(!empty($taskResponsible)){
+            $this->newTasks[$indexAction] = [
+                'text'                =>  $this->replaceTagTemplate($settings['template_task_text'], $call),
+                'complete_till'       =>  time()+3600,
+                'responsible_user_id' =>  $taskResponsible,
+            ];
+            if(!empty($lead)){
+                $this->newTasks[$indexAction]['entity_type'] = 'leads';
+                $this->newTasks[$indexAction]['entity_id'] = (int) $lead;
+            }elseif ($contactExists){
+                if(!empty($contData['contactId'])){
+                    $this->newTasks[$indexAction]['entity_type'] = 'contact';
+                    $this->newTasks[$indexAction]['entity_id']    = (int) $contData['contactId'];
+                }else{
+                    $this->newTasks[$indexAction]['entity_type'] = 'companies';
+                    $this->newTasks[$indexAction]['entity_id']    = (int) $contData['companyId'];
+                }
+            }
+        }
+    }
+
+    /**
      * Создание структуры контакта по шаблону.
      * @param $call
      * @param $contData
      * @param $settings
-     * @return array
+     * @param $responsible
+     * @return void
      */
-    private function getLeadByTemplate($call, $contData, $settings):array
+    private function addNewLead($call, $contData, $settings, $responsible):void
     {
+        $lead = $contData['leadId']??'';
+        if($settings['create_lead'] !== '1' && !empty($lead)){
+            return;
+        }
+        $indexAction = AmoCrmMain::getPhoneIndex($call['phone']);
         $leadData = [
             'name'        =>  $this->replaceTagTemplate($settings['template_lead_name'], $call),
             'status_id'   => (int) $settings['lead_pipeline_status_id'],
@@ -648,7 +702,10 @@ class AmoCdrDaemon extends WorkerBase
                 ];
             }
         }
-        return $leadData;
+
+        $leadData['responsible_user_id'] = $responsible;
+        $leadData['request_id']          = $indexAction;
+        $this->newLeads[$indexAction]    = $leadData;
     }
 
     /**

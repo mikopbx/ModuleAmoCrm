@@ -37,6 +37,12 @@ class ModuleAmoEntitySettings extends ModulesModelsBase
     public $def_responsible;
 
     /**
+     * Ответственный по задаче.
+     * @Column(type="string", nullable=true)
+     */
+    public $task_responsible_type;
+
+    /**
      * Ответственный по задаче / сделке / контакту - первый сотрудник / последний сотрудник / ответственный по клиенту
      * @Column(type="string", nullable=true)
      */

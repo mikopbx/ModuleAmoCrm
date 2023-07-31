@@ -18,6 +18,7 @@ var ModuleAmoCrmEntityEdit = {
   $pipelineDropdown: $('#lead_pipeline_id'),
   $entityActionDropdown: $('#entityAction'),
   $typeDropdown: $('#type'),
+  $task_responsible_type: $('#task_responsible_type'),
 
   /**
   /**
@@ -184,6 +185,148 @@ var ModuleAmoCrmEntityEdit = {
         values: entityActionVariants,
         onChange: window[className].onChangeEntityAction
       });
+      var task_responsible_type = window[className].$task_responsible_type.parent().dropdown('get value');
+      var taskRespVariants = [];
+
+      if (type === 'OUTGOING_KNOWN_FAIL' || type === 'OUTGOING_KNOWN') {
+        taskRespVariants = [{
+          name: globalTranslate['mod_amo_task_responsible_type_'],
+          value: '',
+          selected: task_responsible_type === ''
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_firstAnswerUser'],
+          value: 'firstAnswerUser',
+          selected: task_responsible_type === 'firstAnswerUser'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_lastAnswerUser'],
+          value: 'lastAnswerUser',
+          selected: task_responsible_type === 'lastAnswerUser'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_clientResponsible'],
+          value: 'clientResponsible',
+          selected: task_responsible_type === 'clientResponsible'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_def_responsible'],
+          value: 'def_responsible',
+          selected: task_responsible_type === 'def_responsible'
+        }];
+      } else if (type === 'OUTGOING_UNKNOWN') {
+        taskRespVariants = [{
+          name: globalTranslate['mod_amo_task_responsible_type_'],
+          value: '',
+          selected: task_responsible_type === ''
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_def_responsible'],
+          value: 'def_responsible',
+          selected: task_responsible_type === 'def_responsible'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_firstAnswerUser'],
+          value: 'firstAnswerUser',
+          selected: task_responsible_type === 'firstAnswerUser'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_lastAnswerUser'],
+          value: 'lastAnswerUser',
+          selected: task_responsible_type === 'lastAnswerUser'
+        }];
+      } else if (type === 'MISSING_KNOWN') {
+        taskRespVariants = [{
+          name: globalTranslate['mod_amo_task_responsible_type_'],
+          value: '',
+          selected: task_responsible_type === ''
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_def_responsible'],
+          value: 'def_responsible',
+          selected: task_responsible_type === 'def_responsible'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_clientResponsible'],
+          value: 'clientResponsible',
+          selected: task_responsible_type === 'clientResponsible'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_firstMissedUser'],
+          value: 'firstMissedUser',
+          selected: task_responsible_type === 'firstAnswerUser'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_lastMissedUser'],
+          value: 'lastMissedUser',
+          selected: task_responsible_type === 'lastAnswerUser'
+        }];
+      } else if (type === 'INCOMING_UNKNOWN') {
+        taskRespVariants = [{
+          name: globalTranslate['mod_amo_task_responsible_type_'],
+          value: '',
+          selected: task_responsible_type === ''
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_def_responsible'],
+          value: 'def_responsible',
+          selected: task_responsible_type === 'def_responsible'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_firstAnswerUser'],
+          value: 'firstAnswerUser',
+          selected: task_responsible_type === 'firstAnswerUser'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_lastAnswerUser'],
+          value: 'lastAnswerUser',
+          selected: task_responsible_type === 'lastAnswerUser'
+        }];
+      } else if (type === 'MISSING_UNKNOWN') {
+        taskRespVariants = [{
+          name: globalTranslate['mod_amo_task_responsible_type_'],
+          value: '',
+          selected: task_responsible_type === ''
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_def_responsible'],
+          value: 'def_responsible',
+          selected: task_responsible_type === 'def_responsible'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_firstMissedUser'],
+          value: 'firstMissedUser',
+          selected: task_responsible_type === 'firstAnswerUser'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_lastMissedUser'],
+          value: 'lastMissedUser',
+          selected: task_responsible_type === 'lastAnswerUser'
+        }];
+      } else if (type === 'INCOMING_KNOWN') {
+        taskRespVariants = [{
+          name: globalTranslate['mod_amo_task_responsible_type_'],
+          value: '',
+          selected: task_responsible_type === ''
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_firstAnswerUser'],
+          value: 'firstAnswerUser',
+          selected: task_responsible_type === 'firstAnswerUser'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_lastAnswerUser'],
+          value: 'lastAnswerUser',
+          selected: task_responsible_type === 'lastAnswerUser'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_clientResponsible'],
+          value: 'clientResponsible',
+          selected: task_responsible_type === 'clientResponsible'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_def_responsible'],
+          value: 'def_responsible',
+          selected: task_responsible_type === 'def_responsible'
+        }];
+      }
+
+      window[className].$task_responsible_type.find('option').remove();
+      $.each(taskRespVariants, function (i, item) {
+        var options = {
+          value: item.value,
+          text: item.name
+        };
+
+        if (item.selected) {
+          options.selected = 'selected';
+        }
+
+        window[className].$task_responsible_type.append($('<option>', options));
+      });
+      window[className].$task_responsible_type.parent().dropdown({
+        values: taskRespVariants,
+        onChange: window[className].onChangeEntityAction
+      });
     }
 
     window[className].setVisibilityElements();
@@ -257,9 +400,11 @@ var ModuleAmoCrmEntityEdit = {
     if (create_task) {
       $('#template_task_text').parents('div.field').first().show();
       $('#deadline_task').parents('div.field').first().show();
+      window[className].$task_responsible_type.parents('div.field').first().show();
     } else {
       $('#template_task_text').parents('div.field').first().hide();
       $('#deadline_task').parents('div.field').first().hide();
+      window[className].$task_responsible_type.parents('div.field').first().hide();
     }
   }
 };
