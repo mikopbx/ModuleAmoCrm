@@ -58,7 +58,7 @@ return [
 
     'mod_amo_task_responsible_type'                  => 'Ответственный по задаче',
     'mod_amo_task_responsible_type_'                 => 'Не выбран',
-    'mod_amo_task_responsible_type_firstMissedUser'  => 'Первый, кто пропустил вызов',
+    'mod_amo_task_responsible_type_firstMissedUser'  => 'Первый, на кого пропустил вызов',
     'mod_amo_task_responsible_type_lastMissedUser'   => 'Последний, кто пропустил вызов',
     'mod_amo_task_responsible_type_lastAnswerUser'   => 'Последний, кто ответил на вызов',
     'mod_amo_task_responsible_type_firstAnswerUser'  => 'Первый, кто ответил на вызов',
