@@ -259,6 +259,9 @@ define(function (require) {
     };
     self.call_result = function (phone) {
       let intPhone    = phone.match(/\d+/g).join('');
+      if(intPhone.length < 5){
+        return;
+      }
       let phonePretty = phone;
       let params = {
         phone: phone,

@@ -53,7 +53,7 @@ return [
     'mod_amo_type_MISSING_UNKNOWN'              => 'Пропущенный с неизвестного номера',
     'mod_amo_type_MISSING_KNOWN'                => 'Пропущенный с известного номера',
     'mod_amo_type_OUTGOING_UNKNOWN'             => 'Исходящий на неизвестный номер',
-    'mod_amo_type_OUTGOING_KNOWN'               => 'Исходящий',
+    'mod_amo_type_OUTGOING_KNOWN'               => 'Исходящий отвечен',
     'mod_amo_type_OUTGOING_KNOWN_FAIL'          => 'Неудачный исходящий на известный номер',
 
     'mod_amo_entitySettingsEntityActionField'   => 'Действие со сделками и контактами',

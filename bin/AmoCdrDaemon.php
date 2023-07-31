@@ -555,7 +555,6 @@ class AmoCdrDaemon extends WorkerBase
                     'created_at'  => $call['created_at'],
                     "metadata" => [
                         "is_call_event_needed"  => true,
-                        "call_responsible"      => $responsible,
                         "uniq"                  => $call['uniq'],
                         'duration'              => $call['duration'],
                         "service_code"          => self::SOURCE_ID,
@@ -581,6 +580,9 @@ class AmoCdrDaemon extends WorkerBase
                         ]],
                     ]
                 ];
+                if($this->cdrRows[$call['id']]['answered'] === 1){
+                    $this->newUnsorted[$indexAction]['metadata']['call_responsible'] = $responsible;
+                }
                 // Звонок будет добавлен через неразобранное.
                 unset($calls[$index]);
             }
