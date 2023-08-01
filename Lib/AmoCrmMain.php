@@ -5,7 +5,7 @@ namespace Modules\ModuleAmoCrm\Lib;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Modules\PbxExtensionUtils;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
-use Modules\ModuleAmoCrm\bin\WorkerAmoContacts;
+use Modules\ModuleAmoCrm\bin\ConnectorDb;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoPipeLines;
 use MikoPBX\Common\Models\Extensions;
@@ -499,7 +499,7 @@ class AmoCrmMain extends AmoCrmMainBase
     public static function updateUsers():array
     {
         $users = [];
-        $amoUsers = WorkerAmoContacts::invoke('getPortalUsers', [1]);
+        $amoUsers = ConnectorDb::invoke('getPortalUsers', [1]);
         foreach ($amoUsers as $user){
             if(!is_numeric($user['amoUserId'])){
                 continue;

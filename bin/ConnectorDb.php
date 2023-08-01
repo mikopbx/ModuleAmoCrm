@@ -29,13 +29,14 @@ use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 use Modules\ModuleAmoCrm\Lib\PBXAmoResult;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
+use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
 use Modules\ModuleAmoCrm\Models\ModuleAmoLeads;
 use Modules\ModuleAmoCrm\Models\ModuleAmoPhones;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use Throwable;
 use Phalcon\Mvc\Model\Manager;
 
-class WorkerAmoContacts extends WorkerBase
+class ConnectorDb extends WorkerBase
 {
     private array   $users = [];
     private int     $lastContactsSyncTime;
@@ -56,7 +57,11 @@ class WorkerAmoContacts extends WorkerBase
         cli_set_process_title('SHUTDOWN_'.cli_get_process_title());
     }
 
-    public function getSettings():void
+    /**
+     * Обновление настроек по данным db.
+     * @return void
+     */
+    public function updateSettings():void
     {
         if(isset($this->lastContactsSyncTime, $this->lastCompaniesSyncTime)){
             return;
@@ -74,13 +79,43 @@ class WorkerAmoContacts extends WorkerBase
     }
 
     /**
+     * Возвращает настройки
+     * @param bool $mainOnly
+     * @return array
+     */
+    public function getModuleSettings(bool $mainOnly = false):array
+    {
+        $settings = [
+            'ModuleAmoCrm' => ModuleAmoCrm::findFirst()->toArray(),
+        ];
+        if(!$mainOnly){
+            $settings['ModuleAmoEntitySettings'] = ModuleAmoEntitySettings::find()->toArray();
+        }
+        return $settings;
+    }
+
+    /**
+     * Обновление текущей позиции CDR.
+     */
+    public function updateOffset($offset):bool
+    {
+        $settings = ModuleAmoCrm::findFirst();
+        if(!$settings){
+            return false;
+        }
+        $settings->offsetCdr = $offset;
+        return $settings->save();
+    }
+
+
+    /**
      * Старт работы листнера.
      *
      * @param $params
      */
     public function start($params):void
     {
-        $this->getSettings();
+        $this->updateSettings();
 
         $beanstalk      = new BeanstalkClient(self::class);
         $amoUsers       = ModuleAmoUsers::find('enable=1');
@@ -310,7 +345,7 @@ class WorkerAmoContacts extends WorkerBase
      */
     public function syncContacts($entityType):void
     {
-        $this->getSettings();
+        $this->updateSettings();
 
         $endTime = time();
         $result = WorkerAmoHTTP::invokeAmoApi('getChangedContacts', [$this->lastContactsSyncTime, $endTime, $entityType]);
@@ -344,7 +379,7 @@ class WorkerAmoContacts extends WorkerBase
      */
     public function syncLeads():void
     {
-        $this->getSettings();
+        $this->updateSettings();
         $entityType = 'leads';
         $endTime = time();
         $result = WorkerAmoHTTP::invokeAmoApi('getChangedLeads', [$this->lastLeadsSyncTime, $endTime]);
@@ -570,7 +605,7 @@ class WorkerAmoContacts extends WorkerBase
             'function' => $function,
             'args'     => $args
         ];
-        $client = new BeanstalkClient(WorkerAmoContacts::class);
+        $client = new BeanstalkClient(ConnectorDb::class);
         try {
             $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), 20);
             $object = unserialize($result, ['allowed_classes' => [PBXAmoResult::class, PBXApiResult::class]]);
@@ -582,5 +617,5 @@ class WorkerAmoContacts extends WorkerBase
 }
 
 if(isset($argv) && count($argv) !== 1){
-    WorkerAmoContacts::startWorker($argv??[]);
+    ConnectorDb::startWorker($argv??[]);
 }

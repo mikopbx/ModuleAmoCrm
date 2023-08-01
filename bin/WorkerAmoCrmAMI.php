@@ -25,7 +25,6 @@ use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
-use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 
 class WorkerAmoCrmAMI extends WorkerBase
 {
@@ -70,6 +69,7 @@ class WorkerAmoCrmAMI extends WorkerBase
     {
         parent::signalHandler($signal);
         cli_set_process_title('SHUTDOWN_'.cli_get_process_title());
+        exit(0);
     }
 
     /**
@@ -79,7 +79,7 @@ class WorkerAmoCrmAMI extends WorkerBase
      */
     public function start($params):void
     {
-        $this->beanstalk = new BeanstalkClient(WorkerAmoContacts::class);
+        $this->beanstalk = new BeanstalkClient(ConnectorDb::class);
 
         $this->am     = Util::getAstManager();
         $this->setFilter();
@@ -104,9 +104,10 @@ class WorkerAmoCrmAMI extends WorkerBase
         }
         $this->lastUpdateSettings = time();
         [, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
-        $settings = ModuleAmoCrm::findFirst();
-        if($settings){
-            $this->useInterception = $settings->useInterception;
+
+        $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
+        if(!empty($allSettings) && is_array($allSettings)){
+            $this->useInterception = ($allSettings['ModuleAmoCrm']['useInterception']??'0') === '1';
         }
     }
 

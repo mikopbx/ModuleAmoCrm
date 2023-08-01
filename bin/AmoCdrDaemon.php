@@ -25,10 +25,8 @@ use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 use Modules\ModuleAmoCrm\Lib\Logger;
-use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use MikoPBX\Common\Providers\CDRDatabaseProvider;
-use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
 use DateTime;
 use MikoPBX\Common\Models\Extensions;
 use Throwable;
@@ -90,9 +88,9 @@ class AmoCdrDaemon extends WorkerBase
         $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
         while ($this->needRestart === false){
             if(time() - $this->lastSyncTime > 30){
-                WorkerAmoContacts::invoke('syncContacts', [AmoCrmMain::ENTITY_COMPANIES]);
-                WorkerAmoContacts::invoke('syncContacts', [AmoCrmMain::ENTITY_CONTACTS]);
-                WorkerAmoContacts::invoke('syncLeads', []);
+                ConnectorDb::invoke('syncContacts', [AmoCrmMain::ENTITY_COMPANIES]);
+                ConnectorDb::invoke('syncContacts', [AmoCrmMain::ENTITY_CONTACTS]);
+                ConnectorDb::invoke('syncLeads', []);
                 $this->updateSettings();
             }
             $this->updateActiveCalls();
@@ -109,13 +107,18 @@ class AmoCdrDaemon extends WorkerBase
      */
     private function updateSettings():void
     {
-        /** @var ModuleAmoCrm $settings */
-        $settings = ModuleAmoCrm::findFirst();
-        if($settings){
-            $this->offset        = max(1*$settings->offsetCdr,1);
-            $this->referenceDate = $settings->referenceDate;
-            $this->portalId      = (int)$settings->portalId;
+        $allSettings = ConnectorDb::invoke('getModuleSettings', [false]);
+        if(!empty($allSettings) && is_array($allSettings)){
+            $this->offset        = max(1*$allSettings['ModuleAmoCrm']['offsetCdr'],1);
+            $this->referenceDate = $allSettings['ModuleAmoCrm']['referenceDate'];
+            $this->portalId      = (int)$allSettings['ModuleAmoCrm']['portalId'];
             $this->logger->writeInfo("Update settings, Reference date: {$this->referenceDate}, offset: {$this->offset}");
+
+            $entSettings = $allSettings['ModuleAmoEntitySettings'];
+            $this->entitySettings = [];
+            foreach ($entSettings as $entSetting){
+                $this->entitySettings[$entSetting['type']][$entSetting['did']] = $entSetting;
+            }
         }else{
             $this->logger->writeError('Settings not found...');
             return;
@@ -126,12 +129,6 @@ class AmoCdrDaemon extends WorkerBase
 
         $this->pipeLines = WorkerAmoHTTP::invokeAmoApi('syncPipeLines', [$this->portalId]);
         $this->lastSyncTime = time();
-        /** @var ModuleAmoEntitySettings $entSetting */
-        $this->entitySettings = [];
-        $entSettings = ModuleAmoEntitySettings::find();
-        foreach ($entSettings as $entSetting){
-            $this->entitySettings[$entSetting->type][$entSetting->did] = $entSetting->toArray();
-        }
     }
 
     /**
@@ -140,7 +137,7 @@ class AmoCdrDaemon extends WorkerBase
      */
     private function updateUsers():void
     {
-        $usersAmo = WorkerAmoContacts::invoke('getPortalUsers', [1]);
+        $usersAmo = ConnectorDb::invoke('getPortalUsers', [1]);
         $amoUsersArray = [];
         foreach ($usersAmo as $user){
             $amoUsersArray[$user['number']] = $user['amoUserId'];
@@ -373,8 +370,7 @@ class AmoCdrDaemon extends WorkerBase
         // Прикрепление звонков к сущностям.
         ////
         $this->addCalls($calls, $callCounter);
-        $this->updateOffset();
-
+        ConnectorDb::invoke('updateOffset', [$this->offset]);
     }
 
     /**
@@ -494,20 +490,6 @@ class AmoCdrDaemon extends WorkerBase
     }
 
     /**
-     * Обновление текущей позиции CDR.
-     */
-    private function updateOffset():void
-    {
-        /** @var ModuleAmoCrm $settings */
-        $settings = ModuleAmoCrm::findFirst();
-        if(!$settings){
-            return;
-        }
-        $settings->offsetCdr = $this->offset;
-        $settings->save();
-    }
-
-    /**
      * Подготавливает данные для создания сделок / контактов / задач.
      * @param array $calls
      * @param array $pipeline
@@ -519,7 +501,7 @@ class AmoCdrDaemon extends WorkerBase
         $this->newUnsorted = [];
         $this->newTasks = [];
 
-        $contactsData = WorkerAmoContacts::invoke('getContactsData', [array_unique(array_column($calls, 'phone'))]);
+        $contactsData = ConnectorDb::invoke('getContactsData', [array_unique(array_column($calls, 'phone'))]);
         foreach ($calls as $index => $call) {
             if($this->cdrRows[$call['id']]['answered'] === 1 && $call['duration'] === 0){
                 unset($calls[$index]);
@@ -838,7 +820,7 @@ class AmoCdrDaemon extends WorkerBase
             $contactId = $resultCreateUnsorted->data["_embedded"]["unsorted"][0]["_embedded"]["contacts"][0]["id"]??'';
             $leadId    = $resultCreateUnsorted->data["_embedded"]["unsorted"][0]["_embedded"]["leads"][0]["id"]??'';
             if(!empty($phone)){
-                WorkerAmoContacts::invoke('addContactLeadFromUnsorted', [$phone, $contactId, $leadId]);
+                ConnectorDb::invoke('addContactLeadFromUnsorted', [$phone, $contactId, $leadId]);
             }
         }else{
             $this->logger->writeInfo("Error create unsorted (REQ):".json_encode($this->newUnsorted));

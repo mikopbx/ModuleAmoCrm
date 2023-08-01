@@ -18,7 +18,7 @@ use MikoPBX\Modules\Config\ConfigClass;
 use MikoPBX\Modules\PbxExtensionUtils;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\bin\AmoCdrDaemon;
-use Modules\ModuleAmoCrm\bin\WorkerAmoContacts;
+use Modules\ModuleAmoCrm\bin\ConnectorDb;
 use Modules\ModuleAmoCrm\bin\WorkerAmoCrmAMI;
 use Modules\ModuleAmoCrm\bin\WorkerAmoHTTP;
 use Modules\ModuleAmoCrm\Lib\RestAPI\Controllers\ApiController;
@@ -133,7 +133,7 @@ class AmoCrmConf extends ConfigClass
             ],
             [
                 'type'   => WorkerSafeScriptsCore::CHECK_BY_BEANSTALK,
-                'worker' => WorkerAmoContacts::class,
+                'worker' => ConnectorDb::class,
             ],
             [
                 'type'   => WorkerSafeScriptsCore::CHECK_BY_BEANSTALK,
@@ -179,7 +179,7 @@ class AmoCrmConf extends ConfigClass
                         $request['data']['phone'],
                     ]
                 ];
-                $beanstalk = new BeanstalkClient(WorkerAmoContacts::class);
+                $beanstalk = new BeanstalkClient(ConnectorDb::class);
                 $beanstalk->publish(json_encode($findContactsParams));
                 break;
             case 'ENTITY-UPDATE':
@@ -187,7 +187,7 @@ class AmoCrmConf extends ConfigClass
                     'action' => 'entity-update',
                     'data' => $request['data']??[]
                 ];
-                $beanstalk = new BeanstalkClient(WorkerAmoContacts::class);
+                $beanstalk = new BeanstalkClient(ConnectorDb::class);
                 $beanstalk->publish(json_encode($data));
                 break;
             case 'LISTENER':

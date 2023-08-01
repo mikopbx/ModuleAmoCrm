@@ -11,7 +11,7 @@ namespace Modules\ModuleAmoCrm\App\Forms;
 use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Core\System\Util;
 use Modules\ModuleAmoCrm\bin\AmoCdrDaemon;
-use Modules\ModuleAmoCrm\bin\WorkerAmoContacts;
+use Modules\ModuleAmoCrm\bin\ConnectorDb;
 use Modules\ModuleAmoCrm\Models\ModuleAmoPipeLines;
 use Phalcon\Forms\Element\Check;
 use Phalcon\Forms\Element\Numeric;
@@ -145,7 +145,7 @@ class ModuleAmoCrmEntitySettingsModifyForm extends Form
         }
         unset($extensions);
 
-        $usersAmo = WorkerAmoContacts::invoke('getPortalUsers', [1]);
+        $usersAmo = ConnectorDb::invoke('getPortalUsers', [1]);
         $users    = [];
         foreach ($usersAmo as $user){
             $users[$user['amoUserId']] = ($pbxUsers[$user['number']]??''). " <{$user['number']}>";
