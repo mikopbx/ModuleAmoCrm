@@ -98,7 +98,7 @@ class AmoCdrDaemon extends WorkerBase
             $this->updateActiveCalls();
             $this->updateUsers();
             $this->cdrSync();
-            sleep(3);
+            sleep(1);
             $this->logger->rotate();
         }
     }
@@ -118,11 +118,9 @@ class AmoCdrDaemon extends WorkerBase
             $this->logger->writeInfo("Update settings, Reference date: {$this->referenceDate}, offset: {$this->offset}");
         }else{
             $this->logger->writeError('Settings not found...');
-            // Настройки не заполенны.
             return;
         }
         [, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
-        $this->logger->writeInfo("Count users: ".count($this->users)."");
         $this->innerNums[] = 'outworktimes';
         $this->innerNums[] = 'voicemail';
 
@@ -166,12 +164,14 @@ class AmoCdrDaemon extends WorkerBase
         }
         unset($extensions);
         // Оповещение только если изменилось состояние.
-        $this->logger->writeInfo("Update user list. Count: ".count($result));
         $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_USERS_NAME, ['data' => $result, 'action' => 'USERS']);
-        try {
-            $this->logger->writeInfo("Result: ". json_encode($result, JSON_THROW_ON_ERROR));
-        }catch (Throwable $e){
-            $this->logger->writeInfo("Result: ". $e->getMessage());
+        if(!$result->success){
+            $this->logger->writeInfo("Update user list. Count: ".count($result));
+            try {
+                $this->logger->writeInfo("Result: ". json_encode($result, JSON_THROW_ON_ERROR));
+            }catch (Throwable $e){
+                $this->logger->writeInfo("Result: ". $e->getMessage());
+            }
         }
     }
 
@@ -563,50 +563,9 @@ class AmoCdrDaemon extends WorkerBase
                 ];
             }
 
-            $this->addNewLead($call, $contData, $settings, $responsible);
-
-            if($settings['create_unsorted'] === '1'){
-                // Наполняем неразобранное.
-                $this->newUnsorted[$indexAction] = [
-                    'request_id'  => $indexAction,
-                    'source_name' => self::SOURCE_ID,
-                    'source_uid'  => self::SOURCE_ID,
-                    'pipeline_id' =>  (int)$settings['lead_pipeline_id'],
-                    'created_at'  => $call['created_at'],
-                    "metadata" => [
-                        "is_call_event_needed"  => true,
-                        "uniq"                  => $call['uniq'],
-                        'duration'              => $call['duration'],
-                        "service_code"          => self::SOURCE_ID,
-                        "link"                  => $call["link"],
-                        "phone"                 => $call["phone"],
-                        "called_at"             => $call['created_at'],
-                        "from"                  => $call['source']
-                    ],
-                    "_embedded" => [
-                        'contacts' => [
-                            [
-                                'name' => $this->replaceTagTemplate($settings['template_contact_name'], $call),
-                                'custom_fields_values' => [
-                                    [
-                                        'field_code' => 'PHONE',
-                                        'values' => [['value' => $call["phone"]]]
-                                    ]
-                                ]
-                            ]
-                        ],
-                        'leads' => [[
-                            'name' => $this->replaceTagTemplate($settings['template_lead_name'], $call)
-                        ]],
-                    ]
-                ];
-                if($this->cdrRows[$call['id']]['answered'] === 1){
-                    $this->newUnsorted[$indexAction]['metadata']['call_responsible'] = $responsible;
-                }
-                // Звонок будет добавлен через неразобранное.
-                unset($calls[$index]);
-            }
+            $this->addNewLead($settings, $call, $contData, $responsible);
             $this->addNewTask($settings, $call, $contData);
+            $this->addNewUnsorted($settings,$calls, $index, $responsible);
         }
     }
 
@@ -619,6 +578,61 @@ class AmoCdrDaemon extends WorkerBase
     private function replaceTagTemplate(string $template, array $data):string
     {
         return str_replace(['<НомерТелефона>','<PhoneNumber>'],[$data['phone'],$data['phone']],$template);
+    }
+
+    /**
+     * @param $settings
+     * @param $calls
+     * @param $index
+     * @param $responsible
+     * @return void
+     */
+    private function addNewUnsorted($settings, &$calls, $index, $responsible)
+    {
+        if($settings['create_unsorted'] === '1'){
+            $call = $calls[$index];
+            $indexAction = AmoCrmMain::getPhoneIndex($call['phone']);
+            // Наполняем неразобранное.
+            $this->newUnsorted[$indexAction] = [
+                'request_id'  => $indexAction,
+                'source_name' => self::SOURCE_ID,
+                'source_uid'  => self::SOURCE_ID,
+                'pipeline_id' =>  (int)$settings['lead_pipeline_id'],
+                'created_at'  => $call['created_at'],
+                "metadata" => [
+                    "is_call_event_needed"  => true,
+                    "uniq"                  => $call['uniq'],
+                    'duration'              => $call['duration'],
+                    "service_code"          => self::SOURCE_ID,
+                    "link"                  => $call["link"],
+                    "phone"                 => $call["phone"],
+                    "called_at"             => $call['created_at'],
+                    "from"                  => $call['source']
+                ],
+                "_embedded" => [
+                    'contacts' => [
+                        [
+                            'name' => $this->replaceTagTemplate($settings['template_contact_name'], $call),
+                            'custom_fields_values' => [
+                                [
+                                    'field_code' => 'PHONE',
+                                    'values' => [['value' => $call["phone"]]]
+                                ]
+                            ]
+                        ]
+                    ],
+                    'leads' => [[
+                        'name' => $this->replaceTagTemplate($settings['template_lead_name'], $call)
+                    ]],
+                ]
+            ];
+            if($this->cdrRows[$call['id']]['answered'] === 1){
+                $this->newUnsorted[$indexAction]['metadata']['call_responsible'] = $responsible;
+            }
+            // Звонок будет добавлен через неразобранное.
+            unset($calls[$index]);
+        }
+
     }
 
     /**
@@ -675,10 +689,10 @@ class AmoCdrDaemon extends WorkerBase
      * @param $responsible
      * @return void
      */
-    private function addNewLead($call, $contData, $settings, $responsible):void
+    private function addNewLead($settings, $call, $contData, $responsible):void
     {
         $lead = $contData['leadId']??'';
-        if($settings['create_lead'] !== '1' && !empty($lead)){
+        if($settings['create_lead'] !== '1' || !empty($lead)){
             return;
         }
         $indexAction = AmoCrmMain::getPhoneIndex($call['phone']);
@@ -819,17 +833,16 @@ class AmoCdrDaemon extends WorkerBase
             return;
         }
         $resultCreateUnsorted    = WorkerAmoHTTP::invokeAmoApi('addUnsorted', [array_values($this->newUnsorted)]);
-        if(!$resultCreateUnsorted->success) {
-            $this->logger->writeInfo("Error create unsorted (REQ):".json_encode($this->newUnsorted));
-            $this->logger->writeInfo("Error create unsorted (RES):".json_encode($resultCreateUnsorted));
-        }else{
-            $phone = $resultCreateUnsorted->data["_embedded"]["unsorted"][0]["request_id"]??'';
+        if($resultCreateUnsorted->success) {
+            $phone     = $resultCreateUnsorted->data["_embedded"]["unsorted"][0]["request_id"]??'';
             $contactId = $resultCreateUnsorted->data["_embedded"]["unsorted"][0]["_embedded"]["contacts"][0]["id"]??'';
-            $leadId = $resultCreateUnsorted->data["_embedded"]["unsorted"][0]["_embedded"]["leads"][0]["id"]??'';
+            $leadId    = $resultCreateUnsorted->data["_embedded"]["unsorted"][0]["_embedded"]["leads"][0]["id"]??'';
             if(!empty($phone)){
                 WorkerAmoContacts::invoke('addContactLeadFromUnsorted', [$phone, $contactId, $leadId]);
             }
-
+        }else{
+            $this->logger->writeInfo("Error create unsorted (REQ):".json_encode($this->newUnsorted));
+            $this->logger->writeInfo("Error create unsorted (RES):".json_encode($resultCreateUnsorted));
         }
     }
 }

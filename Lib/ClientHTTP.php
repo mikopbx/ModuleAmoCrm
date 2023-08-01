@@ -133,7 +133,7 @@ class ClientHTTP
     private static function parseResponse($resultHttp, $message, $code):PBXAmoResult
     {
         $res = new PBXAmoResult();
-        if( isset($resultHttp) && ($code === 200 || $resultHttp->getReasonPhrase() === 'Accepted')){
+        if( isset($resultHttp) && ($code === 200 || in_array($resultHttp->getReasonPhrase(), ['Created', 'Accepted'], true))){
             $content = $resultHttp->getBody()->getContents();
             $data    = [];
             try {
