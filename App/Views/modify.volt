@@ -2,12 +2,12 @@
     {{ form.render('id') }}
     {{ form.render('pipeLineStatuses') }}
     {{ form.render('portalId') }}
-    <div class="one field">
+    <div class="three wide field">
         <label for="did">{{ t._('mod_amo_entitySettingsTableDid') }}</label>
         {{ form.render('did') }}
     </div>
     <div class="fields">
-        <div class="six wide field">
+        <div class="seven wide field">
             <label>{{ t._('mod_amo_entitySettingsCreateTypeField') }}</label>
             {{ form.render('type') }}
         </div>
@@ -17,7 +17,7 @@
         </div>
     </div>
    <div class="fields">
-        <div class="six wide field">
+        <div class="seven wide field">
             <label>{{ t._('mod_amo_entitySettingsLeadPipelineIdField') }}</label>
             {{ form.render('lead_pipeline_id') }}
         </div>
@@ -28,7 +28,7 @@
     </div>
 
     <div class="fields">
-        <div class="six wide field">
+        <div class="seven wide field">
             <label>{{ t._('mod_amo_entitySettingsResponsibleField') }}</label>
             {{ form.render('responsible') }}
         </div>
