@@ -163,7 +163,10 @@ class AmoCrmMain extends AmoCrmMainBase
     }
 
     /**
+     * Синхронизация воронок.
+     * @param $portalId
      * @return array
+     * @throws \JsonException
      */
     public function syncPipeLines($portalId):array
     {
@@ -210,9 +213,9 @@ class AmoCrmMain extends AmoCrmMainBase
         $pipeLines = [];
         $dbData = ModuleAmoPipeLines::find(["'$portalId'=portalId", 'columns' => 'amoId,did,name']);
         foreach ($dbData as $line){
-            $pipeLines[$line->did] = [
-                'id' => $line->amoId,
-                'name' => $line->name
+            $pipeLines[] = [
+                'id'    => $line->amoId,
+                'name'  => $line->name
             ];
         }
         return $pipeLines;

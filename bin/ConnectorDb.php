@@ -89,7 +89,7 @@ class ConnectorDb extends WorkerBase
             'ModuleAmoCrm' => ModuleAmoCrm::findFirst()->toArray(),
         ];
         if(!$mainOnly){
-            $settings['ModuleAmoEntitySettings'] = ModuleAmoEntitySettings::find()->toArray();
+            $settings['ModuleAmoEntitySettings'] = ModuleAmoEntitySettings::find("portalId='{$settings['ModuleAmoCrm']['portalId']}'")->toArray();
         }
         return $settings;
     }

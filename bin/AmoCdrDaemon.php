@@ -42,7 +42,6 @@ class AmoCdrDaemon extends WorkerBase
     private array $cdrRows = [];
     private string $lastCacheCdr = '';
     private Logger $logger;
-    private array $pipeLines = [];
     private string $extHostname = '';
     private int $lastSyncTime = 0;
     private int $portalId = 0;
@@ -87,11 +86,12 @@ class AmoCdrDaemon extends WorkerBase
         $this->logger =  new Logger('cdr-daemon', 'ModuleAmoCrm');
         $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
         while ($this->needRestart === false){
-            if(time() - $this->lastSyncTime > 30){
+            if(time() - $this->lastSyncTime > 10){
                 ConnectorDb::invoke('syncContacts', [AmoCrmMain::ENTITY_COMPANIES]);
                 ConnectorDb::invoke('syncContacts', [AmoCrmMain::ENTITY_CONTACTS]);
                 ConnectorDb::invoke('syncLeads', []);
                 $this->updateSettings();
+                WorkerAmoHTTP::invokeAmoApi('syncPipeLines', [$this->portalId]);
             }
             $this->updateActiveCalls();
             $this->updateUsers();
@@ -127,7 +127,6 @@ class AmoCdrDaemon extends WorkerBase
         $this->innerNums[] = 'outworktimes';
         $this->innerNums[] = 'voicemail';
 
-        $this->pipeLines = WorkerAmoHTTP::invokeAmoApi('syncPipeLines', [$this->portalId]);
         $this->lastSyncTime = time();
     }
 
@@ -261,7 +260,6 @@ class AmoCdrDaemon extends WorkerBase
             $this->logger->writeInfo("Start of CDR synchronization. Count: $countCDR");
         }
         $callCounter = [];
-        $pipeline = [];
         foreach ($rows as $row){
             $srcNum = AmoCrmMain::getPhoneIndex($row['src_num']);
             $dstNum = AmoCrmMain::getPhoneIndex($row['dst_num']);
@@ -331,16 +329,9 @@ class AmoCdrDaemon extends WorkerBase
                 'is_app'              => $row['is_app']
             ];
             if(!empty($row['did'])){
-                $pipelineName = $this->pipeLines[$row['did']]['name']??'-';
-                $pipeline[$row['linkedid']] = [
-                    'id' => $this->pipeLines[$row['did']]['id']??'',
-                    'name' => $pipelineName,
-                    'did' => $row['did'],
-                    'dst' => $userPhone
-                ];
-                $call['call_result'] = "| dst: {$userPhone} | {$pipelineName} | did: {$row['did']} |";
+                $this->cdrRows[$row['linkedid']]['did'] = $row['did'];
+                $call['call_result'] = "dst: {$userPhone}, did: {$row['did']}";
             }
-
             if(!isset($callCounter[$row['linkedid']])){
                 $callCounter[$row['linkedid']] = 1;
             }else{
@@ -358,7 +349,7 @@ class AmoCdrDaemon extends WorkerBase
         // Обработка и создание контактов
         ////
 
-        $this->prepareDataCreatingEntities($calls, $pipeline);
+        $this->prepareDataCreatingEntities($calls);
         ////
         // Создание сущностей amoCRM
         ////
@@ -492,9 +483,8 @@ class AmoCdrDaemon extends WorkerBase
     /**
      * Подготавливает данные для создания сделок / контактов / задач.
      * @param array $calls
-     * @param array $pipeline
      */
-    private function prepareDataCreatingEntities(array &$calls, array $pipeline):void
+    private function prepareDataCreatingEntities(array &$calls):void
     {
         $this->newContacts = [];
         $this->newLeads = [];
@@ -515,8 +505,8 @@ class AmoCdrDaemon extends WorkerBase
             $lead          = $contData['leadId']??'';
             $isMissed      = $this->cdrRows[$call['id']]['answered'] === 0;
             $isIncoming    = $call['direction'] === 'inbound';
-            $did           = $pipeline[$call['id']]['did']??'';
 
+            $did           =  $this->cdrRows[$call['id']]['did']??'';
             $type = $this->getCallType($isMissed, $contactExists, $isIncoming);
             $this->cdrRows[$call['id']]['type'] = $type;
             $settings = $this->entitySettings[$type][$did]??$this->entitySettings[$type]['']??[];
@@ -569,7 +559,7 @@ class AmoCdrDaemon extends WorkerBase
      * @param $responsible
      * @return void
      */
-    private function addNewUnsorted($settings, &$calls, $index, $responsible)
+    private function addNewUnsorted($settings, &$calls, $index, $responsible):void
     {
         if($settings['create_unsorted'] === '1'){
             $call = $calls[$index];
