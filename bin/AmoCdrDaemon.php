@@ -160,7 +160,7 @@ class AmoCdrDaemon extends WorkerBase
         }
         unset($extensions);
         // Оповещение только если изменилось состояние.
-        $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_USERS_NAME, ['data' => $result, 'action' => 'USERS']);
+        $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $result, 'action' => 'USERS']);
         if(!$result->success){
             $this->logger->writeInfo("Update user list. Count: ".count($result));
             try {
@@ -211,7 +211,7 @@ class AmoCdrDaemon extends WorkerBase
         if($md5Cdr !== $this->lastCacheCdr){
             $this->logger->writeInfo("Update active call. Count: ".count($params));
             // Оповещаме только если изменилось состояние.
-            $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CDR_NAME, ['data' => $params, 'action' => 'CDRs']);
+            $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $params, 'action' => 'CDRs']);
             try {
                 $this->logger->writeInfo("Result: ". json_encode($result, JSON_THROW_ON_ERROR));
             }catch (Throwable $e){

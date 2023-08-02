@@ -169,10 +169,7 @@ class ConnectorDb extends WorkerBase
         }catch (\Throwable $e){
             return;
         }
-        $clientData = [];
-        if($data['action'] === 'findContacts') {
-            $clientData = $this->findContact($data['numbers']);
-        }elseif($data['action'] === 'sync-сontacts'){
+        if($data['action'] === 'sync-сontacts'){
             $this->syncContacts(AmoCrmMain::ENTITY_COMPANIES);
             $this->syncContacts(AmoCrmMain::ENTITY_CONTACTS);
             $this->syncLeads();
@@ -192,7 +189,7 @@ class ConnectorDb extends WorkerBase
             }
             $tube->reply($res_data);
         }elseif($data['action'] === 'interception'){
-            $clientData = $this->findContact( [$data['phone']] );
+            $clientData = $this->findContacts( [$data['phone']] );
             $userId = $clientData[0]['userId']??null;
             if( isset($this->users[$userId])){
                 try {
@@ -201,9 +198,6 @@ class ConnectorDb extends WorkerBase
                     Util::sysLogMsg(self::class, $e->getMessage());
                 }
             }
-        }
-        if(!empty($clientData)){
-            ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['action' => 'findContact', 'data' => $clientData]);
         }
     }
 
@@ -277,7 +271,7 @@ class ConnectorDb extends WorkerBase
      * @param $numbers
      * @return array
      */
-    private function findContact($numbers):array
+    public function findContacts($numbers):array
     {
         $result = [];
         foreach ($numbers as $phone){
@@ -335,6 +329,7 @@ class ConnectorDb extends WorkerBase
                 $this->saveCache(self::class.':'.$phone, [], 10);
             }
         }
+        ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['action' => 'findContact', 'data' => $result]);
         return $result;
     }
 
@@ -594,20 +589,27 @@ class ConnectorDb extends WorkerBase
     }
 
     /**
-     * Выполнение метода API через свойство worker $this->AmoCrmMain
      * Метод следует вызывать при работе с API из прочих процессов.
-     * @param $function
-     * @param $args
+     * @param string $function
+     * @param array $args
+     * @param bool $retVal
+     * @return array|bool|mixed
      */
-    public static function invoke($function, $args){
+    public static function invoke(string $function, array $args = [], bool $retVal = true){
         $req = [
             'action'   => 'invoke',
             'function' => $function,
             'args'     => $args
         ];
-        $client = new BeanstalkClient(ConnectorDb::class);
+        $client = new BeanstalkClient(self::class);
         try {
-            $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), 20);
+            if($retVal){
+                $req['need-ret'] = true;
+                $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), 20);
+            }else{
+                $client->publish(json_encode($req, JSON_THROW_ON_ERROR));
+                return true;
+            }
             $object = unserialize($result, ['allowed_classes' => [PBXAmoResult::class, PBXApiResult::class]]);
         } catch (\Throwable $e) {
             $object = [];

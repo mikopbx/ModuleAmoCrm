@@ -28,9 +28,7 @@ use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 
 class WorkerAmoCrmAMI extends WorkerBase
 {
-    public const CHANNEL_CALL_NAME = 'http://127.0.0.1/pbxcore/api/nchan/pub/calls';
-    public const CHANNEL_CDR_NAME  = 'http://127.0.0.1/pbxcore/api/amo/pub/active-calls';
-    public const CHANNEL_USERS_NAME= 'http://127.0.0.1/pbxcore/api/amo/pub/users';
+    public const CHANNEL_CALL_NAME = 'http://127.0.0.1/pbxcore/api/nchan/pub/pbx-events';
 
     private int     $extensionLength = 3;
     private array   $users = [];
@@ -204,12 +202,9 @@ class WorkerAmoCrmAMI extends WorkerBase
      * @param $data
      */
     private function actionDial($data):void {
-        $findContactsParams = [
-            'action'  => 'findContacts',
-            'numbers' => [
-                $data['src_num'],
-                $data['dst_num'],
-            ]
+        $numbers = [
+            $data['src_num'],
+            $data['dst_num'],
         ];
         $general_src_num = null;
         if ($data['transfer'] === '1') {
@@ -221,10 +216,10 @@ class WorkerAmoCrmAMI extends WorkerBase
                 } else {
                     $general_src_num = $history[0]['src'];
                 }
-                $findContactsParams['numbers'][] = $general_src_num;
+                $numbers['numbers'][] = $general_src_num;
             }
         }
-        $this->beanstalk->publish(json_encode($findContactsParams));
+        ConnectorDb::invoke('findContacts', [array_unique($numbers)], false);
         $this->actionCreateCdr($data, $general_src_num);
     }
 

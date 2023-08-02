@@ -43,9 +43,7 @@ define(function (require) {
                 }
                 self.settings[key] = value;
             });
-            self.initSocket('calls');
-            self.initSocket('active-calls');
-            self.initSocket('users');
+            self.initSocket('pbx-events');
             setInterval(self.checkConnection, 5000);
 
             self.token = PubSub.subscribe('COMMAND', function (msg, message) {

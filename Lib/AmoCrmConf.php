@@ -172,16 +172,6 @@ class AmoCrmConf extends ConfigClass
         $res->processor = __METHOD__;
         $action = strtoupper($request['action']);
         switch ($action) {
-            case 'FIND-CONTACT':
-                $findContactsParams = [
-                    'action'  => 'findContacts',
-                    'numbers' => [
-                        $request['data']['phone'],
-                    ]
-                ];
-                $beanstalk = new BeanstalkClient(ConnectorDb::class);
-                $beanstalk->publish(json_encode($findContactsParams));
-                break;
             case 'ENTITY-UPDATE':
                 $data = [
                     'action' => 'entity-update',
