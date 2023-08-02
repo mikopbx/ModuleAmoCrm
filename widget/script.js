@@ -72,7 +72,7 @@ define(function (require) {
           phones = phones ? $.parseJSON(phones) : false;
         }
         if (phones && typeof phones[user] !== 'undefined') {
-          currentPhone = phones[user];
+          currentPhone = phones[user].trim();
         }
         let newSettings = {
           currentUser:  user,

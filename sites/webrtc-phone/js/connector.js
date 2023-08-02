@@ -166,7 +166,7 @@ define(function (require) {
                 self.startReconnect = 0;
             }
         },
-        parseCDRs: function (data){
+        c: function (data){
             let calls = [], IDs=[];
             $.each(data, function (i, cdr){
                 let number = '', type = '';
