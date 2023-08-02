@@ -39,9 +39,14 @@ var ModuleAmoCrmEntityEdit = {
       onChange: window[className].onChangeDropdown
     });
     window[className].onChangeDropdown();
+    window[className].onChangeEntityAction();
     window[className].initializeForm();
   },
   onChangeEntityAction: function onChangeEntityAction(value, text, $selectedItem) {
+    if (value === undefined) {
+      value = window[className].$entityActionDropdown.parent().dropdown('get value');
+    }
+
     $("#responsible").parents('div.field').first().show();
     $("#def_responsible").parents('div.field').first().show();
 
@@ -59,6 +64,7 @@ var ModuleAmoCrmEntityEdit = {
       $('#create_unsorted').parents('div.checkbox').first().checkbox('set checked');
       $("#lead_pipeline_status_id").parents('div.field').first().hide();
       $("#lead_pipeline_id").parents('div.field').first().show();
+      $("#def_responsible").parents('div.field').first().hide();
     } else if ('contact' === value) {
       $('#create_contact').parents('div.checkbox').first().checkbox('set checked');
       $('#create_lead').parents('div.checkbox').first().checkbox('set unchecked');
