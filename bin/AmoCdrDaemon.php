@@ -424,9 +424,9 @@ class AmoCdrDaemon extends WorkerBase
             $this->cdrRows[$linkedId]["lastMissedData"]  = $start;
             $this->cdrRows[$linkedId]["lastMissedUser"]  = $amoUserId;
         }
-        $dataIsSet = isset($this->cdrRows[$linkedId]["firstAnswerData"]);
-        if(!$dataIsSet || ($this->cdrRows[$linkedId]["firstAnswerData"] > $start)){
-            $this->cdrRows[$linkedId]["firstAnswerData"]  = $start;
+        $dataIsSet = isset($this->cdrRows[$linkedId]["firstMissedData"]);
+        if(!$dataIsSet || ($this->cdrRows[$linkedId]["firstMissedData"] > $start)){
+            $this->cdrRows[$linkedId]["firstMissedData"]  = $start;
             $this->cdrRows[$linkedId]["firstMissedUser"]  = $amoUserId;
         }
     }
@@ -623,10 +623,10 @@ class AmoCdrDaemon extends WorkerBase
         $contactExists = !empty($contData);
         $lead          = $contData['leadId']??'';
         $responsibleArray = [
-            'lastMissedUser'    => $this->cdrRows[$call['id']]['lastMissedUser'],
-            'firstMissedUser'   => $this->cdrRows[$call['id']]['firstMissedUser'],
-            'lastAnswerUser'    => $this->cdrRows[$call['id']]['lastAnswerUser'],
-            'firstAnswerUser'   => $this->cdrRows[$call['id']]['firstAnswerUser'],
+            'lastMissedUser'    => $this->cdrRows[$call['id']]['lastMissedUser']??'',
+            'firstMissedUser'   => $this->cdrRows[$call['id']]['firstMissedUser']??'',
+            'lastAnswerUser'    => $this->cdrRows[$call['id']]['lastAnswerUser']??'',
+            'firstAnswerUser'   => $this->cdrRows[$call['id']]['firstAnswerUser']??'',
             'clientResponsible' => $contData['responsible_user_id'],
             'def_responsible'   => $settings['def_responsible'],
         ];
