@@ -1,4 +1,22 @@
 <?php
+/*
+ * MikoPBX - free phone system for small business
+ * Copyright © 2017-2023 Alexey Portnov and Nikolay Beketov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
 /**
  * Copyright © MIKO LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
@@ -22,81 +40,28 @@ class PbxExtensionSetup extends PbxExtensionSetupBase
 {
 
     /**
-     * PbxExtensionSetup constructor.
+     * Adds the module to the sidebar menu.
      *
-     * @param string $moduleUniqueID - the unique module identifier
+     * @return bool The result of the addition process.
      */
-    public function __construct(string $moduleUniqueID)
+    public function addToSidebar(): bool
     {
-        parent::__construct($moduleUniqueID);
-
-    }
-
-    /**
-     * Creates database structure according to models annotations
-     *
-     * If it necessary, it fills some default settings, and change sidebar menu item representation for this module
-     *
-     * After installation it registers module on PbxExtensionModules model
-     *
-     *
-     * @return bool result of installation
-     */
-    public function installDB(): bool
-    {
-        $result = $this->createSettingsTableByModelsAnnotations();
-
-        if ($result) {
-            $result = $this->registerNewModule();
+        $menuSettingsKey           = "AdditionalMenuItem{$this->moduleUniqueID}";
+        $menuSettings              = PbxSettings::findFirstByKey($menuSettingsKey);
+        if ($menuSettings === null) {
+            $menuSettings      = new PbxSettings();
+            $menuSettings->key = $menuSettingsKey;
         }
+        $value               = [
+            'uniqid'        => $this->moduleUniqueID,
+            'group'         => 'integrations',
+            'iconClass'     => 'handshake outline',
+            'caption'       => "Breadcrumb{$this->moduleUniqueID}",
+            'showAtSidebar' => true,
+        ];
+        $menuSettings->value = json_encode($value);
 
-        if ($result) {
-            $result = $this->addToSidebar();
-        }
-
-        return $result;
-    }
-
-    /**
-     * Create folders on PBX system and apply rights
-     *
-     * @return bool result of installation
-     */
-    public function installFiles(): bool
-    {
-        return parent::installFiles();
-    }
-
-    /**
-     * Unregister module on PbxExtensionModules,
-     * Makes data backup if $keepSettings is true
-     *
-     * Before delete module we can do some soft delete changes, f.e. change forwarding rules i.e.
-     *
-     * @param  $keepSettings bool creates backup folder with module settings
-     *
-     * @return bool uninstall result
-     */
-    public function unInstallDB($keepSettings = false): bool
-    {
-        return parent::unInstallDB($keepSettings);
-    }
-
-    /**
-     * Выполняет активацию триалов, проверку лицензионного клчюча
-     *
-     * @return bool результат активации лицензии
-     */
-    public function activateLicense(): bool
-    {
-        $lic = PbxSettings::getValueByKey('PBXLicense');
-        if (empty($lic)) {
-            $this->messges[] = 'License key not found...';
-
-            return false;
-        }
-        $this->license->addtrial('81');
-        return true;
+        return $menuSettings->save();
     }
 
 }
