@@ -74,9 +74,7 @@ class AmoCrmMain extends AmoCrmMainBase
         $url = "https://$this->baseDomain/oauth2/access_token";
         $result = ClientHTTP::sendHttpPostRequest($url, $params);
         if($result->success){
-            $connectionData = $this->checkConnection();
-            $id = $connectionData->data['id']??0;
-            $result->success = $this->token->saveToken($result->data, $id);
+            $result->success = $this->token->saveToken($result->data);
         }
         return $result;
     }
@@ -137,7 +135,7 @@ class AmoCrmMain extends AmoCrmMainBase
     /**
      * Получение данных аккаунта.
      */
-    public function checkConnection(): PBXAmoResult
+    public function checkConnection(bool $updatePortalId = false): PBXAmoResult
     {
         if(!PbxExtensionUtils::isEnabled($this->moduleUniqueId)){
             return new PBXAmoResult();
@@ -150,7 +148,13 @@ class AmoCrmMain extends AmoCrmMainBase
         $headers = [
             'Authorization' => $authorization,
         ];
-        return ClientHTTP::sendHttpGetRequest($url, [], $headers);
+
+        $connectionData = ClientHTTP::sendHttpGetRequest($url, [], $headers);
+        $id = (int)($connectionData->data['id']??0);
+        if($updatePortalId && $id > 0){
+            $this->token->savePortalId($id);
+        }
+        return $connectionData;
     }
 
     public function addCalls($calls):PBXApiResult

@@ -139,6 +139,14 @@ define(function (require) {
                 $.each(callData.data, function (i, contact){
                     PubSub.publish('CALLS', {action: 'updateContact', 'data': contact});
                 });
+            }else if(callData.action === 'open-card'){
+                let data = {
+                    number: callData.data.phone,
+                    responsible: callData.data.responsible,
+                    client: callData.data.client,
+                    lead: callData.data.lead
+                };
+                PubSub.publish('CALLS', {action: 'openCardEntities', 'data': data});
             }else if(callData.action === 'USERS'){
                 callData.data = $.grep(callData.data, function(value) {
                     return value.number !== self.settings.currentPhone;
@@ -166,7 +174,7 @@ define(function (require) {
                 self.startReconnect = 0;
             }
         },
-        c: function (data){
+        parseCDRs: function (data){
             let calls = [], IDs=[];
             $.each(data, function (i, cdr){
                 let number = '', type = '';

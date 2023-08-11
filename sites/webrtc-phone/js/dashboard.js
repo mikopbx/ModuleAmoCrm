@@ -91,10 +91,6 @@ define(function (require) {
             }
             let html = template.render(event.data);
             $("#web-rtc-phone-cdr").append(html);
-            // let frameVisibility = localStorage.getItem('frameVisibility');
-            // if(frameVisibility === '1'){
-            //     self.sendMessage({action: 'show-panel'});
-            // }
             self.resize();
         },
         answerCall:function (event){
@@ -107,6 +103,7 @@ define(function (require) {
             let params = {
                 number: element.find('div.m-company-name').attr('data-phone'),
                 id: element.find('div.m-company-name').attr('data-contact-id'),
+                fromPanel: false
             };
             self.sendMessage({action: 'openCard', data: params});
         },
@@ -125,6 +122,8 @@ define(function (require) {
                     cdr.enableGetContact = true;
                     self.addCall({data: cdr});
                 });
+            }else if(message.action === 'openCardEntities'){
+                self.sendMessage(message);
             }else if(message.action === 'addCall'){
                 self.addCall({data: message.data});
             }else if(message.action === 'delCall'){
@@ -151,7 +150,8 @@ define(function (require) {
                 if($(this).attr('data-action') === 'card'){
                     params = {
                         number: $(this).parents('.m-cdr-card').find('.m-contact-name').attr('data-phone'),
-                        id: $(this).parents('.m-cdr-card').find('.m-contact-name').attr('data-contact-id')
+                        id: $(this).parents('.m-cdr-card').find('.m-contact-name').attr('data-contact-id'),
+                        fromPanel: true
                     };
                     self.sendMessage({action: 'openCard', data: params});
                 }else{

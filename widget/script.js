@@ -6,7 +6,6 @@ define(function (require) {
   const Modal     = require('lib/components/base/modal');
 
   return function () {
-    // mikopbx_w = this;
     let self = this;
 
     self.stickers = [];
@@ -119,8 +118,15 @@ define(function (require) {
             text: self.langs.errors[message.code]
           };
           APP.notifications.show_message_error(error_params);
+        }else if(message.action === 'openCardEntities'){
+          if(self.settings.currentUser === message.data.responsible){
+            self.api.gotoContact(message.data.client, message.data.lead);
+          }
         }else if(message.action === 'openCard'){
           self.api.findContact(message.data, function(data){
+            if(data.fromPanel === false){
+              return;
+            }
             if(data.element.id === ''){
               // Контакт НЕ найден.
               self.call_result(data.number);
@@ -131,11 +137,17 @@ define(function (require) {
           })
         }
       },
-      gotoContact: function (id){
-          let elId = `mikopbx-a-${id}`;
+      gotoContact: function (contact, lead=''){
+          let entity = 'contacts';
+          let id = contact;
+          if(lead){
+            entity = 'leads';
+            id = lead;
+          }
+          let elId = `mikopbx-a-${entity}-${id}`;
           let selector = `#${elId}`;
           if ($(selector).length < 1) {
-              $("body").prepend(`<a href="/contacts/detail/${id}" class="js-navigate-link" id="${elId}"></a>`);
+              $("body").prepend(`<a href="/${entity}/detail/${id}" class="js-navigate-link" id="${elId}"></a>`);
           }
           $(selector).trigger('click');
           $(selector).remove();

@@ -104,4 +104,16 @@ class AuthToken
         }
         return $settings->save();
     }
+
+    /**
+     * Обновление значения ID портала.
+     * @param $portalId
+     * @return bool
+     */
+    public function savePortalId($portalId): bool
+    {
+        $settings = ModuleAmoCrm::findFirst();
+        $settings->portalId = $portalId;
+        return $settings->save();
+    }
 }

@@ -133,6 +133,9 @@ define(function (require) {
                     id:      params.element.company
                 };
                 connector.postToFrame({action: 'updateContact', data:  result});
+            }else if(params.action === 'openCardEntities'){
+                // Открыть карточку клиента / сделки.
+                PubSub.publish(connector.settings.ns + ':main', params);
             }else if(params.action === 'openCard'){
                 // Открыть карточку клиента.
                 PubSub.publish(connector.settings.ns + ':main', params);

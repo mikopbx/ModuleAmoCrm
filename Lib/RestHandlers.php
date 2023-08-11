@@ -67,6 +67,7 @@ class RestHandlers extends AmoCrmMainBase
             $settings->save();
         }elseif (isset($params['code']) && !empty($params['code'])){
             $result = WorkerAmoHTTP::invokeAmoApi('getAccessTokenByCode', [$params['code']]);
+            WorkerAmoHTTP::invokeAmoApi('checkConnection', [true]);
         }
         $result->processor = __METHOD__;
         if(!isset($params['save-only']) && isset($params['code'])){
