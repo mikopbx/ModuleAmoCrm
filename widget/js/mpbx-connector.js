@@ -81,14 +81,18 @@ define(function (require) {
                         });
                         // Show a hidden frame when the mouse hovers over the border of the area
                         $(window).mousemove(event => {
-                            if( $(window).width() - event.pageX < 5){
+                            if($(window).width() - event.pageX < 5){
+                                if(localStorage.getItem('frameVisibility') === '1'){
+                                    return;
+                                }
+                                localStorage.setItem('frameVisibility', '1');
                                 $(connector.iFrame).show({
                                     duration: 400,
                                     done: () => {
                                         connector.postToFrame({action: 'resize', height: $(window).height()});
-                                        connector.setHeightFrame();                                    }
+                                        connector.setHeightFrame();
+                                    }
                                 });
-
                             }
                         });
                     };
