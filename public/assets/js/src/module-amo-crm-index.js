@@ -117,6 +117,25 @@ const ModuleAmoCrm = {
 			const id = $(e.target).closest('tr').attr('id');
 			ModuleAmoCrm.deleteRule(id);
 		});
+
+		$('#entitySettingsTable').dataTable( {
+			lengthChange: false,
+			processing: true,
+			paging: false,
+			deferRender: true,
+			autoWidth: false,
+			columns: [
+				{orderable: true, searchable: true},
+				{orderable: true, searchable: true},
+				{orderable: false, searchable: false},
+				{orderable: false, searchable: false},
+				{orderable: false, searchable: false},
+				{orderable: false, searchable: false},
+				{orderable: false, searchable: false},
+			],
+			language: SemanticLocalization.dataTableLocalisation,
+			order: [1, 'asc'],
+		});
 	},
 	onChangeSettings() {
 		if($('#isPrivateWidget').parent().checkbox('is checked')) {
