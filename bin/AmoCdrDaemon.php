@@ -714,7 +714,7 @@ class AmoCdrDaemon extends WorkerBase
         if(!empty($taskResponsible)){
             $this->newTasks[$indexAction] = [
                 'text'                =>  $this->replaceTagTemplate($settings['template_task_text'], $call),
-                'complete_till'       =>  time()+3600,
+                'complete_till'       =>  time()+3600*(int)$settings['deadline_task'],
                 'task_type_id'        =>  1,
                 'responsible_user_id' =>  $taskResponsible,
             ];
