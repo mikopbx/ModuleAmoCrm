@@ -195,7 +195,8 @@ class AmoCdrDaemon extends WorkerBase
                     'phone'               => $cdr['src_num'],
                     'id'                  => $cdr['linkedid'],
                     'did'                 => $cdr['did'],
-                    'responsible'          => $dstUser
+                    'responsible'         => $dstUser,
+                    'type'                => null
                 ];
             }
 
@@ -283,6 +284,9 @@ class AmoCdrDaemon extends WorkerBase
             // Чистим незавершенные вызовы, если необходимо.
             $srcNum = AmoCrmMain::getPhoneIndex($row['src_num']);
             $dstNum = AmoCrmMain::getPhoneIndex($row['dst_num']);
+            if(isset($this->incompleteAnswered[$srcNum])){
+                $this->cdrRows[$row['linkedid']]['incompleteType'] = $this->incompleteAnswered[$srcNum]['type'];
+            }
             unset($this->incompleteAnswered[$srcNum],$this->incompleteAnswered[$dstNum]);
 
             if( in_array($srcNum, $this->innerNums, true)
@@ -435,15 +439,15 @@ class AmoCdrDaemon extends WorkerBase
         if(!$amoUserId){
             return;
         }
-        $answer = $this->getTimestamp($answer, $linkedId);
+        $intAnswer = $this->getTimestamp($answer, $linkedId);
         $dataIsSet = isset($this->cdrRows[$linkedId]["lastAnswerData"]);
-        if(!$dataIsSet || ($this->cdrRows[$linkedId]["lastAnswerData"] < $answer)){
-            $this->cdrRows[$linkedId]["lastAnswerData"]  = $answer;
+        if(!$dataIsSet || ($this->cdrRows[$linkedId]["lastAnswerData"] < $intAnswer)){
+            $this->cdrRows[$linkedId]["lastAnswerData"]  = $intAnswer;
             $this->cdrRows[$linkedId]["lastAnswerUser"]  = $amoUserId;
         }
         $dataIsSet = isset($this->cdrRows[$linkedId]["firstAnswerData"]);
-        if(!$dataIsSet || ($this->cdrRows[$linkedId]["firstAnswerData"] > $answer)){
-            $this->cdrRows[$linkedId]["firstAnswerData"]  = $answer;
+        if(!$dataIsSet || ($this->cdrRows[$linkedId]["firstAnswerData"] > $intAnswer)){
+            $this->cdrRows[$linkedId]["firstAnswerData"]  = $intAnswer;
             $this->cdrRows[$linkedId]["firstAnswerUser"]  = $amoUserId;
         }
     }
@@ -459,15 +463,15 @@ class AmoCdrDaemon extends WorkerBase
         if(!$amoUserId){
             return;
         }
-        $start     = $this->getTimestamp($start, $linkedId);
+        $intStart     = $this->getTimestamp($start, $linkedId);
         $dataIsSet = isset($this->cdrRows[$linkedId]["lastMissedData"]);
-        if(!$dataIsSet || ($this->cdrRows[$linkedId]["lastMissedData"] < $start)){
-            $this->cdrRows[$linkedId]["lastMissedData"]  = $start;
+        if(!$dataIsSet || ($this->cdrRows[$linkedId]["lastMissedData"] < $intStart)){
+            $this->cdrRows[$linkedId]["lastMissedData"]  = $intStart;
             $this->cdrRows[$linkedId]["lastMissedUser"]  = $amoUserId;
         }
         $dataIsSet = isset($this->cdrRows[$linkedId]["firstMissedData"]);
-        if(!$dataIsSet || ($this->cdrRows[$linkedId]["firstMissedData"] > $start)){
-            $this->cdrRows[$linkedId]["firstMissedData"]  = $start;
+        if(!$dataIsSet || ($this->cdrRows[$linkedId]["firstMissedData"] > $intStart)){
+            $this->cdrRows[$linkedId]["firstMissedData"]  = $intStart;
             $this->cdrRows[$linkedId]["firstMissedUser"]  = $amoUserId;
         }
     }
@@ -548,7 +552,9 @@ class AmoCdrDaemon extends WorkerBase
                 $this->incompleteAnswered[$id]['lead']    =  $contData['leadId'];
             }
 
-            $type          = $this->getCallType(false, $contactExists, true);
+            $type = $this->getCallType(false, $contactExists, true);
+            $this->incompleteAnswered[$id]['type']  = $type;
+
             $settings = $this->entitySettings[$type][$call['did']]??$this->entitySettings[$type]['']??[];
             if(empty($settings) && $settings['responsible'] === 'first'){
                 continue;
@@ -563,10 +569,7 @@ class AmoCdrDaemon extends WorkerBase
                     'responsible_user_id' =>  $call['responsible'],
                 ];
             }
-            if(empty($contData['leadId']??'')){
-                // Есть открытый лид.
-                $this->addNewLead($settings, $call, $contData, $call['responsible']);
-            }
+            $this->addNewLead($settings, $call, $contData, $call['responsible']);
         }
         // Завершенные вызовы.
         foreach ($calls as $index => $call) {
@@ -579,12 +582,15 @@ class AmoCdrDaemon extends WorkerBase
             }
             $contData      = $contactsData[$call['phone']];
             $contactExists = !empty($contData);
-            $lead          = $contData['leadId']??'';
             $isMissed      = $this->cdrRows[$call['id']]['answered'] === 0;
             $isIncoming    = $call['direction'] === 'inbound';
 
             $did           =  $this->cdrRows[$call['id']]['did']??'';
-            $type = $this->getCallType($isMissed, $contactExists, $isIncoming);
+            if(isset($this->cdrRows[$call['id']]['incompleteType'])){
+                $type = $this->cdrRows[$call['id']]['incompleteType'];
+            }else{
+                $type = $this->getCallType($isMissed, $contactExists, $isIncoming);
+            }
             $this->cdrRows[$call['id']]['type'] = $type;
             $settings = $this->entitySettings[$type][$did]??$this->entitySettings[$type]['']??[];
             if(empty($settings)){
@@ -595,10 +601,6 @@ class AmoCdrDaemon extends WorkerBase
                     unset($calls[$index],$call);
                 }
                 continue;
-            }
-            if(!empty($lead)){
-                // Есть открытый лид.
-                $settings['create_lead'] = '0';
             }
             // Получим ответственного.
             $responsible = 1*($this->cdrRows[$call['id']][$settings['responsible']."AnswerUser"]??$settings['def_responsible']);
@@ -704,7 +706,7 @@ class AmoCdrDaemon extends WorkerBase
             'firstMissedUser'   => $this->cdrRows[$call['id']]['firstMissedUser']??'',
             'lastAnswerUser'    => $this->cdrRows[$call['id']]['lastAnswerUser']??'',
             'firstAnswerUser'   => $this->cdrRows[$call['id']]['firstAnswerUser']??'',
-            'clientResponsible' => $contData['responsible_user_id'],
+            'clientResponsible' => $contData['responsible_user_id']??'',
             'def_responsible'   => $settings['def_responsible'],
         ];
 
@@ -713,6 +715,7 @@ class AmoCdrDaemon extends WorkerBase
             $this->newTasks[$indexAction] = [
                 'text'                =>  $this->replaceTagTemplate($settings['template_task_text'], $call),
                 'complete_till'       =>  time()+3600,
+                'task_type_id'        =>  1,
                 'responsible_user_id' =>  $taskResponsible,
             ];
             if(!empty($lead)){
