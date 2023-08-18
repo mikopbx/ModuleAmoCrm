@@ -122,7 +122,7 @@ define(function (require) {
                     };
                 }
             })
-            .fail(function(jqXHR, textStatus) {
+            .fail((jqXHR, textStatus) => {
                 if(jqXHR.status === 403){
                     delete  self.eventSource[chan];
                     PubSub.publish('CALLS', {action: "error", code: 'errorAuthAPI'});
