@@ -81,7 +81,7 @@ class ModuleAmoCrm extends ModulesModelsBase
 
     /**
      *
-     * @Column(type="integer", default="1", nullable=true)
+     * @Column(type="integer", default="0", nullable=true)
      */
     public $isPrivateWidget = 0;
 
