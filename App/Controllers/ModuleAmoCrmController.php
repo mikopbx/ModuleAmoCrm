@@ -120,6 +120,7 @@ class ModuleAmoCrmController extends BaseController
         $settings = ModuleAmoCrm::findFirst();
         if ($settings === null) {
             $settings = new ModuleAmoCrm();
+            $settings->isPrivateWidget = '0';
         }
 
         // For example we add providers list on the form
