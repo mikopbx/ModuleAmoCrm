@@ -9,16 +9,19 @@
 
 namespace Modules\ModuleAmoCrm\Lib;
 
+use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\PBX;
 use MikoPBX\Core\System\Processes;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\Cron\WorkerSafeScriptsCore;
 use MikoPBX\Modules\Config\ConfigClass;
+use MikoPBX\Modules\PbxExtensionUtils;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\bin\AmoCdrDaemon;
-use Modules\ModuleAmoCrm\bin\WorkerAmoContacts;
+use Modules\ModuleAmoCrm\bin\ConnectorDb;
 use Modules\ModuleAmoCrm\bin\WorkerAmoCrmAMI;
+use Modules\ModuleAmoCrm\bin\WorkerAmoHTTP;
 use Modules\ModuleAmoCrm\Lib\RestAPI\Controllers\ApiController;
 use MikoPBX\PBXCoreREST\Controllers\Cdr\GetController as CdrGetController;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
@@ -71,7 +74,8 @@ class AmoCrmConf extends ConfigClass
     {
         if ($data['model'] === ModuleAmoCrm::class) {
             $changedFields = count($data['changedFields']);
-            if ($changedFields === 1 && $data['changedFields'][0] === 'offsetCdr') {
+            $syncKeys = ['offsetCdr', 'lastContactsSyncTime', 'lastCompaniesSyncTime', 'lastLeadsSyncTime'];
+            if ($changedFields === 1 && in_array($data['changedFields'][0],$syncKeys, true)) {
                 return;
             }
             if(in_array('tokenForAmo', $data['changedFields'], true)) {
@@ -80,8 +84,35 @@ class AmoCrmConf extends ConfigClass
                     return;
                 }
             }
-            $templateMain = new AmoCrmMain();
-            $templateMain->startAllServices(true);
+            $this->startAllServices(true);
+        }
+    }
+
+    /**
+     * Start or restart module workers
+     *
+     * @param bool $restart
+     */
+    public function startAllServices(bool $restart = false): void
+    {
+        $moduleEnabled = PbxExtensionUtils::isEnabled($this->moduleUniqueId);
+        if ( ! $moduleEnabled) {
+            return;
+        }
+        $workersToRestart = $this->getModuleWorkers();
+        if ($restart) {
+            foreach ($workersToRestart as $moduleWorker) {
+                Processes::processPHPWorker($moduleWorker['worker']);
+            }
+        } else {
+            $safeScript = new WorkerSafeScriptsCore();
+            foreach ($workersToRestart as $moduleWorker) {
+                if ($moduleWorker['type'] === WorkerSafeScriptsCore::CHECK_BY_AMI) {
+                    $safeScript->checkWorkerAMI($moduleWorker['worker']);
+                } else {
+                    $safeScript->checkWorkerBeanstalk($moduleWorker['worker']);
+                }
+            }
         }
     }
 
@@ -103,14 +134,23 @@ class AmoCrmConf extends ConfigClass
             ],
             [
                 'type'   => WorkerSafeScriptsCore::CHECK_BY_BEANSTALK,
-                'worker' => WorkerAmoContacts::class,
+                'worker' => ConnectorDb::class,
+            ],
+            [
+                'type'   => WorkerSafeScriptsCore::CHECK_BY_BEANSTALK,
+                'worker' => WorkerAmoHTTP::class,
             ],
         ];
     }
 
+    /**
+     * REST API модуля.
+     * @return array[]
+     */
     public function getPBXCoreRESTAdditionalRoutes(): array
     {
         return [
+            [ApiController::class, 'amoEntityUpdateAction', '/pbxcore/api/amo-crm/v1/entity-update', 'post', '/', true],
             [ApiController::class, 'callAction',     '/pbxcore/api/amo-crm/v1/callback', 'post', '/', true],
             [ApiController::class, 'listenerAction', '/pbxcore/api/amo-crm/v1/listener', 'post', '/', true],
             [ApiController::class, 'listenerAction', '/pbxcore/api/amo-crm/v1/listener', 'get', '/', true],
@@ -133,36 +173,33 @@ class AmoCrmConf extends ConfigClass
         $res->processor = __METHOD__;
         $action = strtoupper($request['action']);
         switch ($action) {
-            case 'FIND-CONTACT':
-                $findContactsParams = [
-                    'action'  => 'findContacts',
-                    'numbers' => [
-                        $request['data']['phone'],
-                    ]
+            case 'ENTITY-UPDATE':
+                $data = [
+                    'action' => 'entity-update',
+                    'data' => $request['data']??[]
                 ];
-                $beanstalk = new BeanstalkClient(WorkerAmoContacts::class);
-                $beanstalk->publish(json_encode($findContactsParams));
+                $beanstalk = new BeanstalkClient(ConnectorDb::class);
+                $beanstalk->publish(json_encode($data));
                 break;
             case 'LISTENER':
                 // Для Oauth2 авторизации.
-                $amo = new AmoCrmMain();
+                $amo = new RestHandlers();
                 $res = $amo->processRequest($request);
                 break;
             case 'COMMAND':
             case 'TRANSFER':
             case 'CALLBACK':
-                $amo = new AmoCrmMain();
+                $amo = new RestHandlers();
                 $res          = $amo->processCallback($request);
                 $res->success = true;
                 break;
             case 'CHANGE-SETTINGS':
-                $amo          = new AmoCrmMain();
+                $amo          = new RestHandlers();
                 $res          = $amo->saveSettings($request);
                 $res->success = true;
                 break;
             case 'RELOAD':
-                $templateMain = new AmoCrmMain();
-                $templateMain->startAllServices(true);
+                $this->startAllServices(true);
                 $res->success = true;
                 break;
             default:
@@ -174,10 +211,13 @@ class AmoCrmConf extends ConfigClass
     }
 
     /**
+     * Создает файл для проверки авторизации.
      * @return void
      */
     private function makeAuthFiles():void
     {
+        // Wait save settings
+        usleep(200000);
         /** @var ModuleAmoCrm $settings */
         $settings = ModuleAmoCrm::findFirst();
         if(!$settings){
@@ -187,17 +227,22 @@ class AmoCrmConf extends ConfigClass
         if(!file_exists($baseDir)){
             Util::mwMkdir($baseDir, true);
         }
-        $authFile = $baseDir.'/'.basename($settings->tokenForAmo);
+        $authFile  = $baseDir.'/'.basename($settings->tokenForAmo);
         if(!file_exists($authFile)){
-            $grepPath = Util::which('grep');
-            $cutPath = Util::which('cut');
-            $xargs = Util::which('xargs');
+            $grepPath  = Util::which('grep');
+            $cutPath   = Util::which('cut');
+            $xargs     = Util::which('xargs');
             $tokenHash = md5('tokenForAmo');
             Processes::mwExec("$grepPath -Rn '$tokenHash' /var/etc/auth | $cutPath -d ':' -f 1 | $xargs rm -rf ");
-            file_put_contents($baseDir."/".basename($settings->tokenForAmo), $tokenHash);
+            file_put_contents($authFile, $tokenHash);
         }
     }
 
+    /**
+     * Добавляет UserEvent InterceptionAMO во входящие маршруты для перехвата на ответственного.
+     * @param $rout_number
+     * @return string
+     */
     public function generateIncomingRoutBeforeDial($rout_number): string
     {
         return "\t" . 'same => n,UserEvent(InterceptionAMO,CALLERID: ${CALLERID(num)},chan1c: ${CHANNEL},FROM_DID: ${FROM_DID})' . "\n\t";
@@ -250,20 +295,29 @@ class AmoCrmConf extends ConfigClass
             '    add_header X-debug-message "test" always;'.PHP_EOL.
             '}'.PHP_EOL.PHP_EOL.
             'location ~ /pbxcore/api/amo/pub/(.*)$ {'.PHP_EOL."\t".
-            'nchan_publisher;'.PHP_EOL."\t".
-            'allow  127.0.0.1;'.PHP_EOL."\t".
-            'nchan_channel_id "$1";'.PHP_EOL."\t".
-            'nchan_message_buffer_length 1;'.PHP_EOL."\t".
-            'nchan_message_timeout 300m;'.PHP_EOL.
+                'nchan_publisher;'.PHP_EOL."\t".
+                'allow  127.0.0.1;'.PHP_EOL."\t".
+                'nchan_channel_id "$1";'.PHP_EOL."\t".
+                'nchan_message_buffer_length 1;'.PHP_EOL."\t".
+                'nchan_message_timeout 300m;'.PHP_EOL.
             '}'.
             PHP_EOL.
             PHP_EOL.
             "location ^~ /webrtc-phone/ {".PHP_EOL."\t".
-            "root {$this->moduleDir}/sites/;".PHP_EOL."\t".
-            "index index.html;".PHP_EOL."\t".
-            "access_log off;".PHP_EOL."\t".
-            "expires 3d;".PHP_EOL.
-            "}".PHP_EOL;
+                "root {$this->moduleDir}/sites/;".PHP_EOL."\t".
+                "index index.html;".PHP_EOL."\t".
+                "access_log off;".PHP_EOL."\t".
+                "expires 3d;".PHP_EOL.
+            "}".
+            PHP_EOL.
+            PHP_EOL.
+            "location /webrtc {".PHP_EOL."\t".
+                'proxy_pass http://127.0.0.1:'.PbxSettings::getValueByKey('AJAMPort').'/asterisk/ws;'.PHP_EOL."\t".
+                'proxy_http_version 1.1;'.PHP_EOL."\t".
+                'proxy_set_header Upgrade $http_upgrade;'.PHP_EOL."\t".
+                'proxy_set_header Connection "upgrade";'.PHP_EOL."\t".
+                'proxy_read_timeout 86400;'.PHP_EOL.
+            '}'.PHP_EOL;
     }
 
     /**

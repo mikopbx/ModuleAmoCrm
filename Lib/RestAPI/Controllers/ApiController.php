@@ -11,7 +11,9 @@ namespace Modules\ModuleAmoCrm\Lib\RestAPI\Controllers;
 
 use MikoPBX\Common\Providers\LoggerProvider;
 use MikoPBX\PBXCoreREST\Controllers\Modules\ModulesControllerBase;
-use Phalcon\Di;
+use Modules\ModuleAmoCrm\bin\ConnectorDb;
+use Modules\ModuleAmoCrm\bin\WorkerAmoCrmAMI;
+use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 
 class ApiController extends ModulesControllerBase
 {
@@ -38,9 +40,20 @@ class ApiController extends ModulesControllerBase
     {
         $this->evalFunction('listener');
     }
+
+    /**
+     * curl 'https://127.0.0.1/pbxcore/api/amo-crm/v1/find-contact' -H 'Content-Type: application/x-www-form-urlencoded; charset=UTF-8' --data-raw 'phone=79257183047&action=findContact&token=uFJ6v6DfwBfjNVaTL1zKn6KUbSL2xsBWsm3PZ7yG6kRQMWgqu'
+     * @return void
+     */
     public function findContactAction():void
     {
-        $this->evalFunction('find-contact');
+        if($this->checkAuth() === false){
+            return;
+        }
+        $data   =  $this->request->getPost();
+        $result = ConnectorDb::invoke('findContacts', [[$data['phone']]]);
+        $this->echoResponse($result);
+        $this->response->sendRaw();
     }
 
     public function commandAction():void
@@ -53,7 +66,16 @@ class ApiController extends ModulesControllerBase
         $this->evalFunction('change-settings');
     }
 
-    private function evalFunction($name):void
+    public function amoEntityUpdateAction():void
+    {
+        $this->evalFunction('entity-update');
+    }
+
+    /**
+     * Проверка авторизации по токену.
+     * @return bool
+     */
+    private function checkAuth():bool
     {
         if(!file_exists("/var/etc/auth/".$_REQUEST['token'])){
             $remoteAddress = $this->request->getClientAddress(true);
@@ -64,12 +86,34 @@ class ApiController extends ModulesControllerBase
 
             $this->response->setStatusCode(403, 'OK')->sendHeaders();
             $this->response->sendRaw();
+            return false;
+        }
+        return true;
+    }
+
+    private function evalFunction($name):void
+    {
+        if($this->checkAuth() === false){
             return;
         }
 
         $this->callActionForModule('ModuleAmoCrm', $name);
         if(!$this->response->isSent()){
             $this->response->sendRaw();
+        }
+    }
+
+    /**
+     * Вывод ответа сервера.
+     * @param $result
+     * @return void
+     */
+    private function echoResponse($result):void
+    {
+        try {
+            echo json_encode($result, JSON_THROW_ON_ERROR|JSON_PRETTY_PRINT);
+        }catch (\Exception $e){
+            echo 'Error json encode: '. print_r($result, true);
         }
     }
 }

@@ -1,0 +1,5 @@
+{% if text is not defined %}
+  {% set text = lang.button_cancel %}
+{% endif %}
+
+<button type="button" class="button-input button-cancel {{class_name}}" tabindex="{{tab_index}}" id="{{id}}" style="{% if hidden %} display: none;{% endif %}"><span>{{text}}</span></button>

@@ -15,7 +15,9 @@
       "email": "help@miko.ru"
     }
   },
-  "locations": [ "everywhere"],
+  "locations": [
+    "everywhere"
+  ],
   "tour": {
     "is_tour": true,
     "tour_images": {

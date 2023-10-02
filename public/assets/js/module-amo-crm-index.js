@@ -16,8 +16,8 @@ var ModuleAmoCrm = {
   $formObj: $('#' + idForm),
   $checkBoxes: $('#' + idForm + ' .ui.checkbox'),
   $dropDowns: $('#' + idForm + ' .ui.dropdown'),
-  saveTableAJAXUrl: globalRootUrl + idUrl + "/saveTableData",
-  deleteRecordAJAXUrl: globalRootUrl + idUrl + "/delete",
+  saveTableAJAXUrl: "".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/saveTableData"),
+  deleteRecordAJAXUrl: "".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/delete"),
   $disabilityFields: $('#' + idForm + '  .disability'),
   $statusToggle: $('#module-status-toggle'),
   $moduleStatus: $('#status'),
@@ -68,7 +68,10 @@ var ModuleAmoCrm = {
    */
   initialize: function initialize() {
     // инициализируем чекбоксы и выподающие менюшки
-    window[className].$checkBoxes.checkbox();
+    window[className].$checkBoxes.checkbox({
+      onChange: window[className].onChangeSettings
+    });
+    window[className].onChangeSettings();
     window[className].$dropDowns.dropdown();
     window[className].checkStatusToggle();
     window.addEventListener('ModuleStatusChanged', window[className].checkStatusToggle);
@@ -91,20 +94,90 @@ var ModuleAmoCrm = {
     setInterval(window[className].checkStatus, 5000);
     $(window).bind('message', window[className].updateAuthInfo);
     $("#createPassword").on('click', function (e) {
-      $("#tokenForAmo").val(window[className].generatePassword()); // Сохраняем изменения.
-
-      $('#submitbutton').removeClass('disabled'); //.trigger('click');
+      $("#tokenForAmo").val(window[className].generatePassword());
+      $('#submitbutton').removeClass('disabled');
     });
     $("#login-button").on('click', function (e) {
       var client_id = $('#clientId').val();
+
+      if ($('#isPrivateWidget').parent().checkbox('is checked')) {
+        client_id = $('#privateClientId').val();
+      }
+
       var state = encodeURIComponent(client_id);
       var redirect_uri = encodeURIComponent($('#redirectUri').val());
       var url = "https://www.amocrm.ru/oauth?client_id=".concat(client_id, "&state=").concat(state, "&redirect_uri=").concat(redirect_uri, "&mode=post_message&scope=&approval_prompt=auto");
       window[className].popup = window.open(url, 'Auth', 'scrollbars, status, resizable, width=750, height=580');
     });
+    $('body').on('click', 'a.delete', function (e) {
+      e.preventDefault();
+      var id = $(e.target).closest('tr').attr('id');
+      ModuleAmoCrm.deleteRule(id);
+    });
+    $('#entitySettingsTable').dataTable({
+      lengthChange: false,
+      processing: true,
+      paging: false,
+      deferRender: true,
+      autoWidth: false,
+      columns: [{
+        orderable: true,
+        searchable: true
+      }, {
+        orderable: true,
+        searchable: true
+      }, {
+        orderable: false,
+        searchable: false
+      }, {
+        orderable: false,
+        searchable: false
+      }, {
+        orderable: false,
+        searchable: false
+      }, {
+        orderable: false,
+        searchable: false
+      }, {
+        orderable: false,
+        searchable: false
+      }],
+      language: SemanticLocalization.dataTableLocalisation,
+      order: [1, 'asc']
+    });
+  },
+  onChangeSettings: function onChangeSettings() {
+    if ($('#isPrivateWidget').parent().checkbox('is checked')) {
+      $('#private-fields').show();
+    } else {
+      $('#private-fields').hide();
+    }
+  },
+
+  /**
+   * Deletes an extension with the given ID.
+   * @param {string} id - The ID of the rule to delete.
+   */
+  deleteRule: function deleteRule(id) {
+    $('.message.ajax').remove();
+    $.api({
+      url: "".concat(globalRootUrl, "module-amo-crm/delete/").concat(id),
+      on: 'now',
+      successTest: function successTest(response) {
+        // test whether a JSON response is valid
+        return response !== undefined && Object.keys(response).length > 0;
+      },
+      onSuccess: function onSuccess(response) {
+        if (response.success === true) {
+          $('#entitySettingsTable').find("tr[id=".concat(id, "]")).remove();
+        } else {
+          UserMessage.showError(response.message.error, globalTranslate.ex_ImpossibleToDeleteExtension);
+        }
+      }
+    });
   },
   checkStatus: function checkStatus() {
-    $.get(idUrl + '/check', function (result) {
+    $.get("".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/check"), function (result) {
       var elStatusAuth = $('#login-button');
       elStatusAuth.removeClass('red green');
 
@@ -127,7 +200,7 @@ var ModuleAmoCrm = {
     var elStatusAuth = $('#login-button');
     elStatusAuth.removeClass('red green');
     elStatusAuth.text(globalTranslate.module_amo_crm_connect_refresh);
-    $.post("".concat(Config.pbxUrl, "/pbxcore/api/modules/").concat(className, "/listener"), params, function (data) {
+    $.post("".concat(window.location.origin, "/pbxcore/api/modules/").concat(className, "/listener"), params, function (data) {
       if (data.result === false) {
         var errorText = data.messages['error-data'].hint || '' + " (" + data.messages['error-data'].detail || '' + ").";
         $("#warning-message div.header").text(globalTranslate.mod_amo_Error);
@@ -318,7 +391,7 @@ var ModuleAmoCrm = {
     if (priorityWasChanged) {
       $.api({
         on: 'now',
-        url: "".concat(globalRootUrl).concat(idUrl, "/changePriority?table=") + $(table).attr('id').replace('-table', ''),
+        url: "".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/changePriority?table=") + $(table).attr('id').replace('-table', ''),
         method: 'POST',
         data: priorityData
       });
@@ -499,7 +572,7 @@ var ModuleAmoCrm = {
   applyConfigurationChanges: function applyConfigurationChanges() {
     window[className].changeStatus('Updating');
     $.api({
-      url: "".concat(Config.pbxUrl, "/pbxcore/api/modules/") + className + "/reload",
+      url: "".concat(window.location.origin, "/pbxcore/api/modules/") + className + "/reload",
       on: 'now',
       successTest: function successTest(response) {
         // test whether a JSON response is valid
@@ -537,7 +610,7 @@ var ModuleAmoCrm = {
    */
   initializeForm: function initializeForm() {
     Form.$formObj = window[className].$formObj;
-    Form.url = "".concat(globalRootUrl).concat(idUrl, "/save");
+    Form.url = "".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/save");
     Form.validateRules = window[className].validateRules;
     Form.cbBeforeSendForm = window[className].cbBeforeSendForm;
     Form.cbAfterSendForm = window[className].cbAfterSendForm;

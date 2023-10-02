@@ -24,15 +24,12 @@ use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
-use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
+use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 
 class WorkerAmoCrmAMI extends WorkerBase
 {
-    public const CHANNEL_CALL_NAME = 'http://127.0.0.1/pbxcore/api/nchan/pub/calls';
-    public const CHANNEL_CDR_NAME  = 'http://127.0.0.1/pbxcore/api/amo/pub/active-calls';
-    public const CHANNEL_USERS_NAME= 'http://127.0.0.1/pbxcore/api/amo/pub/users';
+    public const CHANNEL_CALL_NAME = 'http://127.0.0.1/pbxcore/api/nchan/pub/pbx-events';
 
-    private AmoCrmMain $amoApi;
     private int     $extensionLength = 3;
     private array   $users = [];
     private array   $innerNums = [];
@@ -60,21 +57,34 @@ class WorkerAmoCrmAMI extends WorkerBase
     private array $activeChannels = [];
 
     /**
+     * Handles the received signal.
+     *
+     * @param int $signal The signal to handle.
+     *
+     * @return void
+     */
+    public function signalHandler(int $signal): void
+    {
+        parent::signalHandler($signal);
+        cli_set_process_title('SHUTDOWN_'.cli_get_process_title());
+        exit(0);
+    }
+
+    /**
      * Старт работы листнера.
      *
      * @param $params
      */
     public function start($params):void
     {
-        $this->amoApi    = new AmoCrmMain();
-        $this->beanstalk = new BeanstalkClient(WorkerAmoContacts::class);
+        $this->beanstalk = new BeanstalkClient(ConnectorDb::class);
 
         $this->am     = Util::getAstManager();
         $this->setFilter();
         $this->checkUpdateSettings();
 
         $this->am->addEventHandler("userevent", [$this, "callback"]);
-        while (true) {
+        while ($this->needRestart === false) {
             $result = $this->am->waitUserEvent(true);
             if (!$result) {
                 // Нужен реконнект.
@@ -92,9 +102,10 @@ class WorkerAmoCrmAMI extends WorkerBase
         }
         $this->lastUpdateSettings = time();
         [, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
-        $settings = ModuleAmoCrm::findFirst();
-        if($settings){
-            $this->useInterception = $settings->useInterception;
+
+        $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
+        if(!empty($allSettings) && is_array($allSettings)){
+            $this->useInterception = ($allSettings['ModuleAmoCrm']['useInterception']??'0') === '1';
         }
     }
 
@@ -191,12 +202,9 @@ class WorkerAmoCrmAMI extends WorkerBase
      * @param $data
      */
     private function actionDial($data):void {
-        $findContactsParams = [
-            'action'  => 'findContacts',
-            'numbers' => [
-                $data['src_num'],
-                $data['dst_num'],
-            ]
+        $numbers = [
+            $data['src_num'],
+            $data['dst_num'],
         ];
         $general_src_num = null;
         if ($data['transfer'] === '1') {
@@ -208,10 +216,10 @@ class WorkerAmoCrmAMI extends WorkerBase
                 } else {
                     $general_src_num = $history[0]['src'];
                 }
-                $findContactsParams['numbers'][] = $general_src_num;
+                $numbers['numbers'][] = $general_src_num;
             }
         }
-        $this->beanstalk->publish(json_encode($findContactsParams));
+        ConnectorDb::invoke('findContacts', [array_unique($numbers)], false);
         $this->actionCreateCdr($data, $general_src_num);
     }
 
@@ -242,7 +250,7 @@ class WorkerAmoCrmAMI extends WorkerBase
                 $this->calls[$call['id']][] = $call;
             }
             $this->activeChannels[$data['src_chan']] = $data['src_num'];
-            $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
+            ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
         }
     }
 
@@ -410,7 +418,7 @@ class WorkerAmoCrmAMI extends WorkerBase
                 'user'    => $userId,
                 'action'  => 'hangup'
             ];
-            $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
+            ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
         }
     }
 
@@ -457,7 +465,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'dst'     => $transferCall['dst'],
             'action'  => 'call'
         ];
-        $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
+        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
 
         $data = [
             'action'   => 'answer',
@@ -465,7 +473,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'id'       => $data['linkedid'],
             'uid'      => $transferCall['uid'],
         ];
-        $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $data);
+        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $data);
     }
 
     /**
@@ -505,7 +513,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'user'    => $this->users[$number],
             'action'  => 'create-chan'
         ];
-        $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
+        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
     }
 
     /**
@@ -529,7 +537,7 @@ class WorkerAmoCrmAMI extends WorkerBase
                 'id'       => $params['linkedid'],
                 'uid'      => $call['uid'],
             ];
-            $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $data);
+            ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $data);
             break;
         }
         unset($call);
@@ -558,7 +566,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'dst'              => '', // Канал назначения не был создан.
             'action'           => 'end-dial',
         ];
-        $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
+        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
     }
 
     /**
@@ -602,7 +610,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'filename'         => $data['recordingfile'],
             'action'           => 'end-call',
         ];
-        $this->amoApi->sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
+        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
 
         // Чистим мусор.
         unset(
@@ -616,4 +624,4 @@ class WorkerAmoCrmAMI extends WorkerBase
     }
 }
 
-WorkerAmoCrmAMI::startWorker($argv??null);
+WorkerAmoCrmAMI::startWorker($argv??[]);

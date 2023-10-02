@@ -1,0 +1,27 @@
+<div class="control-wrapper control--suggest {{class_name}}{% if list_separated %} control-suggest_separated{% endif %}"{% if wrapper_id %} id="{{wrapper_id}}"{% endif %} {{ additional_data }}>
+  {% if suggest_icon %}
+    <span class="list-top-search__icon icon icon-{{suggest_icon}}"></span>
+  {% endif %}
+
+  <ul class="control--suggest--list js-control--suggest--list custom-scroll">
+    {% for v in items %}
+    <li data-value-id="{% if v.id %}{{v.id}}{% else %}{{v.value}}{% endif %}" class="control--suggest--list--item {% if (selected and (v.id == selected)) or (selected and (v.value == selected)) %}{% set value_id = v.id %}control--suggest--list--item-selected{% elseif not selected and (loop.index0 == 0) %}{% set value_id = v.id %}control--suggest--list--item-selected{% endif %} {{v.custom_class}}">
+      <span class="control--suggest--list--item-inner" title="{{v.value}}">{{v.value}}</span>
+    </li>
+    {% endfor %}
+  </ul>
+
+  {% if not selected and value|length %}
+    {% set selected = value %}
+  {% endif %}
+
+  <input autocomplete="off" name="{{name}}" class="{% if not styled_input %}text-input{% endif %} control--suggest--input {% if ajax is defined %}js-control--suggest--input-ajax{% else %}js-control--suggest--input control--suggest--input-inline{% endif %} {{input_class_name}}" id="{{id}}" type="{{ input_type ? input_type : 'text' }}" placeholder="{{placeholder}}" value="{{selected}}" data-value-id="{{ value_id }}" data-type="{{type}}" {% if ajax is defined %}data-url="{{ajax.url}}" data-params="{{ajax.params}}"{% endif %} {% if disabled %}disabled="disabled"{% endif %} {{additional_data}} />
+
+  {% if ajax is not defined and items|length %}
+  <b class="control--suggest--down-btn"></b>
+  {% endif %}
+
+  {% if closable %}
+  <span id="search_clear_button" class="date_field--clear"><span class="icon icon-inline icon-search-cancel"></span><span class="icon icon-inline js-search-hide icon-close"></span></span>
+  {% endif %}
+</div>

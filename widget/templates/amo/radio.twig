@@ -1,0 +1,11 @@
+{% if prefix is not defined %}
+  {% set prefix = id %}
+{% endif %}
+
+<label for="{{prefix}}" class="control-radio__label {{class_name}} {% if disabled %}control-radio__label_disabled{% endif %}" {% if not noTitle %} title="{{label}}" {% endif %} {{additional_data}} {% if color %} style="overflow: visible;" {% endif %}>
+  <div class="control-radio">
+    <input type="radio" name="{{name}}" id="{{prefix}}" value="{{value}}" {{ selected ? 'checked' : '' }} {% if disabled %} disabled{% endif %} {% if fieldId %} data-field-id="{{fieldId}}" {% endif %} data-value="{{dataValue or value}}" {% if color %} data-color="{{color}}" {% endif %}>
+    <div class="control-radio__helper {% if disabled %} control-radio__helper-disabled {% endif %}"></div>
+  </div><!--
+  --><span class="control-radio-label-text element__text {{text_class_name}}" {% if color %} style="background: {{color}}; padding: 2px 6px; border-radius: 3px;" {% endif %}>{{label}}</span>
+</label>

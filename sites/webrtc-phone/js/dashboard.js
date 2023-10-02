@@ -82,6 +82,7 @@ define(function (require) {
                 data: $('#active-call-twig').html()
             });
             if($('#web-rtc-phone .m-cdr-card[data-callid="'+event.data.call_id+'"]').length !== 0 ){
+                // Звонок существует, уже добавлен ранее.
                 return
             }
             if(event.data.number.length <= 4){
@@ -90,12 +91,21 @@ define(function (require) {
             }
             let html = template.render(event.data);
             $("#web-rtc-phone-cdr").append(html);
-            self.sendMessage({action: 'show-panel'});
             self.resize();
         },
         answerCall:function (event){
             let element = $('#web-rtc-phone .m-cdr-card[data-callid="'+event.data.call_id+'"]');
             element.attr('data-answer', event.data.answer);
+            // Открываем карточку при соединении с клиентом.
+            if(element.attr('data-call-type') !== 'in'){
+                return;
+            }
+            let params = {
+                number: element.find('div.m-company-name').attr('data-phone'),
+                id: element.find('div.m-company-name').attr('data-contact-id'),
+                fromPanel: false
+            };
+            self.sendMessage({action: 'openCard', data: params});
         },
         delCall: function (event){
             $('#web-rtc-phone .m-cdr-card[data-callid="'+event.data.call_id+'"]').remove();
@@ -112,6 +122,8 @@ define(function (require) {
                     cdr.enableGetContact = true;
                     self.addCall({data: cdr});
                 });
+            }else if(message.action === 'openCardEntities'){
+                self.sendMessage(message);
             }else if(message.action === 'addCall'){
                 self.addCall({data: message.data});
             }else if(message.action === 'delCall'){
@@ -138,7 +150,8 @@ define(function (require) {
                 if($(this).attr('data-action') === 'card'){
                     params = {
                         number: $(this).parents('.m-cdr-card').find('.m-contact-name').attr('data-phone'),
-                        id: $(this).parents('.m-cdr-card').find('.m-contact-name').attr('data-contact-id')
+                        id: $(this).parents('.m-cdr-card').find('.m-contact-name').attr('data-contact-id'),
+                        fromPanel: true
                     };
                     self.sendMessage({action: 'openCard', data: params});
                 }else{

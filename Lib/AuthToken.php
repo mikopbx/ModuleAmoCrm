@@ -84,7 +84,7 @@ class AuthToken
         return $this->accessToken;
     }
 
-    public function saveToken($authData): bool
+    public function saveToken($authData, $portalId = 0): bool
     {
         $this->updateToken($authData, true);
         $settings = ModuleAmoCrm::findFirst();
@@ -99,6 +99,21 @@ class AuthToken
         }catch (Throwable $e){
             $settings->authData = '';
         }
+        if($portalId > 0){
+            $settings->portalId = $portalId;
+        }
+        return $settings->save();
+    }
+
+    /**
+     * Обновление значения ID портала.
+     * @param $portalId
+     * @return bool
+     */
+    public function savePortalId($portalId): bool
+    {
+        $settings = ModuleAmoCrm::findFirst();
+        $settings->portalId = $portalId;
         return $settings->save();
     }
 }

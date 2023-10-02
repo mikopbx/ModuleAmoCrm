@@ -1,0 +1,24 @@
+{% if not type %}{% set type = "button" %}{% endif %}
+{% if context_menu %}
+  <div class="button-input-wrapper {{class_name}}">
+{% endif %}
+    <button type="{{type}}" {{ additional_data }} class="button-input {% if context_menu %}button-input-with-menu{% endif %} {% if disabled %}button-input-disabled{% endif %} {% if not context_menu %}{{class_name}}{% else %}{{button_input_class_name}}{% endif %}" tabindex="{{tab_index}}" id="{{id}}" {% if title %}title="{{title|capitalize}}"{% endif %}>
+      {% block button_content %}
+        {% if not plain %}<span class="button-input-inner {{inner_class_name}}">{% endif %}
+          {% if icon_class_name %}<span class="icon icon-inline {{icon_class_name}}"></span>{% endif %}
+
+          {% if svg_class_name %}<svg class="svg-icon svg-{{svg_class_name}}-dims"><use xlink:href="#{{svg_class_name}}"></use></svg>{% endif %}
+
+        {% if text %}<span class="button-input-inner__text">{{text}} {{text_bold}}</span>{% endif %}
+
+          {% if icon_right_name %}<span class="{{ icon_right_name }} icon-right"></span>{% endif %}
+        {% if not plain %}</span>{% endif %}
+      {% endblock %}
+    </button>
+
+{% if context_menu %}
+	{% if context_menu != 1 %}
+    {% include 'interface/controls/button/context_menu.twig' with {context_menu_class_name: context_menu_class_name, context_menu: context_menu} %}
+	{% endif %}
+</div>
+{% endif %}

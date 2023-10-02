@@ -36,11 +36,14 @@ class ModuleAmoUsers extends ModulesModelsBase
     public $number;
 
     /**
-     * Toggle
-     *
      * @Column(type="integer", default="1", nullable=true)
      */
     public $enable = 1;
+
+    /**
+     * @Column(type="integer", nullable=true)
+     */
+    public $portalId = 0;
 
     /**
      * @param $calledModelObject

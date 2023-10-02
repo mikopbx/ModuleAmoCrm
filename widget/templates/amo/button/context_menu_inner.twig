@@ -1,0 +1,29 @@
+{% if item.icon %}
+  <span class="button-input__context-menu__item__icon icon icon-inline icon-{{ item.icon }} {{ item.icon_class }}"></span>
+{% endif %}
+
+{% set svg_icon = item.svg_icon_absolute %}
+{% if item.svg_icon %}
+  {% set svg_icon = 'common--' ~ item.svg_icon %}
+{% endif %}
+{% if svg_icon %}
+  <svg class="button-input__context-menu__item__icon svg-icon svg-{{ svg_icon }}-dims {{ item.icon_class }}"><use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#{{ svg_icon }}"></use></svg>
+{% endif %}
+
+<span class="button-input__context-menu__item__text {{ item.span_class }}">
+  {% if item.localization %}
+    {{ lang[item.localization] }}
+  {% elseif item.control %}
+    <span class="button-input__context-menu__item__text_inner">{{ item.text }}</span>
+    {% include "interface/controls/" ~ item.control.type ~".twig" with item.control %}
+  {% else %}
+    {{ item.text }}
+  {% endif %}
+</span>
+{% set svg_left_icon = item.svg_icon_left_absolute %}
+{% if item.svg_icon_left %}
+  {% set svg_left_icon = 'common--' ~ item.svg_icon_left %}
+{% endif %}
+{% if svg_left_icon %}
+  <svg class="button-input__context-menu__item__icon svg-icon svg-{{ svg_left_icon }}-dims {{ item.icon_left_class }}"><use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#{{ svg_left_icon }}"></use></svg>
+{% endif %}

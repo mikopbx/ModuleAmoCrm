@@ -2,28 +2,26 @@
 
 namespace Modules\ModuleAmoCrm\Lib;
 
-use GuzzleHttp;
-use GuzzleHttp\Exception\GuzzleException;
-use MikoPBX\Common\Models\LanInterfaces;
-use MikoPBX\Common\Providers\CDRDatabaseProvider;
-use MikoPBX\Core\System\Processes;
 use MikoPBX\Core\System\Util;
-use MikoPBX\Core\Workers\Cron\WorkerSafeScriptsCore;
 use MikoPBX\Modules\PbxExtensionUtils;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
+use Modules\ModuleAmoCrm\bin\ConnectorDb;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoPipeLines;
-use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Common\Models\PbxSettings;
-use Throwable;
 
 class AmoCrmMain extends AmoCrmMainBase
 {
     private string $baseDomain = '';
-    private string $extHostname = '';
     private AuthToken $token;
-    private string $tokenForAmo = '';
+
+    public bool   $isPrivateWidget;
+    public string $privateClientId;
+    public string $privateClientSecret;
+
+    public const ENTITY_CONTACTS = 'contacts';
+    public const ENTITY_COMPANIES = 'companies';
 
     /**
      * Инициализации API клиента.
@@ -36,18 +34,27 @@ class AmoCrmMain extends AmoCrmMainBase
         $settings = ModuleAmoCrm::findFirst();
         if($settings){
             $this->baseDomain   = $settings->baseDomain;
-            $res = LanInterfaces::findFirst("internet = '1'")->toArray();
-            $this->extHostname  = $res['exthostname']??'';
-            $this->tokenForAmo  = (string)$settings->tokenForAmo;
-
             $this->token = new AuthToken((string)$settings->authData);
+            $this->isPrivateWidget     = (string)$settings->isPrivateWidget === '1';
+            $this->privateClientId     = ''.$settings->privateClientId;
+            $this->privateClientSecret = ''.$settings->privateClientSecret;
             $this->refreshToken();
         }
     }
 
-    public function getExtHostname():string
+    private function getClientId():string
     {
-        return $this->extHostname;
+        if($this->isPrivateWidget) {
+            return $this->privateClientId;
+        }
+        return self::CLIENT_ID;
+    }
+    private function getClientSecret():string
+    {
+        if($this->isPrivateWidget){
+            return $this->privateClientSecret;
+        }
+        return self::CLIENT_SECRET;
     }
 
     /**
@@ -58,14 +65,14 @@ class AmoCrmMain extends AmoCrmMainBase
     public function getAccessTokenByCode($code):PBXAmoResult
     {
         $params  = [
-            'client_id'     => self::CLIENT_ID,
-            'client_secret' => self::CLIENT_SECRET,
+            'client_id'     => $this->getClientId(),
+            'client_secret' => $this->getClientSecret(),
             'grant_type'    => 'authorization_code',
             'code'          => $code,
             'redirect_uri'  => self::REDIRECT_URL,
         ];
         $url = "https://$this->baseDomain/oauth2/access_token";
-        $result = $this->sendHttpPostRequest($url, $params);
+        $result = ClientHTTP::sendHttpPostRequest($url, $params);
         if($result->success){
             $result->success = $this->token->saveToken($result->data);
         }
@@ -88,109 +95,16 @@ class AmoCrmMain extends AmoCrmMainBase
         }
         $url = "https://$this->baseDomain/oauth2/access_token";
         $params = [
-            'client_id'     => self::CLIENT_ID,
-            'client_secret' => self::CLIENT_SECRET,
+            'client_id'     => $this->getClientId(),
+            'client_secret' => $this->getClientSecret(),
             'grant_type' => 'refresh_token',
             'refresh_token' => $refreshToken,
             'redirect_uri'  => self::REDIRECT_URL,
         ];
-        $result = $this->sendHttpPostRequest($url, $params);
+        $result = ClientHTTP::sendHttpPostRequest($url, $params);
         if($result->success){
             $this->token->saveToken($result->data);
         }
-    }
-
-    /**
-     * Обработка запроса от AmoCRM, к примеру call.
-     * @param array $request
-     * @return PBXAmoResult
-     */
-    public function processCallback(array $request): PBXAmoResult
-    {
-        $res = new PBXAmoResult();
-        $params = $request['data'];
-        if($this->tokenForAmo !== $params['token']){
-            $params = null;
-        }
-        if(!is_array($params)){
-            return $res;
-        }
-        $action = "{$params['action']}Action";
-        if(method_exists($this, $action)){
-            return $this->$action($params);
-        }
-        return $res;
-    }
-
-    /**
-     * Сохранение настроек, измененных в AMO CRM.
-     * @param array $request
-     * @return PBXAmoResult
-     */
-    public function saveSettings(array $request):PBXAmoResult{
-        $res = new PBXAmoResult();
-        $res->success = true;
-        $users = $request['data']['users']??[];
-        if(is_array($users)){
-            foreach ($users as $amoUserId => $number){
-                $dbData = ModuleAmoUsers::findFirst("amoUserId='$amoUserId'");
-                if(!$dbData){
-                    $dbData = new ModuleAmoUsers();
-                    $dbData->amoUserId = $amoUserId;
-                }
-                $dbData->number = trim($number);
-                $dbData->save();
-            }
-        }
-        return $res;
-    }
-
-    /**
-     * Обработка команды завершения вызова.
-     * @param array $request
-     * @return PBXAmoResult
-     */
-    public function hangupAction(array $request):PBXAmoResult
-    {
-        $res = new PBXAmoResult();
-        $cdrData = CDRDatabaseProvider::getCacheCdr();
-        try {
-            $am = Util::getAstManager('off');
-        }catch (\Exception $e){
-            return $res;
-        }
-        foreach ($cdrData as $cdr){
-            if($cdr['UNIQUEID'] !== $request['call-id']){
-                continue;
-            }
-            if($request['user-phone'] === $cdr['src_num']){
-                $channel = $cdr['src_chan'];
-            }else{
-                $channel = $cdr['dst_chan'];
-            }
-            $am->Hangup($channel);
-            $res->success = true;
-        }
-
-        return $res;
-    }
-
-    /**
-     * Запуск Originate.
-     * @param $params
-     * @return PBXAmoResult
-     * @throws \Exception
-     */
-    public function callbackAction($params):PBXAmoResult
-    {
-        $res = new PBXAmoResult();
-        $dst = preg_replace("/[^0-9+]/", '', $params['number']);
-        self::amiOriginate($params['user-number'], '', $dst);
-        $this->logger->writeInfo(
-            "ONEXTERNALCALLSTART: originate from user {$params['user-id']} <{$params['user-number']}> to {$dst})"
-        );
-        $res->success = true;
-        return $res;
     }
 
     /**
@@ -219,219 +133,9 @@ class AmoCrmMain extends AmoCrmMainBase
     }
 
     /**
-     * Переадресация вызова.
-     * @param $params
-     * @return PBXAmoResult
-     * @throws \Phalcon\Exception
-     */
-    public function transferAction($params):PBXAmoResult
-    {
-        $res     = new PBXAmoResult();
-        $action  = 'Redirect';
-        $cdrData = CDRDatabaseProvider::getCacheCdr();
-        foreach ($cdrData as $cdr){
-            if(!in_array($params['user-number'], [$cdr['src_num'], $cdr['dst_num']], true)){
-                continue;
-            }
-            if( !empty($cdr['endtime']) ){
-                continue;
-            }
-            if(!empty($cdr['answer'])){
-                $action = 'Atxfer';
-                if($cdr['src_num'] === $params['user-number']){
-                    $chanForRedirect = $cdr['src_chan'];
-                }else{
-                    $chanForRedirect = $cdr['dst_chan'];
-                }
-            }elseif($cdr['src_num'] === $params['user-number']){
-                $chanForRedirect = $cdr['dst_chan'];
-            }else{
-                $chanForRedirect = $cdr['src_chan'];
-            }
-        }
-
-        if(empty($chanForRedirect)){
-            return $res;
-        }
-        $am = Util::getAstManager('off');
-        $command = [
-            'Channel'   => $chanForRedirect,
-            'Exten'     => $params['number'],
-            'Context'   => 'internal-transfer',
-            'Priority'  => '1'
-        ];
-        $am->sendRequestTimeout($action, $command);
-        $res->success = true;
-        return $res;
-    }
-
-    /**
-     * Обработка второго этапа авторизации, ответ от 3ей стороны.
-     * @param array $request
-     * @return PBXAmoResult
-     */
-    public function processRequest(array $request): PBXAmoResult
-    {
-        $result = new PBXAmoResult();
-        $params = $request['data']??[];
-        /** @var ModuleAmoCrm $settings */
-        if(isset($params['error'])) {
-            $settings = ModuleAmoCrm::findFirst();
-            $settings->authData = '';
-            $settings->save();
-        }elseif (isset($params['code']) && !empty($params['code'])){
-            $result = $this->getAccessTokenByCode($params['code']);
-        }
-        $result->processor = __METHOD__;
-        if(!isset($params['save-only']) && isset($params['code'])){
-            $result->setHtml($this->moduleDir.'/public/assets/html/auth-ok.html');
-        }
-        return $result;
-    }
-
-    /**
-     * Отправка POST запроса к API.
-     * @param string $url
-     * @param array $params
-     * @param array $headers
-     * @return PBXAmoResult
-     */
-    public function sendHttpPostRequest(string $url, array $params, array $headers=[]):PBXAmoResult{
-        $client  = new GuzzleHttp\Client();
-        $options = [
-            'timeout'       => 5,
-            'http_errors'   => false,
-            'headers'       => $headers,
-            'json'          => $params,
-        ];
-        $message = '';
-        $resultHttp = null;
-        try {
-            $resultHttp = $client->request('POST', $url, $options);
-            $code       = $resultHttp->getStatusCode();
-        }catch (GuzzleHttp\Exception\ConnectException $e ){
-            $message = $e->getMessage();
-            Util::sysLogMsg('ModuleAmoCrm', "ConnectException");
-            $code = 0;
-        } catch (GuzzleException $e) {
-            $message = $e->getMessage();
-            Util::sysLogMsg('ModuleAmoCrm', "GuzzleException");
-            $code = 0;
-        }
-        return $this->parseResponse($resultHttp, $message, $code);
-    }
-
-    /**
-     * Отправка POST запроса к API.
-     * @param string $url
-     * @param array $params
-     * @param array $headers
-     * @return PBXAmoResult
-     */
-    public function sendHttpPatchRequest(string $url, array $params, array $headers=[]):PBXAmoResult{
-        $client  = new GuzzleHttp\Client();
-        $options = [
-            'timeout'       => 5,
-            'http_errors'   => false,
-            'headers'       => $headers,
-            'json'          => $params,
-        ];
-        $message = '';
-        $resultHttp = null;
-        try {
-            $resultHttp = $client->request('PATCH', $url, $options);
-            $code       = $resultHttp->getStatusCode();
-        }catch (GuzzleHttp\Exception\ConnectException $e ){
-            $message = $e->getMessage();
-            Util::sysLogMsg('ModuleAmoCrm', "ConnectException");
-            $code = 0;
-        } catch (GuzzleException $e) {
-            $message = $e->getMessage();
-            Util::sysLogMsg('ModuleAmoCrm', "GuzzleException");
-            $code = 0;
-        }
-        return $this->parseResponse($resultHttp, $message, $code);
-    }
-
-    /**
-     * Преобразование http ответа в массив.
-     * @param $resultHttp
-     * @param $message
-     * @param $code
-     * @return PBXAmoResult
-     */
-    private function parseResponse($resultHttp, $message, $code):PBXAmoResult
-    {
-        $res = new PBXAmoResult();
-        if( isset($resultHttp) && ($code === 200 || $resultHttp->getReasonPhrase() === 'Accepted')){
-            $content = $resultHttp->getBody()->getContents();
-            $data    = [];
-            try {
-                $data = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
-            }catch (Throwable $e){
-                $message = $e->getMessage();
-            }
-            $res->success = is_array($data);
-            if($res->success){
-                $res->data = $data;
-            }else{
-                $res->messages[] = $content;
-                $res->messages[] = $message;
-            }
-        }else{
-            $res->success = false;
-            $res->messages['error-code'] = $code;
-            $res->messages['error-msg']  = $message;
-            if($resultHttp){
-                try {
-                    $res->messages['error-string']  = $resultHttp->getBody()->getContents();
-                    $res->messages['error-data']    = json_decode($res->messages['error-string'], true);
-                }catch (Throwable $e){
-                    $res->messages['error-data']    = [];
-                }
-            }
-        }
-        return $res;
-    }
-
-    /**
-     * Отправка http GET запроса.
-     * @param string $url
-     * @param array  $params
-     * @param array  $headers
-     * @return PBXAmoResult
-     */
-    private function sendHttpGetRequest(string $url, array $params, array $headers=[]):PBXAmoResult{
-        if(!empty($params)){
-            $url .= "?".http_build_query($params);
-        }
-        $client  = new GuzzleHttp\Client();
-        $options = [
-            'timeout'       => 5,
-            'http_errors'   => false,
-            'headers'       => $headers,
-        ];
-        $message = '';
-        $resultHttp = null;
-        try {
-            $resultHttp = $client->request('GET', $url, $options);
-            $code       = $resultHttp->getStatusCode();
-        }catch (GuzzleHttp\Exception\ConnectException $e ){
-            $message = $e->getMessage();
-            Util::sysLogMsg('ModuleAmoCrm', "ConnectException");
-            $code = 0;
-        } catch (GuzzleException $e) {
-            $message = $e->getMessage();
-            Util::sysLogMsg('ModuleAmoCrm', "GuzzleException");
-            $code = 0;
-        }
-        return $this->parseResponse($resultHttp, $message, $code);
-    }
-
-    /**
      * Получение данных аккаунта.
      */
-    public function checkConnection(): PBXAmoResult
+    public function checkConnection(bool $updatePortalId = false): PBXAmoResult
     {
         if(!PbxExtensionUtils::isEnabled($this->moduleUniqueId)){
             return new PBXAmoResult();
@@ -444,7 +148,13 @@ class AmoCrmMain extends AmoCrmMainBase
         $headers = [
             'Authorization' => $authorization,
         ];
-        return $this->sendHttpGetRequest($url, [], $headers);
+
+        $connectionData = ClientHTTP::sendHttpGetRequest($url, [], $headers);
+        $id = (int)($connectionData->data['id']??0);
+        if($updatePortalId && $id > 0){
+            $this->token->savePortalId($id);
+        }
+        return $connectionData;
     }
 
     public function addCalls($calls):PBXApiResult
@@ -453,14 +163,16 @@ class AmoCrmMain extends AmoCrmMainBase
         $headers = [
             'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
         ];
-        return $this->sendHttpPostRequest($url, $calls, $headers);
+        return ClientHTTP::sendHttpPostRequest($url, $calls, $headers);
     }
 
     /**
-     * Синхронизация воронок продаж.
+     * Синхронизация воронок.
+     * @param $portalId
      * @return array
+     * @throws \JsonException
      */
-    public function synchPipeLines():array
+    public function syncPipeLines($portalId):array
     {
         if(!isset($this->token)){
             return [];
@@ -469,36 +181,32 @@ class AmoCrmMain extends AmoCrmMainBase
         $headers = [
             'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
         ];
-        $response = $this->sendHttpGetRequest($url, [], $headers);
+        $response = ClientHTTP::sendHttpGetRequest($url, [], $headers);
         if($response->success){
             $data = $response->data['_embedded']['pipelines']??[];
             if(is_array($data)){
                 $lineIds = [];
-                $dbData = ModuleAmoPipeLines::find(['columns' => 'amoId,name']);
+                $dbData = ModuleAmoPipeLines::find(["'$portalId'=portalId",'columns' => 'amoId,name']);
                 foreach ($dbData as $lineData){
                     $lineIds[$lineData->amoId] = $lineData->name;
                 }
-                unset($dbData);
                 foreach ($data as $line){
                     if(isset($lineIds[$line['id']])){
-                        if($line['name'] !== $lineIds[$line['id']]){
-                            // Отличается наименование у существующей линии.
-                            $dbData = ModuleAmoPipeLines::findFirst("amoId='{$line['id']}'");
-                            $dbData->name  = $line['name'];
-                            $dbData->save();
-                        }
+                        $dbData = ModuleAmoPipeLines::findFirst("'$portalId'=portalId AND amoId='{$line['id']}'");
                     }else{
                         // Такой линии нет в базе данных.
                         $dbData = new ModuleAmoPipeLines();
-                        $dbData->amoId = $line['id'];
-                        $dbData->name  = $line['name'];
-                        $dbData->save();
+                        $dbData->amoId    = $line['id'];
+                        $dbData->portalId = $portalId;
                     }
+                    $dbData->name  = $line['name'];
+                    $dbData->statuses = json_encode($line['_embedded']['statuses'], JSON_THROW_ON_ERROR);
+                    $dbData->save();
                     unset($lineIds[$line['id']]);
                 }
                 foreach ($lineIds as $id => $name){
                     /** @var ModuleAmoPipeLines $dbData */
-                    $dbData = ModuleAmoPipeLines::findFirst("amoId='{$id}'");
+                    $dbData = ModuleAmoPipeLines::findFirst("'$portalId'=portalId AND amoId='{$id}'");
                     if($dbData){
                         // Такой воронки больше нет. удаляем.
                         $dbData->delete();
@@ -507,11 +215,11 @@ class AmoCrmMain extends AmoCrmMainBase
             }
         }
         $pipeLines = [];
-        $dbData = ModuleAmoPipeLines::find(['columns' => 'amoId,did,name']);
+        $dbData = ModuleAmoPipeLines::find(["'$portalId'=portalId", 'columns' => 'amoId,did,name']);
         foreach ($dbData as $line){
-            $pipeLines[$line->did] = [
-                'id' => $line->amoId,
-                'name' => $line->name
+            $pipeLines[] = [
+                'id'    => $line->amoId,
+                'name'  => $line->name
             ];
         }
         return $pipeLines;
@@ -531,7 +239,7 @@ class AmoCrmMain extends AmoCrmMainBase
         $params = [
             'query' => $phone
         ];
-        $response = $this->sendHttpGetRequest($url, $params, $headers);
+        $response = ClientHTTP::sendHttpGetRequest($url, $params, $headers);
         $result   = new PBXApiResult();
 
         $contact = $response->data['response']['contacts'][0]??false;
@@ -541,7 +249,8 @@ class AmoCrmMain extends AmoCrmMainBase
                 'name'   => $contact['name']??'',
                 'company'=> $contact['company_name']??'',
                 'userId' => $contact['responsible_user_id']??'',
-                'number' => $phone
+                'number' => $phone,
+                'entity' => 'contact'
 
             ];
             $result->success = !empty($result->data['id']);
@@ -555,7 +264,35 @@ class AmoCrmMain extends AmoCrmMainBase
         $headers = [
             'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
         ];
-        return $this->sendHttpPostRequest($url, $calls, $headers);
+        return ClientHTTP::sendHttpPostRequest($url, $calls, $headers);
+    }
+
+    /**
+     * Пакетное добавление сделок.
+     * @param $calls
+     * @return PBXApiResult
+     */
+    public function addLeads($calls):PBXApiResult
+    {
+        $url = "https://$this->baseDomain/api/v4/leads";
+        $headers = [
+            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
+        ];
+        return ClientHTTP::sendHttpPostRequest($url, $calls, $headers);
+    }
+
+    /**
+     * Пакетное добавление сделок.
+     * @param $calls
+     * @return PBXApiResult
+     */
+    public function addTasks($calls):PBXApiResult
+    {
+        $url = "https://$this->baseDomain/api/v4/tasks";
+        $headers = [
+            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
+        ];
+        return ClientHTTP::sendHttpPostRequest($url, $calls, $headers);
     }
 
     public function getNotes($entity_type, $entity_id):PBXApiResult
@@ -564,7 +301,7 @@ class AmoCrmMain extends AmoCrmMainBase
         $headers = [
             'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
         ];
-        return $this->sendHttpGetRequest($url, [], $headers);
+        return ClientHTTP::sendHttpGetRequest($url, [], $headers);
     }
 
     public function getSources():PBXApiResult
@@ -573,7 +310,7 @@ class AmoCrmMain extends AmoCrmMainBase
         $headers = [
             'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
         ];
-        return $this->sendHttpGetRequest($url, [], $headers);
+        return ClientHTTP::sendHttpGetRequest($url, [], $headers);
     }
 
     public function patchNote($entity_type, $entity_id, $id, $newRecFile):PBXApiResult
@@ -594,7 +331,7 @@ class AmoCrmMain extends AmoCrmMainBase
                 'call_result' => 'ANSWERED'
             ],
         ];
-        return $this->sendHttpPatchRequest($url, $params, $headers);
+        return ClientHTTP::sendHttpPatchRequest($url, $params, $headers);
     }
 
     public function notifyUsers(string $phone, array $users):PBXApiResult
@@ -612,7 +349,7 @@ class AmoCrmMain extends AmoCrmMainBase
                 ],
             ]
         ];
-        return $this->sendHttpPostRequest($url, $notify, $headers);
+        return ClientHTTP::sendHttpPostRequest($url, $notify, $headers);
     }
 
     public function addSources($data):PBXApiResult
@@ -640,10 +377,88 @@ class AmoCrmMain extends AmoCrmMainBase
         $headers = [
             'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
         ];
-        return $this->sendHttpPostRequest($url, $sources, $headers);
+        return ClientHTTP::sendHttpPostRequest($url, $sources, $headers);
     }
 
     /**
+     * Получает изменненные контакты / компании.
+     * @param int    $fromTime
+     * @param int    $toTime
+     * @param string $type
+     * @param string $page
+     * @return PBXApiResult
+     */
+    public function getChangedContacts(int $fromTime, int $toTime, string $type, string $page = ''):PBXApiResult
+    {
+        $types = [
+            self::ENTITY_COMPANIES => 'company',
+            self::ENTITY_CONTACTS  => 'contact',
+        ];
+        $url = "https://$this->baseDomain/api/v4/$type";
+        $headers = [
+            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
+        ];
+        $params = [
+            'order[updated_at]' => 'desc',
+            'filter[updated_at][from]' => $fromTime,
+            'filter[updated_at][to]' => $toTime,
+        ];
+
+        if(!empty($page)){
+            $params['page'] = $page;
+        }
+        $response = ClientHTTP::sendHttpGetRequest($url, $params, $headers);
+        $result   = new PBXApiResult();
+        $nextUrl = parse_url($response->data['_links']['next']['href']??'');
+        parse_str($nextUrl['query']??'', $queryArray);
+
+        $result->data = [
+            $type => [],
+            'nextPage' => $queryArray['page']??'',
+        ];
+        foreach ($response->data['_embedded'][$type]??[] as $contact){
+            $contact['type'] = $types[$type];
+            $result->data[$type][]  = $contact;
+        }
+        return $result;
+    }
+
+    /**
+     * Получает измененные сделки
+     * @param int    $fromTime
+     * @param int    $toTime
+     * @param string $page
+     * @return PBXApiResult
+     */
+    public function getChangedLeads(int $fromTime, int $toTime, string $page = ''):PBXApiResult{
+        $url = "https://$this->baseDomain/api/v4/leads";
+        $headers = [
+            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
+        ];
+        $params = [
+            'with' => 'contacts',
+            'order[updated_at]' => 'desc',
+            'filter[updated_at][from]' => $fromTime,
+            'filter[updated_at][to]' => $toTime,
+        ];
+        if(!empty($page)){
+            $params['page'] = $page;
+        }
+        $response = ClientHTTP::sendHttpGetRequest($url, $params, $headers);
+        $result   = new PBXApiResult();
+        $nextUrl = parse_url($response->data['_links']['next']['href']??'');
+        parse_str($nextUrl['query']??'', $queryArray);
+
+        $result->data = [
+            'leads' => [],
+            'nextPage' => $queryArray['page']??'',
+        ];
+        $result->data['leads'] = $response->data['_embedded']['leads']??[];
+        return $result;
+    }
+
+    /**
+     * Создание контактов в amoCRM
      * @param array $data
      * @return PBXApiResult
      */
@@ -654,18 +469,13 @@ class AmoCrmMain extends AmoCrmMainBase
             'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
         ];
         $params = [];
-        $phones = [];
         foreach ($data as $contactData){
             $phone = $contactData['phone']??'';
             if(empty($phone)){
                 continue;
             }
-            if(in_array($phone, $phones, true)){
-                continue;
-            }
-            $phones[] = $contactData['phone'];
-            $params[] = [
-                'name' => $contactData['phone'],
+            $params[$contactData['phone']] = [
+                'name' => $contactData['contactName']??'-- '.$contactData['phone'].' --',
                 'custom_fields_values' => [
                     [
                         'field_code' => 'PHONE',
@@ -673,45 +483,21 @@ class AmoCrmMain extends AmoCrmMainBase
                     ]
                 ]
             ];
+            if(isset($contactData['request_id'])){
+                $params[$contactData['phone']]['request_id'] = $contactData['request_id'];
+            }
+            if(isset($contactData['responsible_user_id'])) {
+                $params[$contactData['phone']]['responsible_user_id'] = $contactData['responsible_user_id'];
+            }
         }
-        unset($phones);
         if(empty($params)){
             $result = new PBXAmoResult();
             $result->success = true;
         }else{
-            $result = $this->sendHttpPostRequest($url, $params, $headers);
+            $params = array_values($params);
+            $result = ClientHTTP::sendHttpPostRequest($url, $params, $headers);
         }
         return $result;
-    }
-
-    /**
-     * Start or restart module workers
-     *
-     * @param bool $restart
-     */
-    public function startAllServices(bool $restart = false): void
-    {
-        $moduleEnabled = PbxExtensionUtils::isEnabled($this->moduleUniqueId);
-        if ( ! $moduleEnabled) {
-            return;
-        }
-        $configClass      = new AmoCrmConf();
-        $workersToRestart = $configClass->getModuleWorkers();
-
-        if ($restart) {
-            foreach ($workersToRestart as $moduleWorker) {
-                Processes::processPHPWorker($moduleWorker['worker']);
-            }
-        } else {
-            $safeScript = new WorkerSafeScriptsCore();
-            foreach ($workersToRestart as $moduleWorker) {
-                if ($moduleWorker['type'] === WorkerSafeScriptsCore::CHECK_BY_AMI) {
-                    $safeScript->checkWorkerAMI($moduleWorker['worker']);
-                } else {
-                    $safeScript->checkWorkerBeanstalk($moduleWorker['worker']);
-                }
-            }
-        }
     }
 
     /**
@@ -720,17 +506,12 @@ class AmoCrmMain extends AmoCrmMainBase
     public static function updateUsers():array
     {
         $users = [];
-        try {
-            /** @var ModuleAmoUsers $user */
-            $amoUsers = ModuleAmoUsers::find('enable=1');
-            foreach ($amoUsers as $user){
-                if(!is_numeric($user->amoUserId)){
-                    continue;
-                }
-                $users[$user->number] = 1*$user->amoUserId;
+        $amoUsers = ConnectorDb::invoke('getPortalUsers', [1]);
+        foreach ($amoUsers as $user){
+            if(!is_numeric($user['amoUserId'])){
+                continue;
             }
-        }catch (Throwable $e){
-            Util::sysLogMsg(__CLASS__, $e->getMessage());
+            $users[$user['number']] = 1*$user['amoUserId'];
         }
         $extensionLength = 1*PbxSettings::getValueByKey('PBXInternalExtensionLength');
         $userList   = [];

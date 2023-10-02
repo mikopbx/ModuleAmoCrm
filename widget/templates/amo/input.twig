@@ -1,0 +1,19 @@
+
+<input name="{{name}}"
+       {% if data_id is defined and data_id %}
+            data-id='{{ data_id }}'
+       {% endif %}
+       {% if sort is defined and sort %}
+            data-sort='{{ sort }}'
+       {% endif %}
+       class="{{class_name}}{% if not styled_input %}text-input{% endif %}"
+       id="{{id}}" type="{% if type %}{{type}}{% else %}text{% endif %}"
+       placeholder="{{placeholder}}"
+       value="{{ value is null ? '' : value }}" {% if style is defined and style %}style="{% for prop, value in style %}{{prop}}:{{value}};{% endfor %}"{% endif %}
+       maxlength="{{max_length}}"
+       {% if disabled %}disabled="disabled"{% endif %}
+       {% if readonly %}readonly="readonly"{% endif %}
+       {{additional_data}}
+       autocomplete="off"
+       {% if autosize_width %}size="{{max(value|length, min_size)}}"{% endif %}
+/>

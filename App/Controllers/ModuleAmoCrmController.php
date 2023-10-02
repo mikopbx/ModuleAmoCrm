@@ -11,10 +11,12 @@ use MikoPBX\Common\Models\CallQueues;
 use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Modules\PbxExtensionUtils;
+use Modules\ModuleAmoCrm\App\Forms\ModuleAmoCrmEntitySettingsModifyForm;
 use Modules\ModuleAmoCrm\App\Forms\ModuleAmoCrmForm;
-use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
+use Modules\ModuleAmoCrm\bin\WorkerAmoHTTP;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use MikoPBX\Common\Models\Providers;
+use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
 
 class ModuleAmoCrmController extends BaseController
 {
@@ -86,10 +88,13 @@ class ModuleAmoCrmController extends BaseController
         }
     }
 
+    /**
+     * Проверка соединения с amoCRM
+     * @return void
+     */
     public function checkAction():void
     {
-        $templateMain = new AmoCrmMain();
-        $result = $templateMain->checkConnection();
+        $result = WorkerAmoHTTP::invokeAmoApi('checkConnection', []);
         $this->view->success = $result->success;
         $this->view->data    = $result->data;
         $this->view->messages= $result->messages;
@@ -131,10 +136,45 @@ class ModuleAmoCrmController extends BaseController
         // Список выбора очередей.
         $this->view->queues = CallQueues::find(['columns' => ['id', 'name']]);
         $this->view->users  = Extensions::find(["type = 'SIP'", 'columns' => ['number', 'callerid']]);
+
+        $rules = ModuleAmoEntitySettings::find(["portalId='$settings->portalId'", 'columns' => ['id', 'did', 'type', 'create_lead', 'create_contact', 'create_unsorted', 'create_task']])->toArray();
+        foreach ($rules as $index => $rule){
+            $rules[$index]['type_translate'] = 'mod_amo_type_'.$rule['type'];
+        }
+        $this->view->entitySettings  = $rules;
     }
 
     /**
-     * Save settings AJAX action
+     * The modify action for creating or editing
+     *
+     * @param string|null $id The ID of the user group (optional)
+     *
+     * @return void
+     */
+    public function modifyAction(string $id = null): void
+    {
+        $footerCollection = $this->assets->collection('footerJS');
+        $footerCollection->addJs('js/pbx/main/form.js', true);
+        $footerCollection->addJs("js/cache/{$this->moduleUniqueID}/module-amo-crm-modify-entity-settings.js", true);
+        $rule = null;
+        if($id){
+            $rule = ModuleAmoEntitySettings::findFirst("id='$id'");
+        }
+        if(!$rule){
+            $rule = new ModuleAmoEntitySettings();
+            $settings = ModuleAmoCrm::findFirst();
+            if ($settings) {
+                $rule->portalId = $settings->portalId;
+            }
+        }
+        $this->view->form      = new ModuleAmoCrmEntitySettingsModifyForm($rule);
+        $this->view->represent = $rule->getRepresent();
+        $this->view->id        = $id;
+        $this->view->pick("{$this->moduleDir}/App/Views/modify");
+    }
+
+    /**
+     * Save settings action
      */
     public function saveAction() :void
     {
@@ -148,7 +188,7 @@ class ModuleAmoCrmController extends BaseController
             if(in_array($key, ['id','offsetCdr','authData'], true)){
                 continue;
             }
-            if('useInterception' === $key){
+            if('useInterception' === $key || 'isPrivateWidget' === $key ){
                 $record->$key = ($data[$key] === 'on') ? '1' : '0';
             } else if (array_key_exists($key, $data)) {
                 if($record->$key !== trim($data[$key])){
@@ -174,23 +214,76 @@ class ModuleAmoCrmController extends BaseController
     }
 
     /**
-     * Delete record
+     * Save settings entity settings action
      */
-    public function deleteAction(): void
+    public function saveEntitySettingsAction():void
     {
-        $table     = $this->request->get('table');
-        $className = $this->getClassName($table);
-        if(empty($className)) {
+        $data= $this->request->getPost();
+        $did = trim($data['did']);
+
+        $filter = [
+            "did=:did: AND type=:type: AND id<>:id: AND portalId=:portalId:",
+            'bind'    => [
+                'did' => $did,
+                'type'=> $data['type']??'',
+                'portalId'=> $data['portalId']??'',
+                'id'  => $data['id']
+            ]
+        ];
+        $record = ModuleAmoEntitySettings::findFirst($filter);
+        if($record){
+            $errorText = Util::translate('mod_amo_rule_for_type_did_exists', false);
+            $this->flash->error($errorText);
             $this->view->success = false;
             return;
         }
-        $id     = $this->request->get('id');
-        $record = $className::findFirstById($id);
+
+        $record = null;
+        if(!empty($data['id'])){
+            $record = ModuleAmoEntitySettings::findFirstById($data['id']);
+        }
+        if ($record === null) {
+            $record = new ModuleAmoEntitySettings();
+        }
+        $this->db->begin();
+        foreach ($record as $key => $value) {
+            if($key === 'id'){
+                continue;
+            }
+            if(in_array($key,['create_contact', 'create_lead', 'create_unsorted', 'create_task'])){
+                $record->$key = ($data[$key] === 'on' || $data[$key] === true) ? '1' : '0';
+            } elseif (array_key_exists($key, $data)) {
+                $record->$key = trim($data[$key]);
+            } else {
+                $record->$key = '';
+            }
+        }
+
+        if (FALSE === $record->save()) {
+            $errors = $record->getMessages();
+            $this->flash->error(implode('<br>', $errors));
+            $this->view->success = false;
+            $this->db->rollback();
+            return;
+        }
+        $this->flash->success($this->translation->_('ms_SuccessfulSaved'));
+        $this->view->success = true;
+        $this->view->id = $record->id;
+        $this->db->commit();
+    }
+
+    /**
+     * Delete record
+     */
+    public function deleteAction($id): void
+    {
+        $record = ModuleAmoEntitySettings::findFirstById($id);
         if ($record !== null && ! $record->delete()) {
             $this->flash->error(implode('<br>', $record->getMessages()));
             $this->view->success = false;
             return;
         }
+        $this->view->id     = $id;
         $this->view->success = true;
     }
 
@@ -201,16 +294,6 @@ class ModuleAmoCrmController extends BaseController
     private function getTablesDescription():array
     {
         $description = [];
-        $description['ModuleAmoPipeLines'] = [
-            'cols' => [
-                'name'       => ['header' => 'Pipeline', 'class' => 'two wide collapsing'],
-                'did'        => ['header' => 'DID',  'class' => ''],
-            ],
-            'ajaxUrl' => '/getNewRecords',
-            'icon' => 'user',
-            'needDelButton' => false
-        ];
-
         return $description;
     }
 

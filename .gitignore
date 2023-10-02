@@ -9,3 +9,4 @@ widget.zip
 /_version
 /build-module.sh
 /sites/webrtc-phone/.idea/
+.DS_Store

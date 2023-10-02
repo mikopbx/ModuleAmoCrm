@@ -1,0 +1,65 @@
+{# На случай, если выбранного значения нет в списке #}
+{% if selected %}
+  {% set selected_temp = selected %}
+  {% set selected = false %}
+  {% set selected_isset = false %}
+
+  {% for v in items %}
+    {% set value = v.id %}
+    {% if v.id is not defined %}
+      {% set value = v.option %}
+    {% endif %}
+
+    {% if value == selected_temp %}
+      {% set selected = selected_temp %}
+      {% set selected_isset = true %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+{# выбранного значения нет #}
+
+<div class="control--select {{class_name}}" {{additional_data}}>
+  <ul class="custom-scroll control--select--list">
+    {% set selected_value = selected %}
+    {% set selected_option = '' %}
+    {% set selected_bg_color = '' %}
+
+    {% for v in items %}
+      {% if need_escape %}
+        {% set option = v.option|escape %}
+      {% else %}
+        {% set option = v.option %}
+      {% endif %}
+      {% set is_selected = false %}
+
+      {% set value = v.id %}
+      {% if v.id is not defined %}
+        {% set value = option %}
+      {% endif %}
+
+      {% if selected_value and (value == selected) %}
+        {% set selected_value = value %}
+        {% set selected_option = option %}
+        {% set is_selected = true %}
+        {% if v.bg_color %}
+          {% set selected_bg_color = v.bg_color %}
+        {% endif %}
+      {% elseif not selected_value and loop.first %}
+        {% set selected_value = value %}
+        {% set selected_option = option %}
+        {% set is_selected = true %}
+        {% if v.bg_color %}
+          {% set selected_bg_color = v.bg_color %}
+        {% endif %}
+      {% endif %}
+      <li data-value="{{ value }}" {% if v.disabled %}data-disabled="disabled"{% endif %} data-color="" class="control--select--list--item {% if is_selected %}control--select--list--item-selected{% endif %} {% if default is defined and v.id == default %}control--select--list--item-default{% endif %} {% if v.bg_color %}control--select--list--item-colored{% endif %} {{v.class_name}}" {% if v.bg_color %}data-bg-color="{{v.bg_color}}" style="background-color:{{v.bg_color}}"{% endif %} {{v.additional_data}}>
+        <span class="control--select--list--item-inner" {% if not no_titles %}title="{{option|striptags}}"{% endif %}>{{option}}</span>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <button class="control--select--button {{button_class_name}} {% if selected_bg_color %}control--select--button-colored{% endif %}" tabindex="{{tab_index}}" type="button" data-value="{{selected_value}}" {% if disabled %}disabled="Y"{% endif %} {% if selected_before %}data-before="{{selected_before}}"{% endif %} {% if selected_after %}data-after="{{selected_after}}"{% endif %} {% if selected_bg_color %}style="background: {{selected_bg_color}}"{% endif %}>
+    <span class="control--select--button-inner">{{ selected_option }}</span>
+  </button>
+  <input type="hidden" class="control--select--input {{ input_special_class }}" id="{{id}}" name="{{name}}" value="{{selected_value}}" data-prev-value="{{selected_value}}">
+</div>

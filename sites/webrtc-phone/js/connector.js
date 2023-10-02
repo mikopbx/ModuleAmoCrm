@@ -43,15 +43,14 @@ define(function (require) {
                 }
                 self.settings[key] = value;
             });
-            self.initEventSource('calls');
-            self.initEventSource('active-calls');
-            self.initEventSource('users');
+            self.initSocket('pbx-events');
             setInterval(self.checkConnection, 5000);
 
             self.token = PubSub.subscribe('COMMAND', function (msg, message) {
                 let url;
+                let reqDate = Date.now();
                 if(message.action === 'saveSettings'){
-                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/change-settings`;
+                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/change-settings?rD=${reqDate}`;
                 }else if(message.action === 'call' || message.action === 'transfer'){
                     message.data = {
                         'action':       (message.action === 'call') ? 'callback':message.action,
@@ -59,14 +58,13 @@ define(function (require) {
                         'user-number':  self.settings.currentPhone,
                         'user-id':      self.settings.currentUser
                     };
-
-                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/callback`;
+                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/callback?rD=${reqDate}`;
                 }else if(message.action === 'findContact'){
-                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/find-contact`;
+                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/find-contact?rD=${reqDate}`;
                 }else if(message.action === 'callback'){
-                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/callback`;
+                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/callback?rD=${reqDate}`;
                 }else{
-                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/command`;
+                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/command?rD=${reqDate}`;
                 }
                 message.data.token = self.settings.token;
                 $.ajax(url, {timeout:5000, type: 'POST', data: message.data})
@@ -95,6 +93,43 @@ define(function (require) {
                 }
             });
         },
+        initSocket: function (chan){
+            let url = `${window.location.origin}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`;
+            $.ajax(url, {
+                timeout:5000,
+                type: 'GET',
+                success: (response) => {
+                    let protocol = 'wss:';
+                    if(window.location.protocol === 'http:'){
+                        protocol = 'ws:';
+                    }
+                    self.eventSource[chan] = new WebSocket(`${protocol}//${window.location.host}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`);
+                    self.eventSource[chan].onopen = function() {
+                        console.debug('onopen:', chan);
+                    };
+                    self.eventSource[chan].onmessage = self.onPbxMessage;
+                    self.eventSource[chan].onclose = function(e) {
+                        console.debug('chan', 'Socket is closed. Reconnect will be attempted in 1 second.', e.reason);
+                        setTimeout(function() {
+                            self.initSocket(chan);
+                        }, 1000);
+                    };
+                    self.eventSource[chan].onerror = function(err) {
+                        console.debug('chan', 'Socket encountered error: ', err.message, 'Closing socket');
+                        setTimeout(function() {
+                            self.initSocket(chan);
+                        }, 5000);
+                    };
+                }
+            })
+            .fail((jqXHR, textStatus) => {
+                if(jqXHR.status === 403){
+                    delete  self.eventSource[chan];
+                    PubSub.publish('CALLS', {action: "error", code: 'errorAuthAPI'});
+                }
+            });
+        },
+
         onPbxMessage: function(event) {
             let callData = undefined;
             try{
@@ -117,6 +152,14 @@ define(function (require) {
                 $.each(callData.data, function (i, contact){
                     PubSub.publish('CALLS', {action: 'updateContact', 'data': contact});
                 });
+            }else if(callData.action === 'open-card'){
+                let data = {
+                    number: callData.data.phone,
+                    responsible: callData.data.responsible,
+                    client: callData.data.client,
+                    lead: callData.data.lead
+                };
+                PubSub.publish('CALLS', {action: 'openCardEntities', 'data': data});
             }else if(callData.action === 'USERS'){
                 callData.data = $.grep(callData.data, function(value) {
                     return value.number !== self.settings.currentPhone;
@@ -130,8 +173,10 @@ define(function (require) {
         checkConnection: function(){
             if( typeof self.eventSource['calls'] !== 'undefined'
                 && self.eventSource['calls'].readyState !== 1){
-
                 let now = new Date().getTime() / 1000;
+                if(self.startReconnect === 0){
+                    self.startReconnect = now - 60;
+                }
                 if(self.state === 1 || ( self.state === 0 && (now - self.startReconnect) > 300 ) ){
                     self.startReconnect = now;
                     PubSub.publish('CALLS', {action: "error", code: 'errorAPITimeOut'});

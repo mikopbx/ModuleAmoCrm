@@ -10,11 +10,8 @@ namespace Modules\ModuleAmoCrm\Models;
 use MikoPBX\Modules\Models\ModulesModelsBase;
 
 /**
- * Class ModuleAmoUsers
+ * Class ModuleAmoPipeLines
  * @package Modules\ModuleAmoCrm\Models
- * @Indexes(
- *     [name='number', columns=['number'], type='']
- * )
  */
 class ModuleAmoPipeLines extends ModulesModelsBase
 {
@@ -41,6 +38,18 @@ class ModuleAmoPipeLines extends ModulesModelsBase
      * @Column(type="string", nullable=true)
      */
     public $did = '';
+
+    /**
+     * Toggle
+     *
+     * @Column(type="string", nullable=true)
+     */
+    public $statuses = '';
+
+    /**
+     * @Column(type="integer", nullable=true)
+     */
+    public $portalId = 0;
 
     /**
      * @param $calledModelObject

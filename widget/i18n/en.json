@@ -24,6 +24,18 @@
         "create_contact" : "Create a contact",
         "call_title": "New call"
     },
+    "sticker": {
+        "label_comment": "Comment",
+        "label_contact": "Contact",
+        "label_email": "Email",
+        "placeholder_comment": "comment...",
+        "placeholder_contact": "contact...",
+        "button_save": "Save",
+        "button_close": "Close",
+        "button_update": "Update",
+        "placeholder_email": "email...",
+        "contact_exists": "The contact already exists"
+    },
     "menu": {
         "main_title" : "Panel MikoPBX"
     },
