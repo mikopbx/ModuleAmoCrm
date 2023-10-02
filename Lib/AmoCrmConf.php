@@ -9,6 +9,7 @@
 
 namespace Modules\ModuleAmoCrm\Lib;
 
+use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\PBX;
 use MikoPBX\Core\System\Processes;
@@ -294,20 +295,29 @@ class AmoCrmConf extends ConfigClass
             '    add_header X-debug-message "test" always;'.PHP_EOL.
             '}'.PHP_EOL.PHP_EOL.
             'location ~ /pbxcore/api/amo/pub/(.*)$ {'.PHP_EOL."\t".
-            'nchan_publisher;'.PHP_EOL."\t".
-            'allow  127.0.0.1;'.PHP_EOL."\t".
-            'nchan_channel_id "$1";'.PHP_EOL."\t".
-            'nchan_message_buffer_length 1;'.PHP_EOL."\t".
-            'nchan_message_timeout 300m;'.PHP_EOL.
+                'nchan_publisher;'.PHP_EOL."\t".
+                'allow  127.0.0.1;'.PHP_EOL."\t".
+                'nchan_channel_id "$1";'.PHP_EOL."\t".
+                'nchan_message_buffer_length 1;'.PHP_EOL."\t".
+                'nchan_message_timeout 300m;'.PHP_EOL.
             '}'.
             PHP_EOL.
             PHP_EOL.
             "location ^~ /webrtc-phone/ {".PHP_EOL."\t".
-            "root {$this->moduleDir}/sites/;".PHP_EOL."\t".
-            "index index.html;".PHP_EOL."\t".
-            "access_log off;".PHP_EOL."\t".
-            "expires 3d;".PHP_EOL.
-            "}".PHP_EOL;
+                "root {$this->moduleDir}/sites/;".PHP_EOL."\t".
+                "index index.html;".PHP_EOL."\t".
+                "access_log off;".PHP_EOL."\t".
+                "expires 3d;".PHP_EOL.
+            "}".
+            PHP_EOL.
+            PHP_EOL.
+            "location /webrtc {".PHP_EOL."\t".
+                'proxy_pass http://127.0.0.1:'.PbxSettings::getValueByKey('AJAMPort').'/asterisk/ws;'.PHP_EOL."\t".
+                'proxy_http_version 1.1;'.PHP_EOL."\t".
+                'proxy_set_header Upgrade $http_upgrade;'.PHP_EOL."\t".
+                'proxy_set_header Connection "upgrade";'.PHP_EOL."\t".
+                'proxy_read_timeout 86400;'.PHP_EOL.
+            '}'.PHP_EOL;
     }
 
     /**

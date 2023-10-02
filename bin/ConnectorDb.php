@@ -32,6 +32,7 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
 use Modules\ModuleAmoCrm\Models\ModuleAmoLeads;
 use Modules\ModuleAmoCrm\Models\ModuleAmoPhones;
+use Modules\ModuleAmoCrm\Models\ModuleAmoPipeLines;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use Throwable;
 use Phalcon\Mvc\Model\Manager;
@@ -399,6 +400,84 @@ class ConnectorDb extends WorkerBase
         if($res){
             $this->lastLeadsSyncTime = $endTime;
         }
+    }
+
+    /**
+     * Заполняет настройки по умолчанию для создания сущностей.
+     * @return void
+     */
+    public function fillEntitySettings():void
+    {
+        $filter     = "'$this->portalId'=portalId";
+        $dbSettings = ModuleAmoEntitySettings::find($filter);
+        $haveEmptyDefUser  = false;
+        $haveEmptyPipeline = false;
+        if(count($dbSettings->toArray()) === 0){
+            $defSettingsFile = dirname(__DIR__).'/db/default-entity-settings.json';
+            try {
+                $defSettings = json_decode(file_get_contents($defSettingsFile), true, 512, JSON_THROW_ON_ERROR);
+            }catch (\Exception $e){
+                $defSettings = [];
+            }
+            foreach ($defSettings as $defSetting){
+                $setting = new ModuleAmoEntitySettings();
+                foreach ($defSetting as $key => $value){
+                    $setting->writeAttribute($key, $value);
+                }
+                $setting->portalId = $this->portalId;
+                $setting->save();
+            }
+
+            $haveEmptyDefUser  = true;
+            $haveEmptyPipeline = true;
+        }else{
+            foreach ($dbSettings as $dbSetting){
+                if(empty($dbSetting->def_responsible)){
+                    $haveEmptyDefUser = true;
+                }
+                if(empty($dbSetting->lead_pipeline_id) || empty($dbSetting->lead_pipeline_status_id)){
+                    $haveEmptyPipeline = true;
+                }
+            }
+        }
+
+        if($haveEmptyDefUser){
+            $dbSettings = ModuleAmoEntitySettings::find($filter);
+            $user = ModuleAmoUsers::findFirst($filter);
+            if($user){
+                foreach ($dbSettings as $dbSetting){
+                    if(empty($dbSetting->def_responsible)){
+                        $dbSetting->def_responsible  = $user->amoUserId;
+                        $dbSetting->save();
+                    }
+                }
+            }
+        }
+
+        if($haveEmptyPipeline){
+            $dbSettings = ModuleAmoEntitySettings::find($filter);
+            $pipeline   = ModuleAmoPipeLines::findFirst($filter);
+            if($pipeline){
+                $statuses = json_decode($pipeline->statuses, true, 512, JSON_THROW_ON_ERROR);
+                $status = '';
+                foreach ($statuses as $statusData){
+                    if($statusData['is_editable']){
+                        $status = $statusData['id'];
+                        break;
+                    }
+                }
+                if(!empty($status)){
+                    foreach ($dbSettings as $dbSetting){
+                        if(empty($dbSetting->lead_pipeline_id) || empty($dbSetting->lead_pipeline_status_id)){
+                            $dbSetting->lead_pipeline_id  = $pipeline->amoId;
+                            $dbSetting->lead_pipeline_status_id = $status;
+                            $dbSetting->save();
+                        }
+                    }
+                }
+            }
+        }
+
     }
 
     /**
