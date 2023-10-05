@@ -76,6 +76,7 @@ class ConnectorDb extends WorkerBase
         }else{
             $this->lastContactsSyncTime  = 0;
             $this->lastCompaniesSyncTime = 0;
+            $this->lastLeadsSyncTime     = 0;
         }
     }
 
@@ -91,10 +92,10 @@ class ConnectorDb extends WorkerBase
             return [];
         }
         $settings = [
-            'ModuleAmoCrm' => $dbData,
+            'ModuleAmoCrm' => $dbData->toArray(),
         ];
         if(!$mainOnly){
-            $settings['ModuleAmoEntitySettings'] = ModuleAmoEntitySettings::find("portalId='{$settings['ModuleAmoCrm']['portalId']}'")->toArray();
+            $settings['ModuleAmoEntitySettings'] = ModuleAmoEntitySettings::find("portalId='{$dbData->portalId}'")->toArray();
         }
         return $settings;
     }

@@ -74,10 +74,11 @@ class WorkerAmoHTTP extends WorkerBase
         }catch (\Throwable $e){
             return;
         }
-        $res_data = [];
+        $res_data = '';
         $funcName = $data['function']??'';
-        if(method_exists($this->amoApi, $funcName)){
+        if(method_exists($this->amoApi, $funcName) && $this->amoApi->isInitDone()){
             $this->needSleep();
+            $this->amoApi->refreshToken();
             if(count($data['args']) === 0){
                 $res_data = $this->amoApi->$funcName();
             }else{

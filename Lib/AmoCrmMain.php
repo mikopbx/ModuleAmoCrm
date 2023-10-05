@@ -15,6 +15,7 @@ class AmoCrmMain extends AmoCrmMainBase
 {
     private string $baseDomain = '';
     private AuthToken $token;
+    private bool $initDone = false;
 
     public bool   $isPrivateWidget;
     public string $privateClientId;
@@ -22,6 +23,15 @@ class AmoCrmMain extends AmoCrmMainBase
 
     public const ENTITY_CONTACTS = 'contacts';
     public const ENTITY_COMPANIES = 'companies';
+
+    /**
+     * Инициализирован ли объект?
+     * @return bool
+     */
+    public function isInitDone():bool
+    {
+        return $this->initDone;
+    }
 
     /**
      * Инициализации API клиента.
@@ -34,11 +44,12 @@ class AmoCrmMain extends AmoCrmMainBase
         $settings = ModuleAmoCrm::findFirst();
         if($settings){
             $this->baseDomain   = $settings->baseDomain;
-            $this->token = new AuthToken((string)$settings->authData);
+            $this->token               = new AuthToken((string)$settings->authData);
             $this->isPrivateWidget     = (string)$settings->isPrivateWidget === '1';
             $this->privateClientId     = ''.$settings->privateClientId;
             $this->privateClientSecret = ''.$settings->privateClientSecret;
             $this->refreshToken();
+            $this->initDone = true;
         }
     }
 
@@ -83,8 +94,11 @@ class AmoCrmMain extends AmoCrmMainBase
      * Обновление токена.
      * @return void
      */
-    private function refreshToken():void
+    public function refreshToken():void
     {
+        if(!$this->initDone){
+            return;
+        }
         $refreshToken = $this->token->getRefreshToken();
         if(empty($refreshToken)){
             return;
@@ -174,9 +188,6 @@ class AmoCrmMain extends AmoCrmMainBase
      */
     public function syncPipeLines($portalId):array
     {
-        if(!isset($this->token)){
-            return [];
-        }
         $url = "https://$this->baseDomain/api/v4/leads/pipelines";
         $headers = [
             'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),

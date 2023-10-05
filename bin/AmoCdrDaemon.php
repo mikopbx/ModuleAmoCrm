@@ -248,6 +248,7 @@ class AmoCdrDaemon extends WorkerBase
      */
     private function cdrSync():void
     {
+        $oldOffset = $this->offset;
         $this->cdrRows = [];
         $add_query                     = [
             'columns' => 'id,start,answer,src_num,dst_num,billsec,recordingfile,UNIQUEID,linkedid,disposition,is_app,did',
@@ -390,7 +391,10 @@ class AmoCdrDaemon extends WorkerBase
         // Прикрепление звонков к сущностям.
         ////
         $this->addCalls($calls, $callCounter);
-        ConnectorDb::invoke('updateOffset', [$this->offset]);
+
+        if($oldOffset !== $this->offset){
+            ConnectorDb::invoke('updateOffset', [$this->offset]);
+        }
     }
 
     /**
