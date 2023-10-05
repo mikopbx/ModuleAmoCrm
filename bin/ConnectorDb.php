@@ -86,8 +86,12 @@ class ConnectorDb extends WorkerBase
      */
     public function getModuleSettings(bool $mainOnly = false):array
     {
+        $dbData = ModuleAmoCrm::findFirst();
+        if(!$dbData){
+            return [];
+        }
         $settings = [
-            'ModuleAmoCrm' => ModuleAmoCrm::findFirst()->toArray(),
+            'ModuleAmoCrm' => $dbData,
         ];
         if(!$mainOnly){
             $settings['ModuleAmoEntitySettings'] = ModuleAmoEntitySettings::find("portalId='{$settings['ModuleAmoCrm']['portalId']}'")->toArray();
