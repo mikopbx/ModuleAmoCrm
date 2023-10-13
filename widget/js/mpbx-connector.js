@@ -55,18 +55,27 @@ define(function (require) {
                 // Checking the availability of content located remotely
                 // ModuleAmoCrm/sites/webrtc-phone/index.html
                 $.ajax({
-                    type : "HEAD",
                     async : true,
                     url : href
                 })
-                .success(function() {
-                    if ($('iframe[src="' + href +'"').length < 1) {
+                .success(function(htmlContent) {
+                    htmlContent = htmlContent.replace(new RegExp('href="', 'g'), `href="//${connector.settings.pbxHost}/webrtc-phone/`);
+                    htmlContent = htmlContent.replace(new RegExp('src="', 'g'),  `src="//${connector.settings.pbxHost}/webrtc-phone/`);
+                    htmlContent = htmlContent.replace(new RegExp('data-main="', 'g'),  `data-main="//${connector.settings.pbxHost}/webrtc-phone/`);
+                    if ($('#miko-pbx-phone').length < 1) {
                         // Add iframe
                         let css = 'position: fixed; z-index: 999; right: 0;bottom: 0; border: 0;';
                         // We connect the style.css file by passing the widget version as a parameter
-                        $("body").prepend(`<iframe id="miko-pbx-phone" src="${href}" width="300" height="${$(window).height()}" style="${css}"></iframe>`);
+                        $("body").prepend(`<iframe id="miko-pbx-phone" src="javascript:void(0);" width="300" height="${$(window).height()}" style="${css}"></iframe>`);
                     }
                     connector.iFrame = document.getElementById('miko-pbx-phone');
+                    $(connector.iFrame).attr('title', connector.settings.pbxHost);
+                    $(connector.iFrame).hide();
+                    let previewIframe =  connector.iFrame.contentDocument ||  connector.iFrame.contentWindow.document;
+                    previewIframe.open();
+                    previewIframe.write(htmlContent);
+                    previewIframe.close();
+
                     connector.iFrame.onload = function (){
                         let frameVisibility= localStorage.getItem('frameVisibility');
                         if(frameVisibility === '1'){
@@ -113,14 +122,17 @@ define(function (require) {
          * @param message
          */
         onMessage: function(event, message = null) {
-            if( typeof event.origin !== 'undefined'
-                && location.protocol+`//${connector.settings.pbxHost}` !== event.origin){
-                return;
-            }
             let params;
             try {
                 params = message || JSON.parse(event.data);
             }catch (e) {
+                return;
+            }
+            if(params.action === 'saveSettings'){
+                // Обновляем значение в настройках.
+                connector.settings.pbxHost = params.pbxHost;
+            }
+            if(connector.settings.pbxHost !== params.pbxHost){
                 return;
             }
             if(params.action === 'init-done'){

@@ -179,6 +179,9 @@ define(function (require) {
             $('#web-rtc-phone').removeClass('invisible');
         },
         sendMessage: function (msgData){
+            if(window.self !== window.top) {
+                msgData.pbxHost = window.frameElement.title;
+            }
             window.parent.postMessage(JSON.stringify(msgData), '*')
         },
         updateDuration: function (){

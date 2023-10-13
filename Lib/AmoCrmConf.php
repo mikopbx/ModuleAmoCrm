@@ -306,8 +306,11 @@ class AmoCrmConf extends ConfigClass
             "location ^~ /webrtc-phone/ {".PHP_EOL."\t".
                 "root {$this->moduleDir}/sites/;".PHP_EOL."\t".
                 "index index.html;".PHP_EOL."\t".
-                "access_log off;".PHP_EOL."\t".
-                "expires 3d;".PHP_EOL.
+                'add_header Expires "0";'.PHP_EOL."\t".
+                'add_header X-TEST-DATE $time_iso8601;'.PHP_EOL."\t".
+                "add_header 'Access-Control-Allow-Origin' '*' always;".PHP_EOL."\t".
+                'add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0";'.PHP_EOL."\t".
+                'add_header Pragma "no-cache";'.PHP_EOL.
             "}".
             PHP_EOL.
             PHP_EOL.

@@ -16,9 +16,13 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 
+let baseUrl = 'js';
+if(window.self !== window.top){
+    // This is iframe.
+    baseUrl = `${window.location.protocol}//${window.frameElement.title}/webrtc-phone/js`;
+}
 requirejs.config({
-    urlArgs: "bust=" + (new Date()).getTime(),
-    baseUrl: 'js',
+    baseUrl: baseUrl,
     paths: {
         'jquery':         'vendors/jquery-3.6.0.min',
         'datatables.net': 'vendors/jquery.dataTables-1.11.5.min',
@@ -28,7 +32,7 @@ requirejs.config({
         'pubsub':         'vendors/pubsub.min',
         'cache':          'vendors/localstorage-slim',
         'bootstrap':      '../bootstrap/js/bootstrap.bundle.min',
+        'jssip':          'vendors/jssip.min',
     },
 });
-
 requirejs(['main']);

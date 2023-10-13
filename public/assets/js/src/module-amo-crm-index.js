@@ -81,17 +81,6 @@ const ModuleAmoCrm = {
 		window.addEventListener('ModuleStatusChanged', window[className].checkStatusToggle);
 		window[className].initializeForm();
 		$('.menu .item').tab();
-		$.get( idUrl + '/getTablesDescription', function( result ) {
-			for (let key in result['data']) {
-				let tableName = key + '-table';
-				if( $('#'+tableName).attr('id') === undefined){
-					continue;
-				}
-				if(result['data'].hasOwnProperty(key)){
-					window[className].initTable(tableName, result['data'][key]);
-				}
-			}
-		});
 
 		window[className].checkStatus();
 		setInterval(window[className].checkStatus, 5000);
