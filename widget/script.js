@@ -47,8 +47,8 @@ define(function (require) {
       onSave: function (data) {
         let phones = data.fields.pbx_users || false;
         if (phones) {
-          $.get( "/api/v2/account", function( data ) {
-            PubSub.publish(self.ns + ':connector', {'users': phones , 'portalId': data.id, action: 'saveSettings'});
+          $.get( "/api/v2/account", function( accData ) {
+            PubSub.publish(self.ns + ':connector', {'users': phones , 'portalId': accData.id, action: 'saveSettings', 'pbxHost': data.fields.miko_pbx_host});
           });
         }
         return true;
@@ -110,6 +110,7 @@ define(function (require) {
         if(message.action === 'findContact'){
           self.api.findContact(message, function (result){
             result.action = 'resultFindContact';
+            result.pbxHost = self.settings.pbxHost;
             PubSub.publish(self.ns + ':connector', result);
           });
         }else if(message.action === 'error'){
@@ -263,7 +264,8 @@ define(function (require) {
             'action':       'callback',
             'number':       params.value,
             'user-number':  self.settings.currentPhone,
-            'user-id':      self.settings.currentUser
+            'user-id':      self.settings.currentUser,
+            'pbxHost':      self.settings.pbxHost
           };
           PubSub.publish(self.ns + ':connector', postParams);
         }

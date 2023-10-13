@@ -50,7 +50,8 @@ define(function (require) {
                 let url;
                 let reqDate = Date.now();
                 if(message.action === 'saveSettings'){
-                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/change-settings?rD=${reqDate}`;
+                    self.settings.pbxHost = message.data.pbxHost;
+                    url = `${window.location.protocol}//${message.data.pbxHost}/pbxcore/api/amo-crm/v1/change-settings?rD=${reqDate}`;
                 }else if(message.action === 'call' || message.action === 'transfer'){
                     message.data = {
                         'action':       (message.action === 'call') ? 'callback':message.action,
@@ -58,13 +59,13 @@ define(function (require) {
                         'user-number':  self.settings.currentPhone,
                         'user-id':      self.settings.currentUser
                     };
-                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/callback?rD=${reqDate}`;
+                    url = `${window.location.protocol}//${self.settings.pbxHost}/pbxcore/api/amo-crm/v1/callback?rD=${reqDate}`;
                 }else if(message.action === 'findContact'){
-                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/find-contact?rD=${reqDate}`;
+                    url = `${window.location.protocol}//${self.settings.pbxHost}/pbxcore/api/amo-crm/v1/find-contact?rD=${reqDate}`;
                 }else if(message.action === 'callback'){
-                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/callback?rD=${reqDate}`;
+                    url = `${window.location.protocol}//${self.settings.pbxHost}/pbxcore/api/amo-crm/v1/callback?rD=${reqDate}`;
                 }else{
-                    url = `${window.location.origin}/pbxcore/api/amo-crm/v1/command?rD=${reqDate}`;
+                    url = `${window.location.protocol}//${self.settings.pbxHost}/pbxcore/api/amo-crm/v1/command?rD=${reqDate}`;
                 }
                 message.data.token = self.settings.token;
                 $.ajax(url, {timeout:5000, type: 'POST', data: message.data})
@@ -78,7 +79,7 @@ define(function (require) {
             });
         },
         initEventSource: function (chan){
-            let url = `${window.location.origin}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`;
+            let url = `${window.location.protocol}//${self.settings.pbxHost}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`;
             self.eventSource[chan] = new EventSource(url, {
                 withCredentials: true
             });
@@ -94,7 +95,7 @@ define(function (require) {
             });
         },
         initSocket: function (chan){
-            let url = `${window.location.origin}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`;
+            let url = `${window.location.protocol}//${self.settings.pbxHost}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`;
             $.ajax(url, {
                 timeout:5000,
                 type: 'GET',
@@ -103,19 +104,19 @@ define(function (require) {
                     if(window.location.protocol === 'http:'){
                         protocol = 'ws:';
                     }
-                    self.eventSource[chan] = new WebSocket(`${protocol}//${window.location.host}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`);
+                    self.eventSource[chan] = new WebSocket(`${protocol}//${self.settings.pbxHost}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`);
                     self.eventSource[chan].onopen = function() {
-                        console.debug('onopen:', chan);
+                        console.debug('onopen ws MikoPBX:', chan);
                     };
                     self.eventSource[chan].onmessage = self.onPbxMessage;
                     self.eventSource[chan].onclose = function(e) {
-                        console.debug('chan', 'Socket is closed. Reconnect will be attempted in 1 second.', e.reason);
+                        console.debug('chan', 'Socket MikoPBX is closed. Reconnect will be attempted in 1 second.', e.reason);
                         setTimeout(function() {
                             self.initSocket(chan);
                         }, 1000);
                     };
                     self.eventSource[chan].onerror = function(err) {
-                        console.debug('chan', 'Socket encountered error: ', err.message, 'Closing socket');
+                        console.debug('chan', 'Socket MikoPBX encountered error: ', err.message, 'Closing socket');
                         setTimeout(function() {
                             self.initSocket(chan);
                         }, 5000);
