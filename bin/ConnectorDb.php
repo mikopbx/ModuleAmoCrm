@@ -113,7 +113,6 @@ class ConnectorDb extends WorkerBase
         return $settings->save();
     }
 
-
     /**
      * Старт работы листнера.
      *

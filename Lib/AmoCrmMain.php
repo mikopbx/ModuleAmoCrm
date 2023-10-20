@@ -23,15 +23,6 @@ class AmoCrmMain extends AmoCrmMainBase
     public const ENTITY_COMPANIES = 'companies';
 
     /**
-     * Инициализирован ли объект?
-     * @return bool
-     */
-    public function isInitDone():bool
-    {
-        return $this->initDone;
-    }
-
-    /**
      * Инициализации API клиента.
      * AmoCrmMain constructor.
      */
@@ -56,6 +47,19 @@ class AmoCrmMain extends AmoCrmMainBase
         }
     }
 
+    /**
+     * Инициализирован ли объект?
+     * @return bool
+     */
+    public function isInitDone():bool
+    {
+        return $this->initDone;
+    }
+
+    /**
+     * Return client ID.
+     * @return string
+     */
     private function getClientId():string
     {
         if($this->isPrivateWidget) {
@@ -63,6 +67,11 @@ class AmoCrmMain extends AmoCrmMainBase
         }
         return self::CLIENT_ID;
     }
+
+    /**
+     * Return client secret
+     * @return string
+     */
     private function getClientSecret():string
     {
         if($this->isPrivateWidget){
@@ -274,91 +283,6 @@ class AmoCrmMain extends AmoCrmMainBase
         return ClientHTTP::sendHttpPostRequest($url, $calls, $headers);
     }
 
-    public function getNotes($entity_type, $entity_id):PBXApiResult
-    {
-        $url = "https://$this->baseDomain/api/v4/$entity_type/$entity_id/notes";
-        $headers = [
-            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
-        ];
-        return ClientHTTP::sendHttpGetRequest($url, [], $headers);
-    }
-
-    public function getSources():PBXApiResult
-    {
-        $url = "https://$this->baseDomain/api/v4/sources";
-        $headers = [
-            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
-        ];
-        return ClientHTTP::sendHttpGetRequest($url, [], $headers);
-    }
-
-    public function patchNote($entity_type, $entity_id, $id, $newRecFile):PBXApiResult
-    {
-        $url = "https://$this->baseDomain/api/v4/$entity_type/$entity_id/notes/$id";
-        $headers = [
-            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
-        ];
-        $params = [
-            'note_type' => 'call_in',
-            'params' => [
-                'link'=>$newRecFile,
-                'uniq'=>"test-uid",
-                'duration'=>60,
-                'source'=>"miko-pbx",
-                'phone' => "74992243333",
-                'call_status' => 4,
-                'call_result' => 'ANSWERED'
-            ],
-        ];
-        return ClientHTTP::sendHttpPatchRequest($url, $params, $headers);
-    }
-
-    public function notifyUsers(string $phone, array $users):PBXApiResult
-    {
-        $url = "https://$this->baseDomain/api/v2/events/";
-        $headers = [
-            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
-        ];
-        $notify = [
-            'add' => [
-                [
-                'type' => "phone_call",
-                'phone_number' => $phone,
-                'users' => $users
-                ],
-            ]
-        ];
-        return ClientHTTP::sendHttpPostRequest($url, $notify, $headers);
-    }
-
-    public function addSources($data):PBXApiResult
-    {
-        $sources = [];
-        foreach ($data as $row){
-            $name       = $row['name']??'';
-            $externalID = $row['external_id']??'';
-            if(empty($name) || empty($externalID)){
-                continue;
-            }
-            $source = [
-                'name' => $name,
-                'external_id' => $externalID
-            ];
-            if(isset($row['pipeline_id'])){
-                $source['pipeline_id'] =  $row['pipeline_id'];
-            }
-            if(isset($row['default'])){
-                $source['default'] =  $row['default'];
-            }
-            $sources[] = $source;
-        }
-        $url = "https://$this->baseDomain/api/v4/sources";
-        $headers = [
-            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
-        ];
-        return ClientHTTP::sendHttpPostRequest($url, $sources, $headers);
-    }
-
     /**
      * Получает изменненные контакты / компании.
      * @param int    $fromTime
@@ -409,7 +333,8 @@ class AmoCrmMain extends AmoCrmMainBase
      * @param string $page
      * @return PBXApiResult
      */
-    public function getChangedLeads(int $fromTime, int $toTime, string $page = ''):PBXApiResult{
+    public function getChangedLeads(int $fromTime, int $toTime, string $page = ''):PBXApiResult
+    {
         $url = "https://$this->baseDomain/api/v4/leads";
         $headers = [
             'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
@@ -429,7 +354,6 @@ class AmoCrmMain extends AmoCrmMainBase
         parse_str($nextUrl['query']??'', $queryArray);
 
         $result->data = [
-            'leads' => [],
             'nextPage' => $queryArray['page']??'',
         ];
         $result->data['leads'] = $response->data['_embedded']['leads']??[];
