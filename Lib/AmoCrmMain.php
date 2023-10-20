@@ -6,8 +6,6 @@ use MikoPBX\Core\System\Util;
 use MikoPBX\Modules\PbxExtensionUtils;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\bin\ConnectorDb;
-use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
-use Modules\ModuleAmoCrm\Models\ModuleAmoPipeLines;
 use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Common\Models\PbxSettings;
 
@@ -40,10 +38,15 @@ class AmoCrmMain extends AmoCrmMainBase
     public function __construct()
     {
         parent::__construct();
-        /** @var ModuleAmoCrm $settings */
-        $settings = ModuleAmoCrm::findFirst();
+
+        $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
+        if(!empty($allSettings) && is_array($allSettings)){
+            $settings = (object)$allSettings['ModuleAmoCrm'];
+        }else{
+            exit(3);
+        }
         if($settings){
-            $this->baseDomain   = $settings->baseDomain;
+            $this->baseDomain           = $settings->baseDomain;
             $this->token               = new AuthToken((string)$settings->authData);
             $this->isPrivateWidget     = (string)$settings->isPrivateWidget === '1';
             $this->privateClientId     = ''.$settings->privateClientId;
@@ -184,7 +187,6 @@ class AmoCrmMain extends AmoCrmMainBase
      * Синхронизация воронок.
      * @param $portalId
      * @return array
-     * @throws \JsonException
      */
     public function syncPipeLines($portalId):array
     {
@@ -195,43 +197,9 @@ class AmoCrmMain extends AmoCrmMainBase
         $response = ClientHTTP::sendHttpGetRequest($url, [], $headers);
         if($response->success){
             $data = $response->data['_embedded']['pipelines']??[];
-            if(is_array($data)){
-                $lineIds = [];
-                $dbData = ModuleAmoPipeLines::find(["'$portalId'=portalId",'columns' => 'amoId,name']);
-                foreach ($dbData as $lineData){
-                    $lineIds[$lineData->amoId] = $lineData->name;
-                }
-                foreach ($data as $line){
-                    if(isset($lineIds[$line['id']])){
-                        $dbData = ModuleAmoPipeLines::findFirst("'$portalId'=portalId AND amoId='{$line['id']}'");
-                    }else{
-                        // Такой линии нет в базе данных.
-                        $dbData = new ModuleAmoPipeLines();
-                        $dbData->amoId    = $line['id'];
-                        $dbData->portalId = $portalId;
-                    }
-                    $dbData->name  = $line['name'];
-                    $dbData->statuses = json_encode($line['_embedded']['statuses'], JSON_THROW_ON_ERROR);
-                    $dbData->save();
-                    unset($lineIds[$line['id']]);
-                }
-                foreach ($lineIds as $id => $name){
-                    /** @var ModuleAmoPipeLines $dbData */
-                    $dbData = ModuleAmoPipeLines::findFirst("'$portalId'=portalId AND amoId='{$id}'");
-                    if($dbData){
-                        // Такой воронки больше нет. удаляем.
-                        $dbData->delete();
-                    }
-                }
-            }
-        }
-        $pipeLines = [];
-        $dbData = ModuleAmoPipeLines::find(["'$portalId'=portalId", 'columns' => 'amoId,did,name']);
-        foreach ($dbData as $line){
-            $pipeLines[] = [
-                'id'    => $line->amoId,
-                'name'  => $line->name
-            ];
+            $pipeLines = ConnectorDb::invoke('updatePipelines', [$data]);
+        }else{
+            $pipeLines = ConnectorDb::invoke('getPipeLines', []);
         }
         return $pipeLines;
     }

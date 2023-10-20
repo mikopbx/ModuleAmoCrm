@@ -673,6 +673,85 @@ class ConnectorDb extends WorkerBase
     }
 
     /**
+     * Синхронизация воронок и статусов.
+     * @param array $data
+     * @return array
+     */
+    public function updatePipelines(array $data):array
+    {
+        $lineIds = [];
+        $dbData = ModuleAmoPipeLines::find(["'$this->portalId'=portalId",'columns' => 'amoId,name']);
+        foreach ($dbData as $lineData){
+            $lineIds[$lineData->amoId] = $lineData->name;
+        }
+        foreach ($data as $line){
+            if(isset($lineIds[$line['id']])){
+                $dbData = ModuleAmoPipeLines::findFirst("'$this->portalId'=portalId AND amoId='{$line['id']}'");
+            }else{
+                // Такой линии нет в базе данных.
+                $dbData = new ModuleAmoPipeLines();
+                $dbData->amoId    = $line['id'];
+                $dbData->portalId = $this->portalId;
+            }
+            $dbData->name  = $line['name'];
+            try {
+                $dbData->statuses = json_encode($line['_embedded']['statuses'], JSON_THROW_ON_ERROR);
+            }catch (\JsonException $e){
+                $dbData->statuses = [];
+            }
+            $dbData->save();
+            unset($lineIds[$line['id']]);
+        }
+        foreach ($lineIds as $id => $name){
+            /** @var ModuleAmoPipeLines $dbData */
+            $dbData = ModuleAmoPipeLines::findFirst("'$this->portalId'=portalId AND amoId='{$id}'");
+            if($dbData){
+                // Такой воронки больше нет. удаляем.
+                $dbData->delete();
+            }
+        }
+
+        return $this->getPipeLines();
+    }
+
+    /**
+     * Возвращает все воронки.
+     * @return array
+     */
+    public function getPipeLines():array
+    {
+        $pipeLines = [];
+        $dbData = ModuleAmoPipeLines::find(["'$this->portalId'=portalId", 'columns' => 'amoId,did,name']);
+        foreach ($dbData as $line){
+            $pipeLines[] = [
+                'id'    => $line->amoId,
+                'name'  => $line->name
+            ];
+        }
+        return $pipeLines;
+    }
+
+    /**
+     * Сохраняет новые настройки в базу данных.
+     * @param array $data
+     * @return bool
+     */
+    public function saveNewSettings(array $data):bool
+    {
+        /** @var ModuleAmoCrm $settings */
+        $settings = ModuleAmoCrm::findFirst();
+        if(!$settings){
+            $settings = new ModuleAmoCrm();
+        }
+        foreach ($settings->toArray() as $key => $value){
+            if(isset($data[$key])){
+                $settings->writeAttribute($key, $data[$key]);
+            }
+        }
+        return $settings->save();
+    }
+
+    /**
      * Метод следует вызывать при работе с API из прочих процессов.
      * @param string $function
      * @param array $args

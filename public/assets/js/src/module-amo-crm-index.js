@@ -17,7 +17,7 @@ const ModuleAmoCrm = {
 	$dropDowns: 			$('#'+idForm+' .ui.dropdown'),
 	saveTableAJAXUrl: 		`${window.location.origin}${globalRootUrl}${idUrl}/saveTableData`,
 	deleteRecordAJAXUrl: 	`${window.location.origin}${globalRootUrl}${idUrl}/delete`,
-	$disabilityFields: 		$('#'+idForm+'  .disability'),
+	$disabilityFields: 		$('div.disability'),
 	$statusToggle: 			$('#module-status-toggle'),
 	$moduleStatus: 			$('#status'),
 	authWindow: 			undefined,
