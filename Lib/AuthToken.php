@@ -109,7 +109,7 @@ class AuthToken
         if($portalId > 0){
             $newSettings['portalId'] = $portalId;
         }
-        return ConnectorDb::invoke('saveNewSettings', [$newSettings]);;
+        return ConnectorDb::invoke('saveNewSettings', [$newSettings]);
     }
 
     /**

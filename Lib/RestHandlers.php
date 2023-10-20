@@ -21,9 +21,8 @@ namespace Modules\ModuleAmoCrm\Lib;
 
 use MikoPBX\Common\Providers\CDRDatabaseProvider;
 use MikoPBX\Core\System\Util;
+use Modules\ModuleAmoCrm\bin\ConnectorDb;
 use Modules\ModuleAmoCrm\bin\WorkerAmoHTTP;
-use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
-use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 
 class RestHandlers extends AmoCrmMainBase
 {
@@ -38,16 +37,7 @@ class RestHandlers extends AmoCrmMainBase
         $res->success = true;
         $users = $request['data']['users']??[];
         if(is_array($users)){
-            foreach ($users as $amoUserId => $number){
-                $dbData = ModuleAmoUsers::findFirst("amoUserId='$amoUserId' AND portalId='{$request['data']['portalId']}'");
-                if(!$dbData){
-                    $dbData = new ModuleAmoUsers();
-                    $dbData->amoUserId = $amoUserId;
-                    $dbData->portalId  = $request['data']['portalId'];
-                }
-                $dbData->number = trim($number);
-                $dbData->save();
-            }
+            ConnectorDb::invoke('saveAmoUsers', [$users,$request['data']['portalId']]);
         }
         return $res;
     }
@@ -60,11 +50,8 @@ class RestHandlers extends AmoCrmMainBase
     {
         $result = new PBXAmoResult();
         $params = $request['data']??[];
-        /** @var ModuleAmoCrm $settings */
         if(isset($params['error'])) {
-            $settings = ModuleAmoCrm::findFirst();
-            $settings->authData = '';
-            $settings->save();
+            ConnectorDb::invoke('saveNewSettings', ['authData' => '']);
         }elseif (isset($params['code']) && !empty($params['code'])){
             $result = WorkerAmoHTTP::invokeAmoApi('getAccessTokenByCode', [$params['code']]);
             WorkerAmoHTTP::invokeAmoApi('checkConnection', [true]);

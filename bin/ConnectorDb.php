@@ -752,6 +752,28 @@ class ConnectorDb extends WorkerBase
     }
 
     /**
+     * Сохраняем список сотрудников портала.
+     * @param $users
+     * @param $portalId
+     * @return bool
+     */
+    public function saveAmoUsers($users, $portalId):bool
+    {
+        $result = true;
+        foreach ($users as $amoUserId => $number){
+            $dbData = ModuleAmoUsers::findFirst("amoUserId='$amoUserId' AND portalId='$portalId'");
+            if(!$dbData){
+                $dbData = new ModuleAmoUsers();
+                $dbData->amoUserId = $amoUserId;
+                $dbData->portalId  = $portalId;
+            }
+            $dbData->number = trim($number);
+            $result = min($dbData->save(), $result);
+        }
+        return $result;
+    }
+
+    /**
      * Метод следует вызывать при работе с API из прочих процессов.
      * @param string $function
      * @param array $args
