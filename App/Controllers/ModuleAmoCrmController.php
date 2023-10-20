@@ -14,8 +14,9 @@ use MikoPBX\Modules\PbxExtensionUtils;
 use Modules\ModuleAmoCrm\App\Forms\ModuleAmoCrmEntitySettingsModifyForm;
 use Modules\ModuleAmoCrm\App\Forms\ModuleAmoCrmForm;
 use Modules\ModuleAmoCrm\bin\WorkerAmoHTTP;
-use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use MikoPBX\Common\Models\Providers;
+
+use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
 
 class ModuleAmoCrmController extends BaseController

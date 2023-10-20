@@ -8,7 +8,6 @@
  */
 namespace Modules\ModuleAmoCrm\App\Forms;
 
-use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMainBase;
 use Phalcon\Forms\Element\Check;
 use Phalcon\Forms\Form;

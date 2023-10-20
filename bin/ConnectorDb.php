@@ -716,10 +716,14 @@ class ConnectorDb extends WorkerBase
 
     /**
      * Возвращает все воронки.
+     * @param bool $source
      * @return array
      */
-    public function getPipeLines():array
+    public function getPipeLines(bool $source = false):array
     {
+        if($source){
+            return ModuleAmoPipeLines::find(["'$this->portalId'=portalId"])->toArray();
+        }
         $pipeLines = [];
         $dbData = ModuleAmoPipeLines::find(["'$this->portalId'=portalId", 'columns' => 'amoId,did,name']);
         foreach ($dbData as $line){
