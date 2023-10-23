@@ -20,10 +20,10 @@ use MikoPBX\Modules\PbxExtensionUtils;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\bin\AmoCdrDaemon;
 use Modules\ModuleAmoCrm\bin\ConnectorDb;
+use Modules\ModuleAmoCrm\bin\SyncDaemon;
 use Modules\ModuleAmoCrm\bin\WorkerAmoCrmAMI;
 use Modules\ModuleAmoCrm\bin\WorkerAmoHTTP;
 use Modules\ModuleAmoCrm\Lib\RestAPI\Controllers\ApiController;
-use MikoPBX\PBXCoreREST\Controllers\Cdr\GetController as CdrGetController;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 
 class AmoCrmConf extends ConfigClass
@@ -139,6 +139,10 @@ class AmoCrmConf extends ConfigClass
             [
                 'type'   => WorkerSafeScriptsCore::CHECK_BY_BEANSTALK,
                 'worker' => WorkerAmoHTTP::class,
+            ],
+            [
+                'type'   => WorkerSafeScriptsCore::CHECK_BY_PID_NOT_ALERT,
+                'worker' => SyncDaemon::class,
             ],
         ];
     }

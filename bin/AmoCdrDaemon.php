@@ -88,11 +88,9 @@ class AmoCdrDaemon extends WorkerBase
         $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
         while ($this->needRestart === false){
             if(time() - $this->lastSyncTime > 10){
+                ConnectorDb::invoke('updateSettings', [], false);
                 WorkerAmoHTTP::invokeAmoApi('syncPipeLines', [$this->portalId]);
                 ConnectorDb::invoke('fillEntitySettings', []);
-                ConnectorDb::invoke('syncContacts', [AmoCrmMain::ENTITY_COMPANIES]);
-                ConnectorDb::invoke('syncContacts', [AmoCrmMain::ENTITY_CONTACTS]);
-                ConnectorDb::invoke('syncLeads', []);
                 $this->updateSettings();
             }
             $this->updateActiveCalls();

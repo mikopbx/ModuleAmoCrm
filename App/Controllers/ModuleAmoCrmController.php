@@ -9,10 +9,12 @@ namespace Modules\ModuleAmoCrm\App\Controllers;
 use MikoPBX\AdminCabinet\Controllers\BaseController;
 use MikoPBX\Common\Models\CallQueues;
 use MikoPBX\Common\Models\Extensions;
+use MikoPBX\Common\Models\PbxExtensionModules;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Modules\PbxExtensionUtils;
 use Modules\ModuleAmoCrm\App\Forms\ModuleAmoCrmEntitySettingsModifyForm;
 use Modules\ModuleAmoCrm\App\Forms\ModuleAmoCrmForm;
+use Modules\ModuleAmoCrm\bin\ConnectorDb;
 use Modules\ModuleAmoCrm\bin\WorkerAmoHTTP;
 use MikoPBX\Common\Models\Providers;
 
@@ -118,10 +120,24 @@ class ModuleAmoCrmController extends BaseController
         $headerCollectionCSS->addCss('css/vendor/datatable/dataTables.semanticui.min.css', true);
         $headerCollectionCSS->addCss('css/vendor/semantic/modal.min.css', true);
 
-        $settings = ModuleAmoCrm::findFirst();
-        if ($settings === null) {
-            $settings = new ModuleAmoCrm();
-            $settings->isPrivateWidget = '0';
+
+        $ModuleSettings = PbxExtensionModules::findFirst(["uniqid='$this->moduleUniqueID'",'columns' => ['disabled']]);
+        if($ModuleSettings->disabled === '1'){
+            // Если модуль отключен.
+            $settings = ModuleAmoCrm::findFirst();
+            if ($settings === null) {
+                $settings = new ModuleAmoCrm();
+                $settings->isPrivateWidget = '0';
+            }
+            $rules = ModuleAmoEntitySettings::find(["portalId='$settings->portalId'", 'columns' => ['id', 'did', 'type', 'create_lead', 'create_contact', 'create_unsorted', 'create_task']])->toArray();
+        }else{
+            // Если включен, то пробуем получить настройки средствами демона ConnectorDb.
+            $allSettings = ConnectorDb::invoke('getModuleSettings', [false]);
+            $settings    = (object)$allSettings['ModuleAmoCrm'];
+            $rules       = $allSettings['ModuleAmoEntitySettings'];
+        }
+        foreach ($rules as $index => $rule){
+            $rules[$index]['type_translate'] = 'mod_amo_type_'.$rule['type'];
         }
 
         // For example we add providers list on the form
@@ -139,10 +155,6 @@ class ModuleAmoCrmController extends BaseController
         $this->view->queues = CallQueues::find(['columns' => ['id', 'name']]);
         $this->view->users  = Extensions::find(["type = 'SIP'", 'columns' => ['number', 'callerid']]);
 
-        $rules = ModuleAmoEntitySettings::find(["portalId='$settings->portalId'", 'columns' => ['id', 'did', 'type', 'create_lead', 'create_contact', 'create_unsorted', 'create_task']])->toArray();
-        foreach ($rules as $index => $rule){
-            $rules[$index]['type_translate'] = 'mod_amo_type_'.$rule['type'];
-        }
         $this->view->entitySettings  = $rules;
     }
 
@@ -180,7 +192,7 @@ class ModuleAmoCrmController extends BaseController
      */
     public function saveAction() :void
     {
-        $data       = $this->request->getPost();
+        $data   = $this->request->getPost();
         $record = ModuleAmoCrm::findFirst();
         if ($record === null) {
             $record = new ModuleAmoCrm();
@@ -192,7 +204,7 @@ class ModuleAmoCrmController extends BaseController
             }
             if('useInterception' === $key || 'isPrivateWidget' === $key ){
                 $record->$key = ($data[$key] === 'on') ? '1' : '0';
-            } else if (array_key_exists($key, $data)) {
+            } elseif (array_key_exists($key, $data)) {
                 if($record->$key !== trim($data[$key])){
                     $record->$key = trim($data[$key]);
                 }

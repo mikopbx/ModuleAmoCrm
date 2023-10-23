@@ -34,15 +34,13 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoLeads;
 use Modules\ModuleAmoCrm\Models\ModuleAmoPhones;
 use Modules\ModuleAmoCrm\Models\ModuleAmoPipeLines;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
+use Phalcon\Di;
 use Throwable;
 use Phalcon\Mvc\Model\Manager;
 
 class ConnectorDb extends WorkerBase
 {
     private array   $users = [];
-    private int     $lastContactsSyncTime;
-    private int     $lastCompaniesSyncTime;
-    private int     $lastLeadsSyncTime;
     private int     $portalId = 0;
 
     /**
@@ -64,19 +62,14 @@ class ConnectorDb extends WorkerBase
      */
     public function updateSettings():void
     {
-        if(isset($this->lastContactsSyncTime, $this->lastCompaniesSyncTime)){
-            return;
-        }
         $settings = ModuleAmoCrm::findFirst();
         if($settings){
-            $this->lastContactsSyncTime  = (int)$settings->lastContactsSyncTime;
-            $this->lastCompaniesSyncTime = (int)$settings->lastCompaniesSyncTime;
-            $this->lastLeadsSyncTime     = (int)$settings->lastLeadsSyncTime;
             $this->portalId              = (int)$settings->portalId;
         }else{
-            $this->lastContactsSyncTime  = 0;
-            $this->lastCompaniesSyncTime = 0;
-            $this->lastLeadsSyncTime     = 0;
+            $settings->lastContactsSyncTime  = 0;
+            $settings->lastCompaniesSyncTime = 0;
+            $settings->lastLeadsSyncTime     = 0;
+            $settings->save();
         }
     }
 
@@ -87,16 +80,18 @@ class ConnectorDb extends WorkerBase
      */
     public function getModuleSettings(bool $mainOnly = false):array
     {
+        $settings = [
+            'startTime' => time(),
+        ];
         $dbData = ModuleAmoCrm::findFirst();
         if(!$dbData){
             return [];
         }
-        $settings = [
-            'ModuleAmoCrm' => $dbData->toArray(),
-        ];
+        $settings['ModuleAmoCrm'] = $dbData->toArray();
         if(!$mainOnly){
             $settings['ModuleAmoEntitySettings'] = ModuleAmoEntitySettings::find("portalId='{$dbData->portalId}'")->toArray();
         }
+        $settings['endTime'] = time();
         return $settings;
     }
 
@@ -174,11 +169,7 @@ class ConnectorDb extends WorkerBase
         }catch (\Throwable $e){
             return;
         }
-        if($data['action'] === 'sync-сontacts'){
-            $this->syncContacts(AmoCrmMain::ENTITY_COMPANIES);
-            $this->syncContacts(AmoCrmMain::ENTITY_CONTACTS);
-            $this->syncLeads();
-        }elseif($data['action'] === 'entity-update'){
+        if($data['action'] === 'entity-update'){
             $this->updatePhoneBook($data['data']['contacts']??[]);
             $this->updateLeads($data['data']['leads']??[]);
         }elseif($data['action'] === 'invoke'){
@@ -190,7 +181,7 @@ class ConnectorDb extends WorkerBase
                 }else{
                     $res_data = $this->$funcName(...$data['args']??[]);
                 }
-                $res_data = serialize($res_data);
+                $res_data = $this->saveResultInTmpFile($res_data);
             }
             $tube->reply($res_data);
         }elseif($data['action'] === 'interception'){
@@ -207,11 +198,54 @@ class ConnectorDb extends WorkerBase
     }
 
     /**
+     * Сериализует данные и сохраняет их во временный файл.
+     * @param $data
+     * @return string
+     */
+    private function saveResultInTmpFile($data):string
+    {
+        try {
+            $res_data = json_encode($data, JSON_THROW_ON_ERROR);
+        }catch (\JsonException $e){
+            return '';
+        }
+        $downloadCacheDir = '/tmp/';
+        $tmpDir = '/tmp/';
+        $di = Di::getDefault();
+        if ($di) {
+            $dirsConfig = $di->getShared('config');
+            $tmoDirName = $dirsConfig->path('core.tempDir') . '/ModuleAmoCrm';
+            Util::mwMkdir($tmoDirName);
+            chown($tmoDirName, 'www');
+            if (file_exists($tmoDirName)) {
+                $tmpDir = $tmoDirName;
+            }
+
+            $downloadCacheDir = $dirsConfig->path('www.downloadCacheDir');
+            if (!file_exists($downloadCacheDir)) {
+                $downloadCacheDir = '';
+            }
+        }
+        $fileBaseName = md5(microtime(true));
+        // "temp-" in the filename is necessary for the file to be automatically deleted after 5 minutes.
+        $filename = $tmpDir . '/temp-' . $fileBaseName;
+        file_put_contents($filename, $res_data);
+        if (!empty($downloadCacheDir)) {
+            $linkName = $downloadCacheDir . '/' . $fileBaseName;
+            // For automatic file deletion.
+            // A file with such a symlink will be deleted after 5 minutes by cron.
+            Util::createUpdateSymlink($filename, $linkName, true);
+        }
+        chown($filename, 'www');
+        return $filename;
+    }
+
+    /**
      * Сохранение изменных данных контактов. Наполнение телефонной книги.
      * @param array $updates
      * @return void
      */
-    private function updatePhoneBook(array $updates):void{
+    public function updatePhoneBook(array $updates):void{
         $idEntityFields = [
             'contact' => 'idEntity',
             'company' => 'linked_company_id',
@@ -339,74 +373,6 @@ class ConnectorDb extends WorkerBase
     }
 
     /**
-     * Синхронизация контактов.
-     * @param $entityType
-     * @return void
-     */
-    public function syncContacts($entityType):void
-    {
-        $this->updateSettings();
-
-        $endTime = time();
-        $result = WorkerAmoHTTP::invokeAmoApi('getChangedContacts', [$this->lastContactsSyncTime, $endTime, $entityType]);
-        if(empty($result->data[$entityType])){
-            return;
-        }
-        $this->updatePhoneBook(['update' => $result->data[$entityType]]);
-        while(!empty($result->data['nextPage'])){
-            $result = WorkerAmoHTTP::invokeAmoApi('getChangedContacts', [$this->lastContactsSyncTime, $endTime, $entityType, $result->data['nextPage']]);
-            $this->updatePhoneBook(['update' => $result->data[$entityType]]);
-        }
-
-        $fieldName = "last".ucfirst($entityType)."SyncTime";
-        $settings = ModuleAmoCrm::findFirst();
-        if($settings){
-            $settings->$fieldName = $endTime;
-        }
-        try {
-            $res = $settings->save();
-        }catch (Throwable $e){
-            $res = false;
-        }
-        if($res){
-            $this->$fieldName = $endTime;
-        }
-    }
-
-    /**
-     * Синхронизация сделок.
-     * @return void
-     */
-    public function syncLeads():void
-    {
-        $this->updateSettings();
-        $entityType = 'leads';
-        $endTime = time();
-        $result = WorkerAmoHTTP::invokeAmoApi('getChangedLeads', [$this->lastLeadsSyncTime, $endTime]);
-        if(empty($result->data[$entityType])){
-            return;
-        }
-        $this->updateLeads([ 'update' => $result->data[$entityType] ]);
-        while(!empty($result->data['nextPage'])){
-            $result = WorkerAmoHTTP::invokeAmoApi('getChangedLeads', [$this->lastLeadsSyncTime, $endTime, $result->data['nextPage']]);
-            $this->updateLeads([ 'update' => $result->data[$entityType]]);
-        }
-
-        $settings = ModuleAmoCrm::findFirst();
-        if($settings){
-            $settings->lastLeadsSyncTime = $endTime;
-        }
-        try {
-            $res = $settings->save();
-        }catch (Throwable $e){
-            $res = false;
-        }
-        if($res){
-            $this->lastLeadsSyncTime = $endTime;
-        }
-    }
-
-    /**
      * Заполняет настройки по умолчанию для создания сущностей.
      * @return void
      */
@@ -489,7 +455,7 @@ class ConnectorDb extends WorkerBase
      * @param array $updates
      * @return void
      */
-    private function updateLeads(array $updates):void
+    public function updateLeads(array $updates):void
     {
         $actions = ['update', 'add', 'delete'];
         foreach ($actions as $action){
@@ -790,6 +756,7 @@ class ConnectorDb extends WorkerBase
             'args'     => $args
         ];
         $client = new BeanstalkClient(self::class);
+        $object = [];
         try {
             if($retVal){
                 $req['need-ret'] = true;
@@ -798,12 +765,20 @@ class ConnectorDb extends WorkerBase
                 $client->publish(json_encode($req, JSON_THROW_ON_ERROR));
                 return true;
             }
-            $object = unserialize($result, ['allowed_classes' => [PBXAmoResult::class, PBXApiResult::class]]);
+            if(file_exists($result)){
+                $object = json_decode(file_get_contents($result), true, 512, JSON_THROW_ON_ERROR);
+            }
         } catch (\Throwable $e) {
             $object = [];
         }
         return $object;
     }
+
+    /**
+     * Действия контроллера с базой данных
+     */
+
+
 }
 
 if(isset($argv) && count($argv) !== 1){
