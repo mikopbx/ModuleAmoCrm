@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'Məsuliyyətli kəsi istifadə edin',
     'mod_amo_rules' => 'Müəssisələrin yaradılması',
     'mod_amo_settingsConnection' => 'Bağlantı parametrləri',
+    'mod_amo_SaveSettingsError' => 'Parametrləri saxlayarkən xəta baş verdi. ConnectorDB xidməti işləməyə bilər.',
 ];
