@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'გამოიყენეთ ჩარევა პასუხისმგებელ პირზე',
     'mod_amo_rules' => 'ერთეულების შექმნა',
     'mod_amo_settingsConnection' => 'კავშირის პარამეტრები',
+    'mod_amo_SaveSettingsError' => 'პარამეტრების შენახვისას მოხდა შეცდომა. ConnectorDB სერვისი შეიძლება არ იყოს გაშვებული.',
 ];
