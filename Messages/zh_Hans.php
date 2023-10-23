@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => '对负责人使用拦截',
     'mod_amo_rules' => '创建实体',
     'mod_amo_settingsConnection' => '连接设置',
+    'mod_amo_SaveSettingsError' => '保存设置时出错。 ConnectorDB 服务可能未运行。',
 ];
