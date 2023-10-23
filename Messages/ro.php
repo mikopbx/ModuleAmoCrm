@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'Folosiți interceptarea pe responsabil',
     'mod_amo_rules' => 'Crearea de Entități',
     'mod_amo_settingsConnection' => 'Setări de conectare',
+    'mod_amo_SaveSettingsError' => 'A apărut o eroare la salvarea setărilor. Este posibil ca serviciul ConnectorDB să nu ruleze.',
 ];
