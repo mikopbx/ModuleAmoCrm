@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'Sorumlu kişi üzerinde müdahaleyi kullanın',
     'mod_amo_rules' => 'Varlıklar Oluşturma',
     'mod_amo_settingsConnection' => 'Bağlantı ayarları',
+    'mod_amo_SaveSettingsError' => 'Ayarlar kaydedilirken bir hata oluştu. ConnectorDB hizmeti çalışmıyor olabilir.',
 ];
