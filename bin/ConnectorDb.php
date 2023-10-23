@@ -67,6 +67,7 @@ class ConnectorDb extends WorkerBase
         if($settings){
             $this->portalId              = (int)$settings->portalId;
         }else{
+            $settings = new ModuleAmoCrm();
             $settings->lastContactsSyncTime  = 0;
             $settings->lastCompaniesSyncTime = 0;
             $settings->lastLeadsSyncTime     = 0;

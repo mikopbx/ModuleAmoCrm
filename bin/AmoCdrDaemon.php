@@ -109,9 +109,9 @@ class AmoCdrDaemon extends WorkerBase
     {
         $allSettings = ConnectorDb::invoke('getModuleSettings', [false]);
         if(!empty($allSettings) && is_array($allSettings)){
-            $this->offset        = max(1*$allSettings['ModuleAmoCrm']['offsetCdr'],1);
-            $this->referenceDate = $allSettings['ModuleAmoCrm']['referenceDate'];
-            $this->portalId      = (int)$allSettings['ModuleAmoCrm']['portalId'];
+            $this->offset        = max(1*$allSettings['ModuleAmoCrm']['offsetCdr']??1,1);
+            $this->referenceDate = $allSettings['ModuleAmoCrm']['referenceDate']??'';
+            $this->portalId      = (int)($allSettings['ModuleAmoCrm']['portalId']??0);
             $this->logger->writeInfo("Update settings, Reference date: {$this->referenceDate}, offset: {$this->offset}");
 
             $entSettings = $allSettings['ModuleAmoEntitySettings'];

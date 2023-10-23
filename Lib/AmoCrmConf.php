@@ -220,9 +220,8 @@ class AmoCrmConf extends ConfigClass
     private function makeAuthFiles():void
     {
         // Wait save settings
-        usleep(200000);
-        /** @var ModuleAmoCrm $settings */
-        $settings = ModuleAmoCrm::findFirst();
+        $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
+        $settings    = (object)$allSettings['ModuleAmoCrm'];
         if(!$settings){
             return;
         }
@@ -230,7 +229,7 @@ class AmoCrmConf extends ConfigClass
         if(!file_exists($baseDir)){
             Util::mwMkdir($baseDir, true);
         }
-        $authFile  = $baseDir.'/'.basename($settings->tokenForAmo);
+        $authFile  = $baseDir.'/'.basename(trim($settings->tokenForAmo));
         if(!file_exists($authFile)){
             $grepPath  = Util::which('grep');
             $cutPath   = Util::which('cut');

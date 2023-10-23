@@ -9,6 +9,9 @@ use Modules\ModuleAmoCrm\bin\ConnectorDb;
 use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Common\Models\PbxSettings;
 
+/**
+ * Объект класса существует только как свойство объекта WorkerAmoHTTP.
+ */
 class AmoCrmMain extends AmoCrmMainBase
 {
     private string $baseDomain = '';
@@ -29,21 +32,24 @@ class AmoCrmMain extends AmoCrmMainBase
     public function __construct()
     {
         parent::__construct();
-
         $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
         if(!empty($allSettings) && is_array($allSettings)){
             $settings = (object)$allSettings['ModuleAmoCrm'];
         }else{
             exit(3);
         }
+
         if($settings){
-            $this->baseDomain           = $settings->baseDomain;
+            $this->baseDomain           = ''.$settings->baseDomain;
             $this->token               = new AuthToken((string)$settings->authData);
             $this->isPrivateWidget     = (string)$settings->isPrivateWidget === '1';
             $this->privateClientId     = ''.$settings->privateClientId;
             $this->privateClientSecret = ''.$settings->privateClientSecret;
             $this->refreshToken();
             $this->initDone = true;
+        }
+        if(empty($this->baseDomain)){
+            exit(4);
         }
     }
 
