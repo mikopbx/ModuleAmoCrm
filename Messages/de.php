@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'Lassen Sie die verantwortliche Person abfangen',
     'mod_amo_rules' => 'Entitäten erstellen',
     'mod_amo_settingsConnection' => 'Verbindungseinstellungen',
+    'mod_amo_SaveSettingsError' => 'Beim Speichern der Einstellungen ist ein Fehler aufgetreten. Der ConnectorDB-Dienst wird möglicherweise nicht ausgeführt.',
 ];
