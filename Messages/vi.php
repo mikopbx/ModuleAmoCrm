@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'Sử dụng sự đánh chặn đối với người phụ trách',
     'mod_amo_rules' => 'Tạo thực thể',
     'mod_amo_settingsConnection' => 'Cài đặt kết nối',
+    'mod_amo_SaveSettingsError' => 'Đã xảy ra lỗi khi lưu cài đặt. Dịch vụ ConnectorDB có thể không chạy.',
 ];
