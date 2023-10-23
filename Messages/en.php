@@ -81,4 +81,5 @@ return [
     'mod_amo_type_responsibleVarFirst' => 'The first person to answer the call',
     'mod_amo_type_responsibleVarLast' => 'The last person to answer the call',
     'mod_amo_rule_for_type_did_exists' => 'The rule for this external number (DID) and this type of call has already been described earlier. Duplicate creation is prohibited.',
+    'mod_amo_SaveSettingsError' => 'An error occurred while saving settings. The ConnectorDB service may not be running.',
 ];
