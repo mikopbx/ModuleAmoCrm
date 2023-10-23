@@ -203,7 +203,6 @@ class AmoCrmConf extends ConfigClass
                 $res->success = true;
                 break;
             case 'RELOAD':
-                $this->startAllServices(true);
                 $res->success = true;
                 break;
             default:

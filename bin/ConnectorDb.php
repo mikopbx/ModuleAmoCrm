@@ -25,6 +25,7 @@ use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
+use Modules\ModuleAmoCrm\App\Forms\ModuleAmoCrmEntitySettingsModifyForm;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 use Modules\ModuleAmoCrm\Lib\PBXAmoResult;
@@ -96,19 +97,6 @@ class ConnectorDb extends WorkerBase
     }
 
     /**
-     * Обновление текущей позиции CDR.
-     */
-    public function updateOffset($offset):bool
-    {
-        $settings = ModuleAmoCrm::findFirst();
-        if(!$settings){
-            return false;
-        }
-        $settings->offsetCdr = $offset;
-        return $settings->save();
-    }
-
-    /**
      * Старт работы листнера.
      *
      * @param $params
@@ -133,7 +121,8 @@ class ConnectorDb extends WorkerBase
         }
     }
 
-    /** Возвращает данные из кэш.
+    /**
+     * Возвращает данные из кэш.
      *
      * @param $cacheKey
      *
@@ -777,6 +766,103 @@ class ConnectorDb extends WorkerBase
     /**
      * Действия контроллера с базой данных
      */
+
+    /**
+     * Delete record
+     */
+    public function deleteEntitySettings($id): array
+    {
+        $result = new PBXApiResult();
+        $record = ModuleAmoEntitySettings::findFirstById($id);
+        if ($record !== null && ! $record->delete()) {
+            $result->messages[] = implode('<br>', $record->getMessages());
+            $result->success    = false;
+        }else{
+            $result->data['id'] = $id;
+            $result->success    = true;
+        }
+        return $result->getResult();
+    }
+
+    /**
+     * Get record
+     */
+    public function getEntitySettings($id): array
+    {
+        $result = new PBXApiResult();
+        $rule = null;
+        if($id){
+            $rule = ModuleAmoEntitySettings::findFirst("id='$id'");
+        }
+        if(!$rule){
+            $rule = new ModuleAmoEntitySettings();
+            $settings = ModuleAmoCrm::findFirst();
+            if ($settings) {
+                $rule->portalId = $settings->portalId;
+            }
+        }
+        $result->data = $rule->toArray();
+        $result->data['represent'] = $rule->getRepresent();
+        return $result->getResult();
+    }
+
+    /**
+     * Save settings entity settings action
+     */
+    public function saveEntitySettingsAction($data):array
+    {
+        $result = new PBXApiResult();
+
+        $did = trim($data['did']);
+        $filter = [
+            "did=:did: AND type=:type: AND id<>:id: AND portalId=:portalId:",
+            'bind'    => [
+                'did' => $did,
+                'type'=> $data['type']??'',
+                'portalId'=> $data['portalId']??'',
+                'id'  => $data['id']
+            ]
+        ];
+        $record = ModuleAmoEntitySettings::findFirst($filter);
+        if($record){
+            $result->messages[] = Util::translate('mod_amo_rule_for_type_did_exists', false);
+            $result->success = false;
+            return $result->getResult();
+        }
+
+        $record = null;
+        if(!empty($data['id'])){
+            $record = ModuleAmoEntitySettings::findFirstById($data['id']);
+        }
+        if ($record === null) {
+            $record = new ModuleAmoEntitySettings();
+        }
+        $this->db->begin();
+        foreach ($record as $key => $value) {
+            if($key === 'id'){
+                continue;
+            }
+            if(in_array($key,['create_contact', 'create_lead', 'create_unsorted', 'create_task'])){
+                $record->$key = ($data[$key] === 'on' || $data[$key] === true) ? '1' : '0';
+            } elseif (array_key_exists($key, $data)) {
+                $record->$key = trim($data[$key]);
+            } else {
+                $record->$key = '';
+            }
+        }
+
+        if (FALSE === $record->save()) {
+            $result->messages[] = $record->getMessages();
+            $result->success = false;
+            $this->db->rollback();
+            return $result->getResult();
+        }
+        $result->success = true;
+        $result->data['id'] = $record->id;
+        $this->db->commit();
+
+        return $result->getResult();
+    }
 
 
 }

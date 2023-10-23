@@ -391,7 +391,7 @@ class AmoCdrDaemon extends WorkerBase
         $this->addCalls($calls, $callCounter);
 
         if($oldOffset !== $this->offset){
-            ConnectorDb::invoke('updateOffset', [$this->offset]);
+            ConnectorDb::invoke('saveNewSettings', [['offsetCdr' => $this->offset]]);
         }
     }
 

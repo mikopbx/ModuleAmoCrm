@@ -20,13 +20,8 @@
 namespace Modules\ModuleAmoCrm\bin;
 require_once 'Globals.php';
 
-use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\Workers\WorkerBase;
-use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
-use Modules\ModuleAmoCrm\Lib\PBXAmoResult;
-use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
-use stdClass;
 
 class SyncDaemon extends WorkerBase
 {
@@ -73,14 +68,14 @@ class SyncDaemon extends WorkerBase
         }
         $entityType = 'leads';
         $endTime = time();
-        $result = WorkerAmoHTTP::invokeAmoApi('getChangedLeads', [$settings->lastLeadsSyncTime, $endTime]);
+        $result = WorkerAmoHTTP::invokeAmoApi('getChangedLeads', [(int)$settings->lastLeadsSyncTime, $endTime]);
         if(empty($result->data[$entityType])){
             return;
         }
         $data = [ 'update' => $result->data[$entityType]];
         ConnectorDb::invoke('updateLeads', [$data]);
         while(!empty($result->data['nextPage'])){
-            $result = WorkerAmoHTTP::invokeAmoApi('getChangedLeads', [$settings->lastLeadsSyncTime, $endTime, $result->data['nextPage']]);
+            $result = WorkerAmoHTTP::invokeAmoApi('getChangedLeads', [(int)$settings->lastLeadsSyncTime, $endTime, $result->data['nextPage']]);
             $data = [ 'update' => $result->data[$entityType]];
             ConnectorDb::invoke('updateLeads', [$data]);
         }

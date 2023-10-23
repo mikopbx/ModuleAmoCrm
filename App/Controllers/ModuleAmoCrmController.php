@@ -159,6 +159,66 @@ class ModuleAmoCrmController extends BaseController
     }
 
     /**
+     * Save settings action
+     */
+    public function saveAction() :void
+    {
+        $data   = $this->request->getPost();
+        $ModuleSettings = PbxExtensionModules::findFirst(["uniqid='$this->moduleUniqueID'",'columns' => ['disabled']]);
+        if($ModuleSettings->disabled !== '1'){
+            $settings = [];
+            foreach ($data as $key => $value) {
+                if(in_array($key, ['id','offsetCdr','authData'], true)){
+                    continue;
+                }
+                if('useInterception' === $key || 'isPrivateWidget' === $key ){
+                    $settings[$key] = ($value === 'on') ? '1' : '0';
+                } else {
+                    $settings[$key]  = $value;
+                }
+            }
+            $this->view->success = ConnectorDb::invoke('saveNewSettings', [$settings]);
+            if(!$this->view->success){
+                $this->flash->error(implode('<br>', [$this->translation->_('mod_amo_SaveSettingsError')]));
+            }
+        }else{
+            $this->db->begin();
+            $record = ModuleAmoCrm::findFirst();
+            if ($record === null) {
+                $record = new ModuleAmoCrm();
+            }
+            foreach ($record as $key => $value) {
+                if(in_array($key, ['id','offsetCdr','authData'], true)){
+                    continue;
+                }
+                if('useInterception' === $key || 'isPrivateWidget' === $key ){
+                    $record->$key = ($data[$key] === 'on') ? '1' : '0';
+                } elseif (array_key_exists($key, $data)) {
+                    if($record->$key !== trim($data[$key])){
+                        $record->$key = trim($data[$key]);
+                    }
+                } else {
+                    $record->$key = '';
+                }
+            }
+            if(empty($record->referenceDate)){
+                $record->referenceDate = Util::getNowDate();
+            }
+            if (FALSE === $record->save()) {
+                $errors = $record->getMessages();
+                $this->flash->error(implode('<br>', $errors));
+                $this->view->success = false;
+                $this->db->rollback();
+                return;
+            }
+            $this->db->commit();
+            $this->view->success = true;
+            $this->flash->success($this->translation->_('ms_SuccessfulSaved'));
+
+        }
+    }
+
+    /**
      * The modify action for creating or editing
      *
      * @param string|null $id The ID of the user group (optional)
@@ -170,61 +230,16 @@ class ModuleAmoCrmController extends BaseController
         $footerCollection = $this->assets->collection('footerJS');
         $footerCollection->addJs('js/pbx/main/form.js', true);
         $footerCollection->addJs("js/cache/{$this->moduleUniqueID}/module-amo-crm-modify-entity-settings.js", true);
-        $rule = null;
-        if($id){
-            $rule = ModuleAmoEntitySettings::findFirst("id='$id'");
-        }
-        if(!$rule){
-            $rule = new ModuleAmoEntitySettings();
-            $settings = ModuleAmoCrm::findFirst();
-            if ($settings) {
-                $rule->portalId = $settings->portalId;
-            }
-        }
-        $this->view->form      = new ModuleAmoCrmEntitySettingsModifyForm($rule);
-        $this->view->represent = $rule->getRepresent();
-        $this->view->id        = $id;
-        $this->view->pick("{$this->moduleDir}/App/Views/modify");
-    }
 
-    /**
-     * Save settings action
-     */
-    public function saveAction() :void
-    {
-        $data   = $this->request->getPost();
-        $record = ModuleAmoCrm::findFirst();
-        if ($record === null) {
-            $record = new ModuleAmoCrm();
-        }
-        $this->db->begin();
-        foreach ($record as $key => $value) {
-            if(in_array($key, ['id','offsetCdr','authData'], true)){
-                continue;
-            }
-            if('useInterception' === $key || 'isPrivateWidget' === $key ){
-                $record->$key = ($data[$key] === 'on') ? '1' : '0';
-            } elseif (array_key_exists($key, $data)) {
-                if($record->$key !== trim($data[$key])){
-                    $record->$key = trim($data[$key]);
-                }
-            } else {
-                $record->$key = '';
-            }
-        }
-        if(empty($record->referenceDate)){
-            $record->referenceDate = Util::getNowDate();
-        }
-        if (FALSE === $record->save()) {
-            $errors = $record->getMessages();
-            $this->flash->error(implode('<br>', $errors));
-            $this->view->success = false;
-            $this->db->rollback();
+        $result = ConnectorDb::invoke('getEntitySettings', [$id]);
+        if(!$result){
             return;
         }
-        $this->flash->success($this->translation->_('ms_SuccessfulSaved'));
-        $this->view->success = true;
-        $this->db->commit();
+        $rule   = (object)$result['data'];
+        $this->view->form      = new ModuleAmoCrmEntitySettingsModifyForm($rule);
+        $this->view->represent = $rule->represent;
+        $this->view->id        = $rule->id;
+        $this->view->pick("{$this->moduleDir}/App/Views/modify");
     }
 
     /**
@@ -233,57 +248,18 @@ class ModuleAmoCrmController extends BaseController
     public function saveEntitySettingsAction():void
     {
         $data= $this->request->getPost();
-        $did = trim($data['did']);
-
-        $filter = [
-            "did=:did: AND type=:type: AND id<>:id: AND portalId=:portalId:",
-            'bind'    => [
-                'did' => $did,
-                'type'=> $data['type']??'',
-                'portalId'=> $data['portalId']??'',
-                'id'  => $data['id']
-            ]
-        ];
-        $record = ModuleAmoEntitySettings::findFirst($filter);
-        if($record){
-            $errorText = Util::translate('mod_amo_rule_for_type_did_exists', false);
-            $this->flash->error($errorText);
+        $response = ConnectorDb::invoke('saveEntitySettingsAction', [$data]);
+        if (FALSE === $response) {
+            $this->flash->error(implode('<br>', [$this->translation->_('mod_amo_SaveSettingsError')]));
             $this->view->success = false;
-            return;
-        }
-
-        $record = null;
-        if(!empty($data['id'])){
-            $record = ModuleAmoEntitySettings::findFirstById($data['id']);
-        }
-        if ($record === null) {
-            $record = new ModuleAmoEntitySettings();
-        }
-        $this->db->begin();
-        foreach ($record as $key => $value) {
-            if($key === 'id'){
-                continue;
-            }
-            if(in_array($key,['create_contact', 'create_lead', 'create_unsorted', 'create_task'])){
-                $record->$key = ($data[$key] === 'on' || $data[$key] === true) ? '1' : '0';
-            } elseif (array_key_exists($key, $data)) {
-                $record->$key = trim($data[$key]);
-            } else {
-                $record->$key = '';
-            }
-        }
-
-        if (FALSE === $record->save()) {
-            $errors = $record->getMessages();
-            $this->flash->error(implode('<br>', $errors));
+        } elseif (FALSE === $response->result) {
+            $this->flash->error(implode('<br>', $response->messages));
             $this->view->success = false;
-            $this->db->rollback();
             return;
         }
         $this->flash->success($this->translation->_('ms_SuccessfulSaved'));
         $this->view->success = true;
-        $this->view->id = $record->id;
-        $this->db->commit();
+        $this->view->id = $response->data['id'];
     }
 
     /**
@@ -291,13 +267,14 @@ class ModuleAmoCrmController extends BaseController
      */
     public function deleteAction($id): void
     {
-        $record = ModuleAmoEntitySettings::findFirstById($id);
-        if ($record !== null && ! $record->delete()) {
-            $this->flash->error(implode('<br>', $record->getMessages()));
+        $result = ConnectorDb::invoke('deleteEntitySettings', [$id]);
+        if (!$result['result']) {
+            $this->flash->error(implode('<br>', $result['messages']).json_encode($result));
             $this->view->success = false;
             return;
         }
-        $this->view->id     = $id;
+        $this->view->test   = '323';
+        $this->view->id     = $result['data']['id'];
         $this->view->success = true;
     }
 
