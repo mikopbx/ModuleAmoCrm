@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'Gebruik interceptie op verantwoordelijken',
     'mod_amo_rules' => 'Entiteiten creëren',
     'mod_amo_settingsConnection' => 'Verbindingsinstellingen',
+    'mod_amo_SaveSettingsError' => 'Er is een fout opgetreden bij het opslaan van de instellingen. De ConnectorDB-service is mogelijk niet actief.',
 ];
