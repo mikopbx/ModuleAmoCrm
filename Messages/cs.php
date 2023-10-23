@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'Použijte odposlech na zodpovědnou osobu',
     'mod_amo_rules' => 'Vytváření entit',
     'mod_amo_settingsConnection' => 'Nastavení připojení',
+    'mod_amo_SaveSettingsError' => 'Při ukládání nastavení došlo k chybě. Služba ConnectorDB možná není spuštěna.',
 ];
