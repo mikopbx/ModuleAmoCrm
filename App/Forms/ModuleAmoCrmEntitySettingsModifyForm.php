@@ -12,14 +12,12 @@ use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Core\System\Util;
 use Modules\ModuleAmoCrm\bin\AmoCdrDaemon;
 use Modules\ModuleAmoCrm\bin\ConnectorDb;
-use Modules\ModuleAmoCrm\Models\ModuleAmoPipeLines;
 use Phalcon\Forms\Element\Check;
 use Phalcon\Forms\Element\Numeric;
 use Phalcon\Forms\Form;
 use Phalcon\Forms\Element\Text;
 use Phalcon\Forms\Element\Hidden;
 use Phalcon\Forms\Element\Select;
-
 
 class ModuleAmoCrmEntitySettingsModifyForm extends Form
 {
@@ -91,13 +89,13 @@ class ModuleAmoCrmEntitySettingsModifyForm extends Form
         );
         $this->add($type);
 
-        $pipeLinesData    = ModuleAmoPipeLines::find("'$entity->portalId'=portalId",);
+        $pipeLinesData    = ConnectorDb::invoke('getPipeLines', [true]);
         $pipeLineStatuses = [];
         $pipeLinesList    = [];
         foreach ($pipeLinesData as $pipeLine){
-            $pipeLinesList[$pipeLine->amoId] = $pipeLine->name;
+            $pipeLinesList[$pipeLine['amoId']] = $pipeLine['name'];
             try {
-                $statuses = json_decode($pipeLine->statuses, true, 512, JSON_THROW_ON_ERROR);
+                $statuses = json_decode($pipeLine['statuses'], true, 512, JSON_THROW_ON_ERROR);
                 foreach ($statuses as $index => $status){
                     if(in_array($status['id'], [142,143,51569353], true)){
                         continue;
@@ -105,12 +103,12 @@ class ModuleAmoCrmEntitySettingsModifyForm extends Form
                     if($index === 0){
                         continue;
                     }
-                    if($pipeLine->amoId === $entity->lead_pipeline_id){
+                    if($pipeLine['amoId'] === $entity->lead_pipeline_id){
                         $selected = $entity->lead_pipeline_status_id===(string)$status['id'];
                     }else{
                         $selected = $index === 1;
                     }
-                    $pipeLineStatuses[$pipeLine->amoId][] = [
+                    $pipeLineStatuses[$pipeLine['amoId']][] = [
                         'name'  => $status['name'],
                         'value' => $status['id'],
                         'selected' => $selected,

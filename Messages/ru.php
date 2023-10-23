@@ -90,6 +90,7 @@ return [
     'mod_amo_tokenForAmo'                 => 'Ключ доступа к API MikoPBX',
     'mod_amo_useInterception'             => 'Использовать перехват на ответственного',
 
+    'mod_amo_SaveSettingsError'           => 'Возникла ошибка сохранения настроек. Возможно не запущен сервис ConnectorDB.',
     'mod_amo_rules'                       => 'Создание сущностей',
     'mod_amo_settingsConnection'          => 'Настройки подключения',
 

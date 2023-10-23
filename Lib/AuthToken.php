@@ -19,9 +19,8 @@
 
 namespace Modules\ModuleAmoCrm\Lib;
 
-
 use MikoPBX\Core\System\Util;
-use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
+use Modules\ModuleAmoCrm\bin\ConnectorDb;
 use Throwable;
 
 class AuthToken
@@ -84,10 +83,15 @@ class AuthToken
         return $this->accessToken;
     }
 
+    /**
+     * Обновление токена.
+     * @param $authData
+     * @param $portalId
+     * @return bool
+     */
     public function saveToken($authData, $portalId = 0): bool
     {
         $this->updateToken($authData, true);
-        $settings = ModuleAmoCrm::findFirst();
         $authData = [
             'token_type'    => $this->type,
             'expires_in'    => $this->expired,
@@ -95,14 +99,17 @@ class AuthToken
             'refresh_token' => $this->refreshToken,
         ];
         try {
-            $settings->authData = json_encode($authData, JSON_THROW_ON_ERROR);
+            $authData = json_encode($authData, JSON_THROW_ON_ERROR);
         }catch (Throwable $e){
-            $settings->authData = '';
+            $authData = '';
         }
+        $newSettings = [
+            'authData' => $authData
+        ];
         if($portalId > 0){
-            $settings->portalId = $portalId;
+            $newSettings['portalId'] = $portalId;
         }
-        return $settings->save();
+        return ConnectorDb::invoke('saveNewSettings', [$newSettings]);
     }
 
     /**
@@ -112,8 +119,6 @@ class AuthToken
      */
     public function savePortalId($portalId): bool
     {
-        $settings = ModuleAmoCrm::findFirst();
-        $settings->portalId = $portalId;
-        return $settings->save();
+        return ConnectorDb::invoke('saveNewSettings', [['portalId'=>$portalId]]);
     }
 }

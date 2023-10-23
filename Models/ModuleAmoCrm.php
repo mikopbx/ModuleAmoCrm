@@ -13,9 +13,7 @@
 
 namespace Modules\ModuleAmoCrm\Models;
 
-use MikoPBX\Common\Models\Providers;
 use MikoPBX\Modules\Models\ModulesModelsBase;
-use Phalcon\Mvc\Model\Relation;
 
 class ModuleAmoCrm extends ModulesModelsBase
 {

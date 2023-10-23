@@ -105,7 +105,9 @@ class WorkerAmoHTTP extends WorkerBase
             $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), 20);
             $object = unserialize($result, ['allowed_classes' => [PBXAmoResult::class, PBXApiResult::class]]);
         } catch (\Throwable $e) {
-            $object = new stdClass();
+            $object = new PBXAmoResult();
+            $object->success = false;
+            $object->messages[] = $e->getMessage();
         }
         return $object;
     }

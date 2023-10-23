@@ -2,7 +2,7 @@
   <a class="active item" data-tab="rules">{{ t._('mod_amo_rules') }}</a>
   <a class="item" data-tab="settings">{{ t._('mod_amo_settingsConnection') }}</a>
 </div>
-<div class="ui bottom attached active tab segment" data-tab="rules">
+<div class="ui bottom attached active tab segment disability" data-tab="rules">
     {{ link_to("module-amo-crm/modify/", '<i class="add circle icon"></i> '~t._('mod_amo_AddRules'), "class": "ui blue button", "id":"add-new-button") }}
     {% for rule in entitySettings %}
         {% if loop.first %}

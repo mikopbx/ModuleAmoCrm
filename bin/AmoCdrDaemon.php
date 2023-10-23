@@ -88,11 +88,9 @@ class AmoCdrDaemon extends WorkerBase
         $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
         while ($this->needRestart === false){
             if(time() - $this->lastSyncTime > 10){
+                ConnectorDb::invoke('updateSettings', [], false);
                 WorkerAmoHTTP::invokeAmoApi('syncPipeLines', [$this->portalId]);
                 ConnectorDb::invoke('fillEntitySettings', []);
-                ConnectorDb::invoke('syncContacts', [AmoCrmMain::ENTITY_COMPANIES]);
-                ConnectorDb::invoke('syncContacts', [AmoCrmMain::ENTITY_CONTACTS]);
-                ConnectorDb::invoke('syncLeads', []);
                 $this->updateSettings();
             }
             $this->updateActiveCalls();
@@ -111,11 +109,13 @@ class AmoCdrDaemon extends WorkerBase
     {
         $allSettings = ConnectorDb::invoke('getModuleSettings', [false]);
         if(!empty($allSettings) && is_array($allSettings)){
-            $this->offset        = max(1*$allSettings['ModuleAmoCrm']['offsetCdr'],1);
-            $this->referenceDate = $allSettings['ModuleAmoCrm']['referenceDate'];
-            $this->portalId      = (int)$allSettings['ModuleAmoCrm']['portalId'];
-            $this->logger->writeInfo("Update settings, Reference date: {$this->referenceDate}, offset: {$this->offset}");
-
+            $oldOffset = $this->offset;
+            $this->offset        = max(1*$allSettings['ModuleAmoCrm']['offsetCdr']??1,1);
+            $this->referenceDate = $allSettings['ModuleAmoCrm']['referenceDate']??'';
+            $this->portalId      = (int)($allSettings['ModuleAmoCrm']['portalId']??0);
+            if($oldOffset !== $this->offset){
+                $this->logger->writeInfo("Update settings, Reference date: $this->referenceDate, offset: $this->offset");
+            }
             $entSettings = $allSettings['ModuleAmoEntitySettings'];
             $this->entitySettings = [];
             foreach ($entSettings as $entSetting){
@@ -393,7 +393,7 @@ class AmoCdrDaemon extends WorkerBase
         $this->addCalls($calls, $callCounter);
 
         if($oldOffset !== $this->offset){
-            ConnectorDb::invoke('updateOffset', [$this->offset]);
+            ConnectorDb::invoke('saveNewSettings', [['offsetCdr' => $this->offset]]);
         }
     }
 

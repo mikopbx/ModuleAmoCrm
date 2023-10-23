@@ -20,10 +20,10 @@ use MikoPBX\Modules\PbxExtensionUtils;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\bin\AmoCdrDaemon;
 use Modules\ModuleAmoCrm\bin\ConnectorDb;
+use Modules\ModuleAmoCrm\bin\SyncDaemon;
 use Modules\ModuleAmoCrm\bin\WorkerAmoCrmAMI;
 use Modules\ModuleAmoCrm\bin\WorkerAmoHTTP;
 use Modules\ModuleAmoCrm\Lib\RestAPI\Controllers\ApiController;
-use MikoPBX\PBXCoreREST\Controllers\Cdr\GetController as CdrGetController;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 
 class AmoCrmConf extends ConfigClass
@@ -140,6 +140,10 @@ class AmoCrmConf extends ConfigClass
                 'type'   => WorkerSafeScriptsCore::CHECK_BY_BEANSTALK,
                 'worker' => WorkerAmoHTTP::class,
             ],
+            [
+                'type'   => WorkerSafeScriptsCore::CHECK_BY_PID_NOT_ALERT,
+                'worker' => SyncDaemon::class,
+            ],
         ];
     }
 
@@ -199,7 +203,6 @@ class AmoCrmConf extends ConfigClass
                 $res->success = true;
                 break;
             case 'RELOAD':
-                $this->startAllServices(true);
                 $res->success = true;
                 break;
             default:
@@ -217,9 +220,8 @@ class AmoCrmConf extends ConfigClass
     private function makeAuthFiles():void
     {
         // Wait save settings
-        usleep(200000);
-        /** @var ModuleAmoCrm $settings */
-        $settings = ModuleAmoCrm::findFirst();
+        $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
+        $settings    = (object)$allSettings['ModuleAmoCrm'];
         if(!$settings){
             return;
         }
@@ -227,7 +229,7 @@ class AmoCrmConf extends ConfigClass
         if(!file_exists($baseDir)){
             Util::mwMkdir($baseDir, true);
         }
-        $authFile  = $baseDir.'/'.basename($settings->tokenForAmo);
+        $authFile  = $baseDir.'/'.basename(trim($settings->tokenForAmo));
         if(!file_exists($authFile)){
             $grepPath  = Util::which('grep');
             $cutPath   = Util::which('cut');

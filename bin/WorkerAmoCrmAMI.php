@@ -240,7 +240,8 @@ class WorkerAmoCrmAMI extends WorkerBase
         $this->createCdrCheckIncoming($tmpCalls, $data, $generalNumber);
         foreach ($tmpCalls as $call){
             $callFound = false;
-            foreach ($this->calls[$data['linkedid']] as $oldCall) {
+            $callsById = $this->calls[$data['linkedid']]??[];
+            foreach ($callsById as $oldCall) {
                 if($call['uid'] === $oldCall['uid']){
                     $callFound = true;
                     break;
