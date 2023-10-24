@@ -831,7 +831,7 @@ class AmoCdrDaemon extends WorkerBase
             }
             if( isset($this->newTasks[$contact['request_id']]) ){
                 $this->newTasks[$contact['request_id']]['entity_id'] = $contact['id'];
-                $this->newTasks[$contact['request_id']]['entity_type'] = 'contacts';
+                $this->newTasks[$contact['request_id']]['entity_type'] = 'contact';
             }
             if( isset($this->incompleteAnswered[$contact['request_id']]) ){
                 $this->incompleteAnswered[$contact['request_id']]['client'] = $contact['id'];
