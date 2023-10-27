@@ -702,6 +702,10 @@ class ConnectorDb extends WorkerBase
         if(!$settings){
             $settings = new ModuleAmoCrm();
         }
+        if(isset($data['portalId']) && (int)$data['portalId'] === 0){
+            // Не сохраняем пустое значение portalId.
+            unset($data['portalId']);
+        }
         foreach ($settings->toArray() as $key => $value){
             if(isset($data[$key])){
                 $settings->writeAttribute($key, $data[$key]);

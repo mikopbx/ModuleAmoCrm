@@ -221,7 +221,7 @@ class AmoCrmConf extends ConfigClass
     {
         // Wait save settings
         $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
-        if(!$allSettings){
+        if(!$allSettings || !isset($allSettings['ModuleAmoCrm'])){
             return;
         }
         $settings    = (object)$allSettings['ModuleAmoCrm'];
