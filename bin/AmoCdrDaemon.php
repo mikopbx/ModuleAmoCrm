@@ -80,7 +80,7 @@ class AmoCdrDaemon extends WorkerBase
     /**
      * Начало загрузки истории звонков в Amo.
      */
-    public function start($params):void
+    public function start($argv):void
     {
         $res = LanInterfaces::findFirst("internet = '1'")->toArray();
         $this->extHostname  = $res['exthostname']??'';

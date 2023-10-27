@@ -42,9 +42,9 @@ class SyncDaemon extends WorkerBase
     /**
      * Старт работы листнера.
      *
-     * @param $params
+     * @param $argv
      */
-    public function start($params):void
+    public function start($argv):void
     {
         while ($this->needRestart === false) {
             $this->syncLeads();
