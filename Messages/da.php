@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'Brug aflytning på den ansvarlige',
     'mod_amo_rules' => 'Oprettelse af enheder',
     'mod_amo_settingsConnection' => 'Forbindelsesindstillinger',
+    'mod_amo_SaveSettingsError' => 'Der opstod en fejl under lagring af indstillinger. ConnectorDB-tjenesten kører muligvis ikke.',
 ];

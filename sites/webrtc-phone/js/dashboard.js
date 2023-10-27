@@ -2,6 +2,7 @@ define(function (require) {
     const $         = require('jquery');
     const Twig      = require('twig');
     const connector = require('connector');
+    const sip       = require('sip');
     const users     = require('users');
     const PubSub    = require('pubsub');
     const cache     = require('cache');
@@ -69,6 +70,9 @@ define(function (require) {
         connect: function (event){
             self.heightWindow = event.data.heightWindow;
             connector.init(event.data);
+            if(event.data.sipPassword !== undefined){
+                sip.start(event.data);
+            }
         },
         addCall: function (event){
             let contact = cache.get('phone:'+event.data.number);

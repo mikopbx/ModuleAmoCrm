@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'Använd avlyssning på ansvarig',
     'mod_amo_rules' => 'Skapa enheter',
     'mod_amo_settingsConnection' => 'Anslutningsinställningar',
+    'mod_amo_SaveSettingsError' => 'Ett fel uppstod när inställningarna skulle sparas. ConnectorDB-tjänsten kanske inte körs.',
 ];

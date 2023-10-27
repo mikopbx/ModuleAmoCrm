@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'Χρησιμοποιήστε υποκλοπή στον υπεύθυνο',
     'mod_amo_rules' => 'Δημιουργία οντοτήτων',
     'mod_amo_settingsConnection' => 'Ρυθμίσεις σύνδεσης',
+    'mod_amo_SaveSettingsError' => 'Παρουσιάστηκε σφάλμα κατά την αποθήκευση των ρυθμίσεων. Η υπηρεσία ConnectorDB ενδέχεται να μην εκτελείται.',
 ];

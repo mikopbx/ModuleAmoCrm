@@ -73,9 +73,9 @@ class WorkerAmoCrmAMI extends WorkerBase
     /**
      * Старт работы листнера.
      *
-     * @param $params
+     * @param $argv
      */
-    public function start($params):void
+    public function start($argv):void
     {
         $this->beanstalk = new BeanstalkClient(ConnectorDb::class);
 

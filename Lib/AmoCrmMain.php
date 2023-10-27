@@ -176,7 +176,7 @@ class AmoCrmMain extends AmoCrmMainBase
         if(empty(trim($authorization))){
             return new PBXAmoResult();
         }
-        $url = "https://$this->baseDomain/api/v2/account";
+        $url = "https://$this->baseDomain/api/v4/account";
         $headers = [
             'Authorization' => $authorization,
         ];

@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'Використовувати перехоплення на відповідального',
     'mod_amo_rules' => 'Створення сутностей',
     'mod_amo_settingsConnection' => 'Налаштування підключення',
+    'mod_amo_SaveSettingsError' => 'Виникла помилка збереження налаштувань. Можливо не запущено сервіс ConnectorDB.',
 ];

@@ -42,9 +42,9 @@ class SyncDaemon extends WorkerBase
     /**
      * Старт работы листнера.
      *
-     * @param $params
+     * @param $argv
      */
-    public function start($params):void
+    public function start($argv):void
     {
         while ($this->needRestart === false) {
             $this->syncLeads();
@@ -61,9 +61,13 @@ class SyncDaemon extends WorkerBase
     private function syncLeads():void
     {
         $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
-        if(!empty($allSettings) && is_array($allSettings)){
+        if(!empty($allSettings) && is_array($allSettings) && isset($allSettings['ModuleAmoCrm'])){
             $settings = (object)$allSettings['ModuleAmoCrm'];
         }else{
+            return;
+        }
+        if((int)$settings->portalId <=0 ){
+            // Нет подключения к порталу.
             return;
         }
         $entityType = 'leads';
@@ -72,12 +76,18 @@ class SyncDaemon extends WorkerBase
         if(empty($result->data[$entityType])){
             return;
         }
-        $data = [ 'update' => $result->data[$entityType]];
-        ConnectorDb::invoke('updateLeads', [$data]);
+        $chunks = array_chunk($result->data[$entityType], 50, false);
+        foreach ($chunks as $chunk){
+            ConnectorDb::invoke('updateLeads', [[ 'update' => $chunk]]);
+            usleep(500000);
+        }
         while(!empty($result->data['nextPage'])){
             $result = WorkerAmoHTTP::invokeAmoApi('getChangedLeads', [(int)$settings->lastLeadsSyncTime, $endTime, $result->data['nextPage']]);
-            $data = [ 'update' => $result->data[$entityType]];
-            ConnectorDb::invoke('updateLeads', [$data]);
+            $chunks = array_chunk($result->data[$entityType], 50, false);
+            foreach ($chunks as $chunk){
+                ConnectorDb::invoke('updateLeads', [[ 'update' => $chunk]]);
+                usleep(500000);
+            }
         }
         ConnectorDb::invoke('saveNewSettings', [['lastLeadsSyncTime' => $endTime]]);
     }
@@ -95,17 +105,27 @@ class SyncDaemon extends WorkerBase
         }else{
             return;
         }
+        if((int)$settings->portalId <=0 ){
+            // Нет подключения к порталу.
+            return;
+        }
         $endTime = time();
         $result = WorkerAmoHTTP::invokeAmoApi('getChangedContacts', [$settings->lastContactsSyncTime, $endTime, $entityType]);
         if(empty($result->data[$entityType])){
             return;
         }
-        $data = ['update' => $result->data[$entityType]];
-        ConnectorDb::invoke('updatePhoneBook', [$data]);
+        $chunks = array_chunk($result->data[$entityType], 50, false);
+        foreach ($chunks as $chunk){
+            ConnectorDb::invoke('updatePhoneBook', [[ 'update' => $chunk]]);
+            usleep(500000);
+        }
         while(!empty($result->data['nextPage'])){
             $result = WorkerAmoHTTP::invokeAmoApi('getChangedContacts', [$settings->lastContactsSyncTime, $endTime, $entityType, $result->data['nextPage']]);
-            $data = ['update' => $result->data[$entityType]];
-            ConnectorDb::invoke('updatePhoneBook', [$data]);
+            $chunks = array_chunk($result->data[$entityType], 50, false);
+            foreach ($chunks as $chunk){
+                ConnectorDb::invoke('updatePhoneBook', [[ 'update' => $chunk]]);
+                usleep(500000);
+            }
         }
         $fieldName = "last".ucfirst($entityType)."SyncTime";
         ConnectorDb::invoke('saveNewSettings', [[$fieldName => $endTime]]);

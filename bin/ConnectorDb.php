@@ -100,9 +100,9 @@ class ConnectorDb extends WorkerBase
     /**
      * Старт работы листнера.
      *
-     * @param $params
+     * @param $argv
      */
-    public function start($params):void
+    public function start($argv):void
     {
         $this->updateSettings();
 
@@ -701,6 +701,10 @@ class ConnectorDb extends WorkerBase
         $settings = ModuleAmoCrm::findFirst();
         if(!$settings){
             $settings = new ModuleAmoCrm();
+        }
+        if(isset($data['portalId']) && (int)$data['portalId'] === 0){
+            // Не сохраняем пустое значение portalId.
+            unset($data['portalId']);
         }
         foreach ($settings->toArray() as $key => $value){
             if(isset($data[$key])){

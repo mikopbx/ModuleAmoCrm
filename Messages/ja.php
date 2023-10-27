@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => '担当者にインターセプトを使用する',
     'mod_amo_rules' => 'エンティティの作成',
     'mod_amo_settingsConnection' => '接続設定',
+    'mod_amo_SaveSettingsError' => '設定の保存中にエラーが発生しました。 ConnectorDB サービスが実行されていない可能性があります。',
 ];

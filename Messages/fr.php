@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'Utiliser l\'interception sur le responsable',
     'mod_amo_rules' => 'Création d\'entités',
     'mod_amo_settingsConnection' => 'Paramètres de connexion',
+    'mod_amo_SaveSettingsError' => 'Une erreur s\'est produite lors de l\'enregistrement des paramètres. Le service ConnectorDB n\'est peut-être pas en cours d\'exécution.',
 ];

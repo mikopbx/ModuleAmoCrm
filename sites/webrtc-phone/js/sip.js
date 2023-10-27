@@ -20,8 +20,14 @@ define(function (require) {
     let $           = require('jquery');
     const PubSub    = require('pubsub');
     const JsSIP     = require('jssip');
+    const moment    = require('moment');
 
-    let ctxSip = {
+    function translate(string){
+        return string;
+    }
+
+    // let ctxSip = {
+    ctxSip = {
         connSettings: {
             pbxHost: '',
             currentPhone: '',
@@ -31,16 +37,29 @@ define(function (require) {
         config : {},
         sessionEventHandlers: {},
         phone 		 : null,
-        ringtone     : document.getElementById('ringtone'),
-        ringbacktone : document.getElementById('ringbacktone'),
-        dtmfTone     : document.getElementById('dtmfTone'),
-        sipRemoteAudio:document.getElementById("sipRemoteAudio"),
+        ringtone     : null,
+        ringbacktone : null,
+        dtmfTone     : null,
+        sipRemoteAudio: document.getElementById("sipRemoteAudio"),
         Sessions     : [],
         callTimers   : {},
         callActiveID : null,
         callVolume    : 1,
         Stream       : null,
+
+        addAudioTag: function (key, path){
+            ctxSip[key] = new Audio(`${window.location.origin}/webrtc-phone/sounds/${path}.mp3`);
+            ctxSip[key].loop = true;
+            ctxSip[key].addEventListener('ended', function() {
+                this.currentTime = 0;
+                this.play();
+            }, false);
+        },
         start: function (connSettings){
+            ctxSip.addAudioTag('ringtone', 'outgoing');
+            ctxSip.addAudioTag('ringbacktone', 'incoming');
+            ctxSip.addAudioTag('dtmfTone', 'dtmf');
+
             $.each(connSettings, function (key, value){
                 if(typeof ctxSip.connSettings[key] === 'undefined'){
                     return;
@@ -92,10 +111,8 @@ define(function (require) {
             });
             ctxSip.phone.on('disconnected', function() {
                 ctxSip.setStatus("Disconnected");
-
                 // disable phone
                 ctxSip.setError(true, 'Websocket Disconnected.', 'An Error occurred connecting to the websocket.');
-
                 // remove existing sessions
                 $("#sessions > .session").each(function(i, session) {
                     ctxSip.removeSession(session, 500);
@@ -118,7 +135,6 @@ define(function (require) {
                 }
                 e.session.direction = 'incoming';
                 ctxSip.newSession(e.session);
-                console.log(this, e);
             });
             ctxSip.phone.on('sipEvent', function(data, parameter) {
                 // console.log(parameter, data);
@@ -133,7 +149,7 @@ define(function (require) {
                 };
                 // This key is set to prevent multiple windows.
                 localStorage.setItem('ctxPhone', 'true');
-                $("#mldError").modal('hide');
+                // $("#mldError").modal('hide');
                 ctxSip.setStatus("Ready");
             });
 
@@ -187,13 +203,14 @@ define(function (require) {
          * @param {string} status
          */
         setStatus : function(status) {
+            console.debug(status);
             let icon    = 'fa-question',
                 tooltip = '???',
                 text    = '';
             if(status === 'Ready' || 'Connected' === status){
                 icon    = 'fa-signal';
                 tooltip = translate('statusPhone.'+status);
-                text    = tooltip; ;
+                text    = tooltip;
             }else if(status === 'Connecting'){
                 icon = 'fa-circle text-primary';
                 tooltip = translate('statusPhone.'+status);
@@ -221,6 +238,8 @@ define(function (require) {
          * @param closable
          */
         setError : function(err, title, msg, closable) {
+            console.log(err, title, msg, closable);
+            return;
             // Show modal if err = true
             let mdlError = $("#mdlError");
             if (err === true) {
@@ -402,7 +421,7 @@ define(function (require) {
          */
         logClear : function() {
             localStorage.removeItem('sipCalls');
-            ctxSip.logShow();
+            // ctxSip.logShow();
         },
 
         /**
@@ -418,12 +437,12 @@ define(function (require) {
                     id   : session.ctxid,
                     time : new Date().getTime()
                 },
-                calllog = JSON.parse(localStorage.getItem('sipCalls'));
+                callLog = JSON.parse(localStorage.getItem('sipCalls'));
 
-            if (!calllog) { calllog = {}; }
+            if (!callLog) { callLog = {}; }
 
-            if (!calllog.hasOwnProperty(session.ctxid)) {
-                calllog[log.id] = {
+            if (!callLog.hasOwnProperty(session.ctxid)) {
+                callLog[log.id] = {
                     id    : log.id,
                     clid  : log.clid,
                     uri   : log.uri,
@@ -432,15 +451,17 @@ define(function (require) {
                 };
             }
             if (status === 'ended') {
-                calllog[log.id].stop = log.time;
+                callLog[log.id].stop = log.time;
             }
-            if (status === 'ended' && calllog[log.id].status === 'ringing') {
-                calllog[log.id].status = 'missed';
+            if (status === 'ended' && callLog[log.id].status === 'ringing') {
+                callLog[log.id].status = 'missed';
             } else {
-                calllog[log.id].status = status;
+                callLog[log.id].status = status;
             }
-            localStorage.setItem('sipCalls', JSON.stringify(calllog));
-            ctxSip.logShow();
+            localStorage.setItem('sipCalls', JSON.stringify(callLog));
+            // ctxSip.logShow();
+
+            console.debug(log);
         },
 
         /**
@@ -449,7 +470,14 @@ define(function (require) {
          */
         connectionOnAddStream: function(e){
             // https://github.com/versatica/JsSIP/issues/501
-            ctxSip.sipRemoteAudio.srcObject = e.stream;
+            // ctxSip.sipRemoteAudio.srcObject = e.stream;
+            // ctxSip.sipRemoteAudio.play();
+            // ctxSip.sipRemoteAudio = document.createElement('audio');
+            if ('srcObject' in ctxSip.sipRemoteAudio) {
+                ctxSip.sipRemoteAudio.srcObject = e.stream;
+            } else {
+                ctxSip.sipRemoteAudio.src = window.URL.createObjectURL(e.stream);
+            }
             ctxSip.sipRemoteAudio.play();
         },
 
@@ -499,7 +527,7 @@ define(function (require) {
                 ctxSip.callActiveID = null;
                 ctxSip.logCall(this, 'ended');
             }
-            ctxSip.Sessions[this.ctxid] = undefined;
+            delete ctxSip.Sessions[this.ctxid];
         },
 
         sessionOnFailed: function() {
@@ -509,7 +537,7 @@ define(function (require) {
             ctxSip.setCallSessionStatus('Terminated');
             ctxSip.logCall(this, 'ended');
             ctxSip.callActiveID = null;
-            ctxSip.Sessions[this.ctxid] = undefined;
+            delete ctxSip.Sessions[this.ctxid];
         },
         sessionOnEnded: function() {
             console.log('ended');
@@ -518,7 +546,7 @@ define(function (require) {
             ctxSip.setCallSessionStatus("");
             ctxSip.logCall(this, 'ended');
             ctxSip.callActiveID = null;
-            ctxSip.Sessions[this.ctxid] = undefined;
+            delete ctxSip.Sessions[this.ctxid]
         },
         sessionOnMuted: function() {
             console.log('muted');
@@ -533,7 +561,7 @@ define(function (require) {
         sipCall : function(target){
             let options = {
                 'mediaConstraints' : {'audio': true, 'video': false},
-                'iceServers': [], // [{url: ['stun:stun.sipnet.ru']}],
+                'iceServers':  [{url: ['stun:stun.sipnet.ru']}],
                 'mediaStream': ctxSip.Stream,
             };
             let aor = ctxSip.makeAor(target);
@@ -590,8 +618,7 @@ define(function (require) {
 
         newSession : function(newSess) {
             newSess.displayName = newSess.remote_identity.display_name || newSess.remote_identity.uri.user;
-            newSess.ctxid       = ctxSip.getUniqueID();
-
+            newSess.ctxid       = newSess.id;
             let status;
             if (newSess.direction === 'incoming') {
                 status = "Incoming: "+ newSess.displayName;

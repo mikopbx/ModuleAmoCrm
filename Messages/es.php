@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'Utilizar la interceptación sobre la persona a cargo.',
     'mod_amo_rules' => 'Creando entidades',
     'mod_amo_settingsConnection' => 'Configuración de conexión',
+    'mod_amo_SaveSettingsError' => 'Se produjo un error al guardar la configuración. Es posible que el servicio ConnectorDB no se esté ejecutando.',
 ];

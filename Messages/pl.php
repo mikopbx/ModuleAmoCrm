@@ -81,4 +81,5 @@ return [
     'mod_amo_useInterception' => 'Użyj przechwycenia na osobie odpowiedzialnej',
     'mod_amo_rules' => 'Tworzenie obiektów',
     'mod_amo_settingsConnection' => 'Ustawienia połączenia',
+    'mod_amo_SaveSettingsError' => 'Wystąpił błąd podczas zapisywania ustawień. Usługa ConnectorDB może nie być uruchomiona.',
 ];

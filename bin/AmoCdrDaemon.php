@@ -80,7 +80,7 @@ class AmoCdrDaemon extends WorkerBase
     /**
      * Начало загрузки истории звонков в Amo.
      */
-    public function start($params):void
+    public function start($argv):void
     {
         $res = LanInterfaces::findFirst("internet = '1'")->toArray();
         $this->extHostname  = $res['exthostname']??'';
@@ -831,7 +831,7 @@ class AmoCdrDaemon extends WorkerBase
             }
             if( isset($this->newTasks[$contact['request_id']]) ){
                 $this->newTasks[$contact['request_id']]['entity_id'] = $contact['id'];
-                $this->newTasks[$contact['request_id']]['entity_type'] = 'contacts';
+                $this->newTasks[$contact['request_id']]['entity_type'] = 'contact';
             }
             if( isset($this->incompleteAnswered[$contact['request_id']]) ){
                 $this->incompleteAnswered[$contact['request_id']]['client'] = $contact['id'];
