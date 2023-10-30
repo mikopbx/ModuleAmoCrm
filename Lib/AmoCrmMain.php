@@ -311,6 +311,7 @@ class AmoCrmMain extends AmoCrmMainBase
             'order[updated_at]' => 'desc',
             'filter[updated_at][from]' => $fromTime,
             'filter[updated_at][to]' => $toTime,
+            'limit' => 249
         ];
 
         if(!empty($page)){
@@ -350,6 +351,7 @@ class AmoCrmMain extends AmoCrmMainBase
             'order[updated_at]' => 'desc',
             'filter[updated_at][from]' => $fromTime,
             'filter[updated_at][to]' => $toTime,
+            'limit' => 249
         ];
         if(!empty($page)){
             $params['page'] = $page;

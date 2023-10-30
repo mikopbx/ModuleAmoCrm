@@ -33,7 +33,7 @@
     "create_lead": "1",
     "create_unsorted": "0",
     "template_task_text": "Перезвонить по номеру <PhoneNumber>",
-    "deadline_task": "1"
+    "deadline_task": "0"
   },
   {
     "did": "",
@@ -69,7 +69,7 @@
     "create_lead": "1",
     "create_unsorted": "0",
     "template_task_text": "Перезвонить по номеру <PhoneNumber> (был пропущенный)",
-    "deadline_task": "1"
+    "deadline_task": "0"
   },
   {
     "did": "",
