@@ -302,6 +302,13 @@ const ModuleAmoCrmEntityEdit = {
 			$('#deadline_task').parents('div.field').first().hide();
 			window[className].$task_responsible_type.parents('div.field').first().hide();
 		}
+		let type = window[className].$typeDropdown.parent().dropdown('get value');
+
+		if(type === 'OUTGOING_KNOWN_FAIL' || type === 'OUTGOING_KNOWN' || type === 'OUTGOING_UNKNOWN') {
+			$('#did').parents('div.field').first().hide();
+		}else{
+			$('#did').parents('div.field').first().show();
+		}
 	}
 };
 
