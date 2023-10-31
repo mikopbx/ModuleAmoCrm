@@ -79,14 +79,14 @@ class SyncDaemon extends WorkerBase
         $chunks = array_chunk($result->data[$entityType], 50, false);
         foreach ($chunks as $chunk){
             ConnectorDb::invoke('updateLeads', [[ 'update' => $chunk]]);
-            usleep(500000);
+            sleep(5);
         }
         while(!empty($result->data['nextPage'])){
             $result = WorkerAmoHTTP::invokeAmoApi('getChangedLeads', [(int)$settings->lastLeadsSyncTime, $endTime, $result->data['nextPage']]);
             $chunks = array_chunk($result->data[$entityType], 50, false);
             foreach ($chunks as $chunk){
                 ConnectorDb::invoke('updateLeads', [[ 'update' => $chunk]]);
-                usleep(500000);
+                sleep(5);
             }
         }
         ConnectorDb::invoke('saveNewSettings', [['lastLeadsSyncTime' => $endTime]]);

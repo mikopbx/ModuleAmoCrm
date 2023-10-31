@@ -89,13 +89,17 @@ class Logger
 
     private function getDecodedString($data):string
     {
-        $printedData = print_r($data, true);
+        try {
+            $printedData = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }catch (\Exception $e){
+            $printedData = print_r($data, true);
+        }
         if(is_bool($printedData)){
             $result = '';
         }else{
             $result = urldecode($printedData);
         }
-        return $result;
+        return getmypid().': '.$result;
     }
 
 }

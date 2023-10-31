@@ -150,7 +150,10 @@ class WorkerAmoHTTP extends WorkerBase
         try {
             $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), 20);
             if(file_exists($result)){
+                $filename = $result;
                 $result = json_decode(file_get_contents($result), true, 512, JSON_THROW_ON_ERROR);
+                unlink($filename);
+                unset($filename);
             }
             $object = unserialize($result, ['allowed_classes' => [PBXAmoResult::class, PBXApiResult::class]]);
         } catch (\Throwable $e) {
@@ -182,6 +185,7 @@ class WorkerAmoHTTP extends WorkerBase
 
 }
 
-if(isset($argv) && count($argv) !== 1){
+if(isset($argv) && count($argv) !== 1
+    && Util::getFilePathByClassName(WorkerAmoHTTP::class) === $argv[0]){
     WorkerAmoHTTP::startWorker($argv??[]);
 }
