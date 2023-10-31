@@ -11,6 +11,7 @@ namespace Modules\ModuleAmoCrm\Lib;
 
 use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Core\System\BeanstalkClient;
+use MikoPBX\Core\System\Configs\CronConf;
 use MikoPBX\Core\System\PBX;
 use MikoPBX\Core\System\Processes;
 use MikoPBX\Core\System\Util;
@@ -342,10 +343,21 @@ class AmoCrmConf extends ConfigClass
      * Process after enable action in web interface
      *
      * @return void
-     * @throws \Exception
      */
     public function onAfterModuleEnable(): void
     {
+        $cron = new CronConf();
+        $cron->reStart();
         PBX::dialplanReload();
+    }
+
+    /**
+     * @param array $tasks
+     */
+    public function createCronTasks(array &$tasks): void
+    {
+        $tmpDir = $this->di->getShared('config')->path('core.tempDir') . '/ModuleAmoCrm';
+        $findPath   = Util::which('find');
+        $tasks[]    = "*/1 * * * * $findPath $tmpDir -mmin +1 -type f -delete> /dev/null 2>&1\n";
     }
 }

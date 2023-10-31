@@ -25,10 +25,9 @@ use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
-use Modules\ModuleAmoCrm\App\Forms\ModuleAmoCrmEntitySettingsModifyForm;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
-use Modules\ModuleAmoCrm\Lib\PBXAmoResult;
+use Modules\ModuleAmoCrm\Lib\Logger;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
 use Modules\ModuleAmoCrm\Models\ModuleAmoLeads;
@@ -43,6 +42,7 @@ class ConnectorDb extends WorkerBase
 {
     private array   $users = [];
     private int     $portalId = 0;
+    private Logger $logger;
 
     /**
      * Handles the received signal.
@@ -55,6 +55,20 @@ class ConnectorDb extends WorkerBase
     {
         parent::signalHandler($signal);
         cli_set_process_title('SHUTDOWN_'.cli_get_process_title());
+    }
+
+    /**
+     * Callback for the ping to keep the connection alive.
+     *
+     * @param BeanstalkClient $message The received message.
+     *
+     * @return void
+     */
+    public function pingCallBack(BeanstalkClient $message): void
+    {
+        $this->logger->writeInfo(getmypid().': pingCallBack ...');
+        $this->logger->rotate();
+        parent::pingCallBack($message);
     }
 
     /**
@@ -105,6 +119,9 @@ class ConnectorDb extends WorkerBase
     public function start($argv):void
     {
         $this->updateSettings();
+        $this->logger =  new Logger('ConnectorDb', 'ModuleAmoCrm');
+        $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
+        $this->logger->writeInfo($argv);
 
         $beanstalk      = new BeanstalkClient(self::class);
         $amoUsers       = ModuleAmoUsers::find('enable=1');
@@ -115,12 +132,15 @@ class ConnectorDb extends WorkerBase
             $this->users[1*$user->amoUserId] = preg_replace('/[D]/', '', $user->number);
         }
 
+        $this->logger->writeInfo($this->users);
+
         $beanstalk->subscribe(self::class, [$this, 'onEvents']);
         $beanstalk->subscribe($this->makePingTubeName(self::class), [$this, 'pingCallBack']);
         while ($this->needRestart === false) {
             $beanstalk->wait();
         }
     }
+
 
     /**
      * Возвращает данные из кэш.
@@ -157,8 +177,10 @@ class ConnectorDb extends WorkerBase
         try {
             $data = json_decode($tube->getBody(), true, 512, JSON_THROW_ON_ERROR);
         }catch (\Throwable $e){
+            $tube->reply(false);
             return;
         }
+        $this->logger->writeInfo($data);
         if($data['action'] === 'entity-update'){
             $this->updatePhoneBook($data['data']['contacts']??[]);
             $this->updateLeads($data['data']['leads']??[]);
@@ -185,6 +207,8 @@ class ConnectorDb extends WorkerBase
                 }
             }
         }
+        $tube->reply($res_data);
+
     }
 
     /**
@@ -761,6 +785,7 @@ class ConnectorDb extends WorkerBase
             }
             if(file_exists($result)){
                 $object = json_decode(file_get_contents($result), true, 512, JSON_THROW_ON_ERROR);
+                unlink($result);
             }
         } catch (\Throwable $e) {
             $object = [];
@@ -872,6 +897,7 @@ class ConnectorDb extends WorkerBase
 
 }
 
-if(isset($argv) && count($argv) !== 1){
+if(isset($argv) && count($argv) !== 1
+    && Util::getFilePathByClassName(ConnectorDb::class) === $argv[0]){
     ConnectorDb::startWorker($argv??[]);
 }
