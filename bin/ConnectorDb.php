@@ -297,7 +297,9 @@ class ConnectorDb extends WorkerBase
                         $newRecord->company_name        = $entity['company_name']??'';
                         $newRecord->linked_company_id   = $entity['linked_company_id']??'';
                         $newRecord->writeAttribute($idEntity,$entity['id']);
-                        $newRecord->save();
+                        if(!$newRecord->save()){
+                            $this->logger->writeError(['error' => 'Fail save contact', 'msg' => $newRecord->getMessages(), 'data' => $entity]);
+                        }
                     }
                 }
             }
@@ -498,7 +500,9 @@ class ConnectorDb extends WorkerBase
                     $newRecord->companyId           = $company;
                     $newRecord->isMainContact       = $contact['is_main']?'1':'0';
                     $newRecord->closed_at           = $lead['closed_at']??0;
-                    $newRecord->save();
+                    if(!$newRecord->save()){
+                        $this->logger->writeError(['error' => 'Fail save contact', 'msg' => $newRecord->getMessages(), 'data' => $contact]);
+                    }
                 }
                 if(!empty($company) && count($contacts) === 0){
                     $newRecord = new ModuleAmoLeads();
@@ -512,7 +516,9 @@ class ConnectorDb extends WorkerBase
                     $newRecord->companyId           = $company;
                     $newRecord->isMainContact       = '0';
                     $newRecord->closed_at           = $lead['closed_at']??0;
-                    $newRecord->save();
+                    if(!$newRecord->save()){
+                        $this->logger->writeError(['error' => 'Fail save contact', 'msg' => $newRecord->getMessages(), 'data' => $lead]);
+                    }
                 }
             }
         }
