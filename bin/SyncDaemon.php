@@ -27,6 +27,8 @@ class SyncDaemon extends WorkerBase
 {
     public const LIMIT_PART = 249;
 
+    private string $columnName = 'updated_at';
+
     /**
      * Handles the received signal.
      *
@@ -47,6 +49,10 @@ class SyncDaemon extends WorkerBase
      */
     public function start($argv):void
     {
+        $type = $argv[2]??'';
+        if($type === 'init'){
+            $this->columnName = 'created_at';
+        }
         while ($this->needRestart === false) {
             $this->syncContacts(AmoCrmMain::ENTITY_CONTACTS);
             $this->syncLeads();
@@ -64,6 +70,9 @@ class SyncDaemon extends WorkerBase
         $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
         if(!empty($allSettings) && is_array($allSettings) && isset($allSettings['ModuleAmoCrm'])){
             $settings = (object)$allSettings['ModuleAmoCrm'];
+            if($this->columnName === 'created_at'){
+                $settings->lastLeadsSyncTime = 0;
+            }
         }else{
             return;
         }
@@ -76,9 +85,9 @@ class SyncDaemon extends WorkerBase
         $url = "https://".AmoCrmMain::EMPTY_HOST_VALUE."/api/v4/$entityType";
         $params = [
             'with' => 'contacts',
-            'order[updated_at]' => 'desc',
-            'filter[updated_at][from]' => (int)$settings->lastLeadsSyncTime,
-            'filter[updated_at][to]' => $endTime,
+            'order['.$this->columnName.']' => 'desc',
+            'filter['.$this->columnName.'][from]' => (int)$settings->lastLeadsSyncTime,
+            'filter['.$this->columnName.'][to]' => $endTime,
             'limit' => self::LIMIT_PART
         ];
         $nextPage = $url."?".http_build_query($params);
@@ -102,8 +111,12 @@ class SyncDaemon extends WorkerBase
     private function syncContacts($entityType):void
     {
         $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
+        $fieldName = "last".ucfirst($entityType)."SyncTime";
         if(!empty($allSettings) && is_array($allSettings)){
             $settings = (object)$allSettings['ModuleAmoCrm'];
+            if($this->columnName === 'created_at'){
+                $settings->$fieldName = 0;
+            }
         }else{
             return;
         }
@@ -111,13 +124,12 @@ class SyncDaemon extends WorkerBase
             // Нет подключения к порталу.
             return;
         }
-        $fieldName = "last".ucfirst($entityType)."SyncTime";
         $endTime = time();
         $url = "https://".AmoCrmMain::EMPTY_HOST_VALUE."/api/v4/$entityType";
         $params = [
-            'order[updated_at]' => 'desc',
-            'filter[updated_at][from]'  => $settings->$fieldName,
-            'filter[updated_at][to]'    => $endTime,
+            'order['.$this->columnName.']' => 'desc',
+            'filter['.$this->columnName.'][from]'  => $settings->$fieldName,
+            'filter['.$this->columnName.'][to]'    => $endTime,
             'limit' => self::LIMIT_PART
         ];
         $nextPage = $url."?".http_build_query($params);
