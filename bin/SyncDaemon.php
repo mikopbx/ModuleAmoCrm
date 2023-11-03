@@ -25,6 +25,7 @@ use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 
 class SyncDaemon extends WorkerBase
 {
+    public const LIMIT_PART = 249;
 
     /**
      * Handles the received signal.
@@ -47,9 +48,9 @@ class SyncDaemon extends WorkerBase
     public function start($argv):void
     {
         while ($this->needRestart === false) {
+            $this->syncContacts(AmoCrmMain::ENTITY_CONTACTS);
             $this->syncLeads();
             $this->syncContacts(AmoCrmMain::ENTITY_COMPANIES);
-            $this->syncContacts(AmoCrmMain::ENTITY_CONTACTS);
             sleep(10);
         }
     }
@@ -70,23 +71,24 @@ class SyncDaemon extends WorkerBase
             // Нет подключения к порталу.
             return;
         }
-        $entityType = 'leads';
         $endTime = time();
-        $result = WorkerAmoHTTP::invokeAmoApi('getChangedLeads', [(int)$settings->lastLeadsSyncTime, $endTime]);
-        if(empty($result->data[$entityType])){
-            return;
-        }
-        $chunks = array_chunk($result->data[$entityType], 50, false);
-        foreach ($chunks as $chunk){
-            ConnectorDb::invoke('updateLeads', [[ 'update' => $chunk]]);
-            sleep(5);
-        }
-        while(!empty($result->data['nextPage'])){
-            $result = WorkerAmoHTTP::invokeAmoApi('getChangedLeads', [(int)$settings->lastLeadsSyncTime, $endTime, $result->data['nextPage']]);
+        $entityType = 'leads';
+        $url = "https://".AmoCrmMain::EMPTY_HOST_VALUE."/api/v4/$entityType";
+        $params = [
+            'with' => 'contacts',
+            'order[updated_at]' => 'desc',
+            'filter[updated_at][from]' => (int)$settings->lastLeadsSyncTime,
+            'filter[updated_at][to]' => $endTime,
+            'limit' => self::LIMIT_PART
+        ];
+        $nextPage = $url."?".http_build_query($params);
+        while(!empty($nextPage)){
+            $result = WorkerAmoHTTP::invokeAmoApi('getChangedEntity', [$nextPage, $entityType]);
+            $nextPage = $result->data['nextPage']??'';
             $chunks = array_chunk($result->data[$entityType], 50, false);
             foreach ($chunks as $chunk){
                 ConnectorDb::invoke('updateLeads', [[ 'update' => $chunk]]);
-                sleep(5);
+                sleep(1);
             }
         }
         ConnectorDb::invoke('saveNewSettings', [['lastLeadsSyncTime' => $endTime]]);
@@ -109,25 +111,25 @@ class SyncDaemon extends WorkerBase
             // Нет подключения к порталу.
             return;
         }
+        $fieldName = "last".ucfirst($entityType)."SyncTime";
         $endTime = time();
-        $result = WorkerAmoHTTP::invokeAmoApi('getChangedContacts', [$settings->lastContactsSyncTime, $endTime, $entityType]);
-        if(empty($result->data[$entityType])){
-            return;
-        }
-        $chunks = array_chunk($result->data[$entityType], 50, false);
-        foreach ($chunks as $chunk){
-            ConnectorDb::invoke('updatePhoneBook', [[ 'update' => $chunk]]);
-            usleep(500000);
-        }
-        while(!empty($result->data['nextPage'])){
-            $result = WorkerAmoHTTP::invokeAmoApi('getChangedContacts', [$settings->lastContactsSyncTime, $endTime, $entityType, $result->data['nextPage']]);
+        $url = "https://".AmoCrmMain::EMPTY_HOST_VALUE."/api/v4/$entityType";
+        $params = [
+            'order[updated_at]' => 'desc',
+            'filter[updated_at][from]'  => $settings->$fieldName,
+            'filter[updated_at][to]'    => $endTime,
+            'limit' => self::LIMIT_PART
+        ];
+        $nextPage = $url."?".http_build_query($params);
+        while(!empty($nextPage)){
+            $result = WorkerAmoHTTP::invokeAmoApi('getChangedEntity', [$nextPage, $entityType]);
+            $nextPage = $result->data['nextPage'];
             $chunks = array_chunk($result->data[$entityType], 50, false);
             foreach ($chunks as $chunk){
                 ConnectorDb::invoke('updatePhoneBook', [[ 'update' => $chunk]]);
-                usleep(500000);
+                sleep(1);
             }
         }
-        $fieldName = "last".ucfirst($entityType)."SyncTime";
         ConnectorDb::invoke('saveNewSettings', [[$fieldName => $endTime]]);
     }
 }

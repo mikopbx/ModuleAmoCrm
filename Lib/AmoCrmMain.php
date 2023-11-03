@@ -24,6 +24,9 @@ class AmoCrmMain extends AmoCrmMainBase
 
     public const ENTITY_CONTACTS = 'contacts';
     public const ENTITY_COMPANIES = 'companies';
+    public const ENTITY_LEADS = 'leads';
+
+    public const EMPTY_HOST_VALUE = 'EMPTY_HOST_VALUE';
 
     /**
      * Инициализации API клиента.
@@ -291,80 +294,33 @@ class AmoCrmMain extends AmoCrmMainBase
 
     /**
      * Получает изменненные контакты / компании.
-     * @param int    $fromTime
-     * @param int    $toTime
      * @param string $type
-     * @param string $page
+     * @param string $pageLink
      * @return PBXApiResult
      */
-    public function getChangedContacts(int $fromTime, int $toTime, string $type, string $page = ''):PBXApiResult
+    public function getChangedEntity(string $pageLink, string $type):PBXApiResult
     {
         $types = [
-            self::ENTITY_COMPANIES => 'company',
-            self::ENTITY_CONTACTS  => 'contact',
+            self::ENTITY_COMPANIES  => 'company',
+            self::ENTITY_CONTACTS   => 'contact',
+            self::ENTITY_LEADS      => self::ENTITY_LEADS,
         ];
-        $url = "https://$this->baseDomain/api/v4/$type";
         $headers = [
             'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
         ];
-        $params = [
-            'order[updated_at]' => 'desc',
-            'filter[updated_at][from]' => $fromTime,
-            'filter[updated_at][to]' => $toTime,
-            'limit' => 249
-        ];
-
-        if(!empty($page)){
-            $params['page'] = $page;
-        }
+        $url = str_replace(self::EMPTY_HOST_VALUE, $this->baseDomain ,$pageLink);
+        $params = [];
         $response = ClientHTTP::sendHttpGetRequest($url, $params, $headers);
         $result   = new PBXApiResult();
-        $nextUrl = parse_url($response->data['_links']['next']['href']??'');
-        parse_str($nextUrl['query']??'', $queryArray);
-
+        $nextUrl = $response->data['_links']['next']['href']??'';
         $result->data = [
             $type => [],
-            'nextPage' => $queryArray['page']??'',
+            'nextPage' => $nextUrl,
         ];
         foreach ($response->data['_embedded'][$type]??[] as $contact){
             $contact['type'] = $types[$type];
             $result->data[$type][]  = $contact;
         }
-        return $result;
-    }
-
-    /**
-     * Получает измененные сделки
-     * @param int    $fromTime
-     * @param int    $toTime
-     * @param string $page
-     * @return PBXApiResult
-     */
-    public function getChangedLeads(int $fromTime, int $toTime, string $page = ''):PBXApiResult
-    {
-        $url = "https://$this->baseDomain/api/v4/leads";
-        $headers = [
-            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
-        ];
-        $params = [
-            'with' => 'contacts',
-            'order[updated_at]' => 'desc',
-            'filter[updated_at][from]' => $fromTime,
-            'filter[updated_at][to]' => $toTime,
-            'limit' => 249
-        ];
-        if(!empty($page)){
-            $params['page'] = $page;
-        }
-        $response = ClientHTTP::sendHttpGetRequest($url, $params, $headers);
-        $result   = new PBXApiResult();
-        $nextUrl = parse_url($response->data['_links']['next']['href']??'');
-        parse_str($nextUrl['query']??'', $queryArray);
-
-        $result->data = [
-            'nextPage' => $queryArray['page']??'',
-        ];
-        $result->data['leads'] = $response->data['_embedded']['leads']??[];
         return $result;
     }
 
