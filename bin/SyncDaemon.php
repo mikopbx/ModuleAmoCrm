@@ -57,6 +57,9 @@ class SyncDaemon extends WorkerBase
             $this->syncContacts(AmoCrmMain::ENTITY_CONTACTS);
             $this->syncLeads();
             $this->syncContacts(AmoCrmMain::ENTITY_COMPANIES);
+            if($this->columnName === 'created_at'){
+                exit();
+            }
             sleep(10);
         }
     }
