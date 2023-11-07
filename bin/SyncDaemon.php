@@ -26,8 +26,10 @@ use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 class SyncDaemon extends WorkerBase
 {
     public const LIMIT_PART = 249;
+    public const COLUMN_UPDATE_NAME = "updated_at";
+    public const COLUMN_CREATE_NAME = "created_at";
 
-    private string $columnName = 'updated_at';
+    private string $columnName = self::COLUMN_UPDATE_NAME;
 
     /**
      * Handles the received signal.
@@ -51,13 +53,13 @@ class SyncDaemon extends WorkerBase
     {
         $type = $argv[2]??'';
         if($type === 'init'){
-            $this->columnName = 'created_at';
+            $this->columnName = self::COLUMN_CREATE_NAME;
         }
         while ($this->needRestart === false) {
             $this->syncContacts(AmoCrmMain::ENTITY_CONTACTS);
-            $this->syncLeads();
+            $this->syncContacts(AmoCrmMain::ENTITY_LEADS);
             $this->syncContacts(AmoCrmMain::ENTITY_COMPANIES);
-            if($this->columnName === 'created_at'){
+            if($type === 'init'){
                 exit();
             }
             sleep(10);
@@ -65,59 +67,22 @@ class SyncDaemon extends WorkerBase
     }
 
     /**
-     * Синхронизация сделок.
-     * @return void
-     */
-    private function syncLeads():void
-    {
-        $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
-        if(!empty($allSettings) && is_array($allSettings) && isset($allSettings['ModuleAmoCrm'])){
-            $settings = (object)$allSettings['ModuleAmoCrm'];
-            if($this->columnName === 'created_at'){
-                $settings->lastLeadsSyncTime = 0;
-            }
-        }else{
-            return;
-        }
-        if((int)$settings->portalId <=0 ){
-            // Нет подключения к порталу.
-            return;
-        }
-        $endTime = time();
-        $entityType = 'leads';
-        $url = "https://".AmoCrmMain::EMPTY_HOST_VALUE."/api/v4/$entityType";
-        $params = [
-            'with' => 'contacts',
-            'order['.$this->columnName.']' => 'desc',
-            'filter['.$this->columnName.'][from]' => (int)$settings->lastLeadsSyncTime,
-            'filter['.$this->columnName.'][to]' => $endTime,
-            'limit' => self::LIMIT_PART
-        ];
-        $nextPage = $url."?".http_build_query($params);
-        while(!empty($nextPage)){
-            $result = WorkerAmoHTTP::invokeAmoApi('getChangedEntity', [$nextPage, $entityType]);
-            $nextPage = $result->data['nextPage']??'';
-            $chunks = array_chunk($result->data[$entityType], 50, false);
-            foreach ($chunks as $chunk){
-                ConnectorDb::invoke('updateLeads', [[ 'update' => $chunk]]);
-                sleep(1);
-            }
-        }
-        ConnectorDb::invoke('saveNewSettings', [['lastLeadsSyncTime' => $endTime]]);
-    }
-
-    /**
      * Синхронизация контактов.
-     * @param $entityType
+     * @param string $entityType
      * @return void
      */
-    private function syncContacts($entityType):void
+    private function syncContacts(string $entityType):void
     {
         $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
         $fieldName = "last".ucfirst($entityType)."SyncTime";
+        $updateFunc = [
+            AmoCrmMain::ENTITY_CONTACTS => 'updatePhoneBook',
+            AmoCrmMain::ENTITY_COMPANIES => 'updatePhoneBook',
+            AmoCrmMain::ENTITY_LEADS => 'updateLeads'
+        ];
         if(!empty($allSettings) && is_array($allSettings)){
             $settings = (object)$allSettings['ModuleAmoCrm'];
-            if($this->columnName === 'created_at'){
+            if($this->columnName === self::COLUMN_CREATE_NAME){
                 $settings->$fieldName = 0;
             }
         }else{
@@ -135,13 +100,16 @@ class SyncDaemon extends WorkerBase
             'filter['.$this->columnName.'][to]'    => $endTime,
             'limit' => self::LIMIT_PART
         ];
+        if($entityType === AmoCrmMain::ENTITY_LEADS){
+            $params['with'] = 'contacts';
+        }
         $nextPage = $url."?".http_build_query($params);
         while(!empty($nextPage)){
             $result = WorkerAmoHTTP::invokeAmoApi('getChangedEntity', [$nextPage, $entityType]);
             $nextPage = $result->data['nextPage'];
             $chunks = array_chunk($result->data[$entityType], 50, false);
             foreach ($chunks as $chunk){
-                ConnectorDb::invoke('updatePhoneBook', [[ 'update' => $chunk]]);
+                ConnectorDb::invoke($updateFunc[$entityType], [[ 'update' => $chunk]]);
                 sleep(1);
             }
         }
