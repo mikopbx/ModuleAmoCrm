@@ -50,15 +50,27 @@ class Logger
             Util::addRegularWWWRights($logPath);
         }
         $this->logFile  = $logPath . $class . '.log';
-        $adapter       = new Stream($this->logFile);
+        $this->init();
+    }
+
+    /**
+     * Инициализация логгера.
+     * @return void
+     */
+    private function init():void
+    {
         $this->logger  = new \Phalcon\Logger(
             'messages',
             [
-                'main' => $adapter,
+                'main' =>  new Stream($this->logFile),
             ]
         );
     }
 
+    /**
+     * Ротация лог файла.
+     * @return void
+     */
     public function rotate(): void
     {
         $rotation = new Rotation([
@@ -70,9 +82,16 @@ class Logger
                 Util::sysLogMsg('amoCRM-Log', $exception->getMessage());
              },
         ]);
-        $rotation->rotate($this->logFile);
+        if($rotation->rotate($this->logFile)){
+            $this->init();
+        }
     }
 
+    /**
+     * Записать в лог ошибку.
+     * @param $data
+     * @return void
+     */
     public function writeError($data): void
     {
         if ($this->debug) {
@@ -80,6 +99,11 @@ class Logger
         }
     }
 
+    /**
+     * Записать в лог информационное сообщение.
+     * @param $data
+     * @return void
+     */
     public function writeInfo($data): void
     {
         if ($this->debug) {
@@ -87,6 +111,11 @@ class Logger
         }
     }
 
+    /**
+     * Кодирование данных в виде json.
+     * @param $data
+     * @return string
+     */
     private function getDecodedString($data):string
     {
         try {
