@@ -82,4 +82,6 @@ return [
     'mod_amo_rules' => 'エンティティの作成',
     'mod_amo_settingsConnection' => '接続設定',
     'mod_amo_SaveSettingsError' => '設定の保存中にエラーが発生しました。 ConnectorDB サービスが実行されていない可能性があります。',
+    'mod_amo_NeedWaitSyncTitle' => '連絡先を同期する',
+    'mod_amo_NeedWaitSyncBody' => '連絡先とトランザクションは同期されます。プロセスが完了するまで待ちます。ポータルへの通話のアップロードが停止しました。',
 ];
