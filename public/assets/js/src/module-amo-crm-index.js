@@ -167,6 +167,11 @@ const ModuleAmoCrm = {
 				elStatusAuth.addClass('red')
 				elStatusAuth.text(globalTranslate.module_amo_crm_connect_fail);
 			}
+			if(result.data.lastContactsSyncTime === 0){
+				$('#WaitSyncMsg').show();
+			}else{
+				$('#WaitSyncMsg').hide();
+			}
 		});
 	},
 
