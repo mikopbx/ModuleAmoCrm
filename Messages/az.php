@@ -82,4 +82,6 @@ return [
     'mod_amo_rules' => 'Müəssisələrin yaradılması',
     'mod_amo_settingsConnection' => 'Bağlantı parametrləri',
     'mod_amo_SaveSettingsError' => 'Parametrləri saxlayarkən xəta baş verdi. ConnectorDB xidməti işləməyə bilər.',
+    'mod_amo_NeedWaitSyncTitle' => 'Kontaktların sinxronlaşdırılması',
+    'mod_amo_NeedWaitSyncBody' => 'Kontaktlar və əməliyyatlar sinxronlaşdırılır. Prosesin tamamlanmasını gözləyin. Zənglərin portala yüklənməsi dayandırılıb.',
 ];
