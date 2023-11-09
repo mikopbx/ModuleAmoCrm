@@ -82,4 +82,6 @@ return [
     'mod_amo_rules' => 'Entitäten erstellen',
     'mod_amo_settingsConnection' => 'Verbindungseinstellungen',
     'mod_amo_SaveSettingsError' => 'Beim Speichern der Einstellungen ist ein Fehler aufgetreten. Der ConnectorDB-Dienst wird möglicherweise nicht ausgeführt.',
+    'mod_amo_NeedWaitSyncTitle' => 'Kontakte synchronisieren',
+    'mod_amo_NeedWaitSyncBody' => 'Kontakte und Transaktionen werden synchronisiert. Warten Sie, bis der Vorgang abgeschlossen ist. Das Hochladen von Anrufen auf das Portal wurde gestoppt.',
 ];
