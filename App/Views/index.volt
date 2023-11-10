@@ -1,3 +1,16 @@
+
+{% if !workIsAllowed %}
+<div id="WaitSyncMsg" class="ui icon message">
+  <i class="notched circle loading icon"></i>
+  <div class="content">
+    <div class="header">
+      {{ t._('mod_amo_NeedWaitSyncTitle') }}
+    </div>
+    <p>{{ t._('mod_amo_NeedWaitSyncBody') }}</p>
+  </div>
+</div>
+{% endif %}
+
 <div class="ui top attached tabular menu">
   <a class="active item" data-tab="rules">{{ t._('mod_amo_rules') }}</a>
   <a class="item" data-tab="settings">{{ t._('mod_amo_settingsConnection') }}</a>

@@ -82,4 +82,6 @@ return [
     'mod_amo_rules' => 'Création d\'entités',
     'mod_amo_settingsConnection' => 'Paramètres de connexion',
     'mod_amo_SaveSettingsError' => 'Une erreur s\'est produite lors de l\'enregistrement des paramètres. Le service ConnectorDB n\'est peut-être pas en cours d\'exécution.',
+    'mod_amo_NeedWaitSyncTitle' => 'Synchronisation des contacts',
+    'mod_amo_NeedWaitSyncBody' => 'Les contacts et les transactions sont synchronisés. Attendez la fin du processus. Le téléchargement des appels vers le portail s\'est arrêté.',
 ];

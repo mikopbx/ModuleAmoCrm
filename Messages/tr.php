@@ -82,4 +82,6 @@ return [
     'mod_amo_rules' => 'Varlıklar Oluşturma',
     'mod_amo_settingsConnection' => 'Bağlantı ayarları',
     'mod_amo_SaveSettingsError' => 'Ayarlar kaydedilirken bir hata oluştu. ConnectorDB hizmeti çalışmıyor olabilir.',
+    'mod_amo_NeedWaitSyncTitle' => 'Kişileri senkronize etme',
+    'mod_amo_NeedWaitSyncBody' => 'Kişiler ve işlemler senkronize edilir. İşlemin tamamlanmasını bekleyin. Çağrıların portala yüklenmesi durduruldu.',
 ];

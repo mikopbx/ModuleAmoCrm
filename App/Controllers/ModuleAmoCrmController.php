@@ -97,7 +97,10 @@ class ModuleAmoCrmController extends BaseController
      */
     public function checkAction():void
     {
-        $result = WorkerAmoHTTP::invokeAmoApi('checkConnection', []);
+        $result      = WorkerAmoHTTP::invokeAmoApi('checkConnection', []);
+        $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
+        $lastContactsSyncTime = (int)($allSettings['ModuleAmoCrm']['lastContactsSyncTime']??0);
+        $result->data['lastContactsSyncTime'] = $lastContactsSyncTime;
         $this->view->success = $result->success;
         $this->view->data    = $result->data;
         $this->view->messages= $result->messages;
@@ -151,10 +154,10 @@ class ModuleAmoCrmController extends BaseController
         $this->view->form = new ModuleAmoCrmForm($settings, $options);
         $this->view->pick("{$this->moduleDir}/App/Views/index");
 
+        $this->view->workIsAllowed = ((int)$settings->lastContactsSyncTime) > 0;
         // Список выбора очередей.
         $this->view->queues = CallQueues::find(['columns' => ['id', 'name']]);
         $this->view->users  = Extensions::find(["type = 'SIP'", 'columns' => ['number', 'callerid']]);
-
         $this->view->entitySettings  = $rules;
     }
 

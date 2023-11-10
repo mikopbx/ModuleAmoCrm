@@ -82,4 +82,6 @@ return [
     'mod_amo_rules' => 'Criando Entidades',
     'mod_amo_settingsConnection' => 'Configurações de conexão',
     'mod_amo_SaveSettingsError' => 'Ocorreu um erro ao salvar as configurações. O serviço ConnectorDB pode não estar em execução.',
+    'mod_amo_NeedWaitSyncTitle' => 'Sincronizando contatos',
+    'mod_amo_NeedWaitSyncBody' => 'Contatos e transações são sincronizados. Aguarde a conclusão do processo. O upload de chamadas para o portal foi interrompido.',
 ];

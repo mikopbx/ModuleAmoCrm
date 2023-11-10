@@ -15,6 +15,8 @@ return [
     'module_amo_crmSimpleLogin'     => 'Ввести код авторизации',
     'mod_amo_authCodeText'          => 'Введите код авторизации',
     'mod_amo_authCodeSave'          => 'Сохранить',
+    'mod_amo_NeedWaitSyncTitle'     => 'Синхронизация контактов',
+    'mod_amo_NeedWaitSyncBody'      => 'Выполняется синхронизация контактов и сделок. Дождитесь завершения процесса. Загрузка звонков на портал остановлена.',
 
     'repModuleAmoCrm'               => 'Модуль шаблон - %repesent%',
     'mo_ModuleModuleAmoCrm'         => 'Модуль шаблон',

@@ -86,16 +86,20 @@ class AmoCdrDaemon extends WorkerBase
         $this->extHostname  = $res['exthostname']??'';
         $this->logger =  new Logger('cdr-daemon', 'ModuleAmoCrm');
         $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
+
+        $workIsAllowed = false;
         while ($this->needRestart === false){
             if(time() - $this->lastSyncTime > 10){
                 ConnectorDb::invoke('updateSettings', [], false);
                 WorkerAmoHTTP::invokeAmoApi('syncPipeLines', [$this->portalId]);
                 ConnectorDb::invoke('fillEntitySettings', []);
-                $this->updateSettings();
+                $workIsAllowed = $this->updateSettings();
             }
-            $this->updateActiveCalls();
-            $this->updateUsers();
-            $this->cdrSync();
+            if($workIsAllowed){
+                $this->updateActiveCalls();
+                $this->updateUsers();
+                $this->cdrSync();
+            }
             sleep(1);
             $this->logger->rotate();
         }
@@ -105,7 +109,7 @@ class AmoCdrDaemon extends WorkerBase
      * Получение актуальных настроек.
      * @return void
      */
-    private function updateSettings():void
+    private function updateSettings():bool
     {
         $allSettings = ConnectorDb::invoke('getModuleSettings', [false]);
         if(!empty($allSettings) && is_array($allSettings)){
@@ -121,15 +125,18 @@ class AmoCdrDaemon extends WorkerBase
             foreach ($entSettings as $entSetting){
                 $this->entitySettings[$entSetting['type']][$entSetting['did']] = $entSetting;
             }
+            $lastContactsSyncTime = (int)($allSettings['ModuleAmoCrm']['lastContactsSyncTime']??0);
+            $workIsAllowed = $lastContactsSyncTime > 0;
         }else{
             $this->logger->writeError('Settings not found...');
-            return;
+            return false;
         }
         [, $this->users, $this->innerNums] = AmoCrmMain::updateUsers();
         $this->innerNums[] = 'outworktimes';
         $this->innerNums[] = 'voicemail';
 
         $this->lastSyncTime = time();
+        return $workIsAllowed;
     }
 
     /**

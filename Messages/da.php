@@ -82,4 +82,6 @@ return [
     'mod_amo_rules' => 'Oprettelse af enheder',
     'mod_amo_settingsConnection' => 'Forbindelsesindstillinger',
     'mod_amo_SaveSettingsError' => 'Der opstod en fejl under lagring af indstillinger. ConnectorDB-tjenesten kører muligvis ikke.',
+    'mod_amo_NeedWaitSyncTitle' => 'Synkronisering af kontakter',
+    'mod_amo_NeedWaitSyncBody' => 'Kontakter og transaktioner synkroniseres. Vent på, at processen er fuldført. Upload af opkald til portalen er stoppet.',
 ];

@@ -82,4 +82,6 @@ return [
     'mod_amo_rules' => 'Tworzenie obiektów',
     'mod_amo_settingsConnection' => 'Ustawienia połączenia',
     'mod_amo_SaveSettingsError' => 'Wystąpił błąd podczas zapisywania ustawień. Usługa ConnectorDB może nie być uruchomiona.',
+    'mod_amo_NeedWaitSyncTitle' => 'Synchronizowanie kontaktów',
+    'mod_amo_NeedWaitSyncBody' => 'Kontakty i transakcje są synchronizowane. Poczekaj na zakończenie procesu. Przesyłanie wywołań do portalu zostało zatrzymane.',
 ];

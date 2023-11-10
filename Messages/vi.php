@@ -82,4 +82,6 @@ return [
     'mod_amo_rules' => 'Tạo thực thể',
     'mod_amo_settingsConnection' => 'Cài đặt kết nối',
     'mod_amo_SaveSettingsError' => 'Đã xảy ra lỗi khi lưu cài đặt. Dịch vụ ConnectorDB có thể không chạy.',
+    'mod_amo_NeedWaitSyncTitle' => 'Đồng bộ hóa danh bạ',
+    'mod_amo_NeedWaitSyncBody' => 'Danh bạ và giao dịch được đồng bộ hóa. Đợi quá trình hoàn tất. Việc tải cuộc gọi lên cổng đã dừng.',
 ];
