@@ -26,6 +26,7 @@ return [
     'mod_amo_baseDomain'            => 'Адрес портала (пример: example.amocrm.ru)',
     'mod_amo_Error'                 => 'Ошибка',
     'mod_amo_isPrivateWidget'       => 'Это приватная интеграция',
+    'mod_amo_panelIsEnable'         => 'Использовать панель управления вызовами',
     'mod_amo_privateClientId'       => 'ID интеграции',
     'mod_amo_privateClientSecret'   => 'Секретный ключ интеграции',
 

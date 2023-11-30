@@ -26,12 +26,17 @@ class ModuleAmoCrmForm extends Form
         $this->add(new Text('baseDomain'));
         $this->add(new Text('tokenForAmo'));
 
-        // Export cdr
         $useInterception = ['value' => null];
         if ($entity->useInterception === '1') {
             $useInterception = ['checked' => 'checked', 'value' => null];
         }
         $this->add(new Check('useInterception', $useInterception));
+
+        $panelIsEnable = ['value' => null];
+        if ($entity->panelIsEnable === '1') {
+            $panelIsEnable = ['checked' => 'checked', 'value' => null];
+        }
+        $this->add(new Check('panelIsEnable', $panelIsEnable));
 
         $isPrivateWidget = ['value' => null];
         if ($entity->isPrivateWidget === '1') {
