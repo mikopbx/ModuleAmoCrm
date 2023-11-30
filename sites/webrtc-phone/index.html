@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" style="display: none">
 <head>
     <!-- Required meta tags -->
     <meta charset="utf-8">
@@ -8,7 +8,6 @@
     <link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="bootstrap/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="bootstrap/css/rowGroup.bootstrap5.min.css" rel="stylesheet">
-    <title>Web RTC Phone</title>
     <link href="css/all.min.css" rel="stylesheet">
     <link href="css/brands.min.css" rel="stylesheet">
     <link href="css/regular.min.css" rel="stylesheet">
@@ -110,6 +109,23 @@
 </div>
 
 <audio id="sipRemoteAudio"></audio>
-
+<script>
+window.onload = function() {
+    let iframe = window.parent.document.getElementById('miko-pbx-phone');
+    console.log(iframe.getAttribute('title'));
+    let apiUrl = window.location.protocol + '//' + iframe.getAttribute('title') + '/pbxcore/api/amo-crm/v1/panel-enable';
+    // Выполняем запрос
+    fetch(apiUrl)
+        .then(function(response) {
+            if (response.status === 200) {
+                console.log('OK');
+                // Получаем элемент, у которого нужно удалить атрибут style
+                document.querySelector('html').style = "";
+            } else {
+                console.log('FALSE');
+            }
+        });
+};
+</script>
 </body>
 </html>

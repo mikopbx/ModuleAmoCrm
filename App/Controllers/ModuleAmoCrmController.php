@@ -174,7 +174,7 @@ class ModuleAmoCrmController extends BaseController
                 if(in_array($key, ['id','offsetCdr','authData'], true)){
                     continue;
                 }
-                if('useInterception' === $key || 'isPrivateWidget' === $key ){
+                if(in_array($key, ['useInterception', 'isPrivateWidget', 'panelIsEnable'])){
                     $settings[$key] = ($value === 'on') ? '1' : '0';
                 } else {
                     $settings[$key]  = $value;

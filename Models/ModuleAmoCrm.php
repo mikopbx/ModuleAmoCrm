@@ -60,6 +60,13 @@ class ModuleAmoCrm extends ModulesModelsBase
     public $useInterception = 1;
 
     /**
+     * Toggle
+     *
+     * @Column(type="integer", default="1", nullable=true)
+     */
+    public $panelIsEnable = 1;
+
+    /**
      *
      * @Column(type="integer", default="1", nullable=true)
      */

@@ -61,6 +61,22 @@ class ApiController extends ModulesControllerBase
         $this->evalFunction('command');
     }
 
+    public function panelIsEnable():void
+    {
+        if($this->checkAuth() === false){
+            return;
+        }
+        $allSettings   = ConnectorDb::invoke('getModuleSettings', [true]);
+        $panelIsEnable = $allSettings['ModuleAmoCrm']['panelIsEnable']??'0';
+        if($panelIsEnable === '1'){
+            $code = 200;
+        }else{
+            $code = 201;
+        }
+        $this->response->setStatusCode($code, 'OK')->sendHeaders();
+        $this->response->sendRaw();
+    }
+
     public function changeSettingsAction():void
     {
         $this->evalFunction('change-settings');
