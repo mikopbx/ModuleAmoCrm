@@ -317,6 +317,11 @@ class AmoCdrDaemon extends WorkerBase
                 $phoneCol  = 'dst_num';
                 $amoUserId = $this->users[$srcNum]??null;
                 $userPhone = $srcNum;
+            }elseif(strlen($srcNum) > 6 && empty($dstNum)){
+                // Исходящий.
+                $direction = 'inbound';
+                $amoUserId = null;
+                $userPhone = '';
             }else{
                 $this->offset = $row['id'];
                 continue;
