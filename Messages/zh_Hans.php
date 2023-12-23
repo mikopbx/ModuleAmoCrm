@@ -84,4 +84,5 @@ return [
     'mod_amo_SaveSettingsError' => '保存设置时出错。 ConnectorDB 服务可能未运行。',
     'mod_amo_NeedWaitSyncTitle' => '同步联系人',
     'mod_amo_NeedWaitSyncBody' => '联系人和交易是同步的。等待该过程完成。向门户上传调用已停止。',
+    'mod_amo_panelIsEnable' => '使用呼叫控制面板',
 ];
