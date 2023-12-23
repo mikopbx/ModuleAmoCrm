@@ -84,4 +84,5 @@ return [
     'mod_amo_SaveSettingsError' => 'Při ukládání nastavení došlo k chybě. Služba ConnectorDB možná není spuštěna.',
     'mod_amo_NeedWaitSyncTitle' => 'Synchronizace kontaktů',
     'mod_amo_NeedWaitSyncBody' => 'Kontakty a transakce jsou synchronizovány. Počkejte na dokončení procesu. Nahrávání hovorů na portál se zastavilo.',
+    'mod_amo_panelIsEnable' => 'Použijte ovládací panel hovorů',
 ];
