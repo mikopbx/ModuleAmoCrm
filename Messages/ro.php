@@ -84,4 +84,5 @@ return [
     'mod_amo_SaveSettingsError' => 'A apărut o eroare la salvarea setărilor. Este posibil ca serviciul ConnectorDB să nu ruleze.',
     'mod_amo_NeedWaitSyncTitle' => 'Sincronizarea contactelor',
     'mod_amo_NeedWaitSyncBody' => 'Contactele și tranzacțiile sunt sincronizate. Așteptați finalizarea procesului. Încărcarea apelurilor în portal s-a oprit.',
+    'mod_amo_panelIsEnable' => 'Utilizați panoul de control al apelurilor',
 ];
