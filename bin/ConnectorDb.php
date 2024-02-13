@@ -181,11 +181,11 @@ class ConnectorDb extends WorkerBase
             return;
         }
         $this->logger->writeInfo($data);
+        $res_data = [];
         if($data['action'] === 'entity-update'){
             $this->updatePhoneBook($data['data']['contacts']??[]);
             $this->updateLeads($data['data']['leads']??[]);
         }elseif($data['action'] === 'invoke'){
-            $res_data = [];
             $funcName = $data['function']??'';
             if(method_exists($this, $funcName)){
                 if(count($data['args']) === 0){
@@ -195,7 +195,6 @@ class ConnectorDb extends WorkerBase
                 }
                 $res_data = $this->saveResultInTmpFile($res_data);
             }
-            $tube->reply($res_data);
         }elseif($data['action'] === 'interception'){
             $clientData = $this->findContacts( [$data['phone']] );
             $userId = $clientData[0]['userId']??null;
