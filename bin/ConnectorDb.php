@@ -270,12 +270,7 @@ class ConnectorDb extends WorkerBase
             $entities = $updates[$action]??[];
             foreach ($entities as $entity){
                 $idEntity = $idEntityFields[$entity['type']];
-                /** @var ModuleAmoPhones $oldRecord */
-                $oldData = ModuleAmoPhones::find("$idEntity='${entity['id']}'");
-                foreach ($oldData as $oldRecord){
-                    $oldRecord->delete();
-                }
-                unset($oldData);
+                ModuleAmoPhones::find("$idEntity='${entity['id']}'")->delete();
                 if($action === 'delete'){
                     continue;
                 }

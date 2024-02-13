@@ -115,16 +115,11 @@ class SyncDaemon extends WorkerBase
             $params['with'] = 'contacts';
         }
         $nextPage = $url."?".http_build_query($params);
-        $startMsgSend = false;
         while(!empty($nextPage)){
             $result   = WorkerAmoHTTP::invokeAmoApi('getChangedEntity', [$nextPage, $entityType]);
             $nextPage = $result->data['nextPage'];
             $chunks   = array_chunk($result->data[$entityType], 50, false);
             foreach ($chunks as $chunk){
-                if($startMsgSend === false){
-                    $startMsgSend = true;
-                    $this->logger->writeInfo("Synchronization $entityType, column name: $columnName  from time {$settings->$fieldName}");
-                }
                 $this->logger->writeInfo($chunk);
                 ConnectorDb::invoke($updateFunc[$entityType], [[ 'update' => $chunk]]);
                 sleep(1);
