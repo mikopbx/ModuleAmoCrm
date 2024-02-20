@@ -368,7 +368,8 @@ class ConnectorDb extends WorkerBase
                 'columns'    => ['idEntity as id,name,company_name as company,responsible_user_id as userId,phone as number,entityType as entity'],
                 'bind'       => [
                     'phone' => AmoCrmMain::getPhoneIndex($phone)
-                ]
+                ],
+                'order' => 'id'
             ];
             $res = ModuleAmoPhones::findFirst($filter);
             if($res){
