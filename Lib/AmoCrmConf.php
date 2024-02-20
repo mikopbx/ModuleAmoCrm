@@ -361,6 +361,8 @@ class AmoCrmConf extends ConfigClass
     {
         $tmpDir = $this->di->getShared('config')->path('core.tempDir') . '/ModuleAmoCrm';
         $findPath   = Util::which('find');
-        $tasks[]    = "*/1 * * * * $findPath $tmpDir -mmin +1 -type f -delete> /dev/null 2>&1\n";
+        $phpPath    = Util::which('php');
+        $tasks[]    = "*/1 * * * * $findPath $tmpDir -mmin +1 -type f -delete> /dev/null 2>&1".PHP_EOL;
+        $tasks[]    = "* 1 * * * $phpPath $this->moduleDir/bin/start-init-sync.php > /dev/null 2>&1".PHP_EOL;
     }
 }

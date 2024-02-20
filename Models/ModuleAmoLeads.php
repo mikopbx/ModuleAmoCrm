@@ -17,6 +17,7 @@ use MikoPBX\Modules\Models\ModulesModelsBase;
  *     [name='contactId', columns=['contactId'], type=''],
  *     [name='portalId', columns=['portalId'], type=''],
  *     [name='companyId', columns=['companyId'], type=''],
+ *     [name='initTime', columns=['initTime'], type=''],
  *     [name='closed_at', columns=['closed_at'], type='']
  * )
  */
@@ -80,6 +81,12 @@ class ModuleAmoLeads extends ModulesModelsBase
      * @Column(type="integer", nullable=true)
      */
     public $portalId = 0;
+
+    /**
+     * @Column(type="integer", nullable=true)
+     */
+    public $initTime = 0;
+
 
     /**
      * @param $calledModelObject

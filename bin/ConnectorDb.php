@@ -42,7 +42,8 @@ class ConnectorDb extends WorkerBase
 {
     private array   $users = [];
     private int     $portalId = 0;
-    private Logger $logger;
+    private int     $initTime = 0;
+    private Logger  $logger;
 
     /**
      * Handles the received signal.
@@ -254,6 +255,29 @@ class ConnectorDb extends WorkerBase
     }
 
     /**
+     * Старт новой синхронизации контактов.
+     * @param int $initTime
+     * @return void
+     */
+    public function updateInitTime(int $initTime):void
+    {
+        $this->initTime = $initTime;
+    }
+
+    /**
+     * Удаляет все записи, что не соответствуют $initTime
+     * Используется при синхронизации / актуализации контактов
+     * @param int $initTime
+     * @return void
+     */
+    public function deleteWithFailTime(int $initTime):void
+    {
+        $this->initTime = $initTime;
+        ModuleAmoLeads::find("initTime<>'$initTime'")->delete();
+        ModuleAmoPhones::find("initTime<>'$initTime'")->delete();
+    }
+
+    /**
      * Сохранение изменных данных контактов. Наполнение телефонной книги.
      * @param array $updates
      * @return void
@@ -290,6 +314,7 @@ class ConnectorDb extends WorkerBase
                         $newRecord->name                = $entity['name']??'';
                         $newRecord->company_name        = $entity['company_name']??'';
                         $newRecord->linked_company_id   = $entity['linked_company_id']??'';
+                        $newRecord->initTime            = $this->initTime;
                         $newRecord->writeAttribute($idEntity,$entity['id']);
                         if(!$newRecord->save()){
                             $this->logger->writeError(['error' => 'Fail save contact', 'msg' => $newRecord->getMessages(), 'data' => $entity]);
@@ -472,7 +497,6 @@ class ConnectorDb extends WorkerBase
         foreach ($actions as $action){
             $leads = $updates[$action]??[];
             foreach ($leads as $lead){
-                /** @var ModuleAmoPhones $oldRecord */
                 $oldData = ModuleAmoLeads::find("idAmo='{$lead['id']}'");
                 foreach ($oldData as $oldRecord){
                     $oldRecord->delete();
@@ -495,6 +519,7 @@ class ConnectorDb extends WorkerBase
                     $newRecord->companyId           = $company;
                     $newRecord->isMainContact       = $contact['is_main']?'1':'0';
                     $newRecord->closed_at           = $lead['closed_at']??0;
+                    $newRecord->initTime            = $this->initTime;
                     if(!$newRecord->save()){
                         $this->logger->writeError(['error' => 'Fail save contact', 'msg' => $newRecord->getMessages(), 'data' => $contact]);
                     }
@@ -511,6 +536,7 @@ class ConnectorDb extends WorkerBase
                     $newRecord->companyId           = $company;
                     $newRecord->isMainContact       = '0';
                     $newRecord->closed_at           = $lead['closed_at']??0;
+                    $newRecord->initTime            = $this->initTime;
                     if(!$newRecord->save()){
                         $this->logger->writeError(['error' => 'Fail save contact', 'msg' => $newRecord->getMessages(), 'data' => $lead]);
                     }
@@ -547,6 +573,7 @@ class ConnectorDb extends WorkerBase
             $newRecord->entityType          = 'contact';
             $newRecord->idPhone             = $phone;
             $newRecord->idEntity            = $contactId;
+            $newRecord->initTime            = $this->initTime;
             $newRecord->save();
         }
         return true;

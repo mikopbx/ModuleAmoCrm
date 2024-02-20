@@ -33,6 +33,8 @@ class SyncDaemon extends WorkerBase
     private string $columnName = self::COLUMN_UPDATE_NAME;
     private Logger $logger;
 
+    private int $initTime = 0;
+
     /**
      * Handles the received signal.
      *
@@ -55,19 +57,36 @@ class SyncDaemon extends WorkerBase
     {
         $this->logger =  new Logger('SyncDaemon', 'ModuleAmoCrm');
         $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
-
-        $type = $argv[2]??'';
-        if($type === 'init'){
-            $this->columnName = self::COLUMN_CREATE_NAME;
-        }
         while ($this->needRestart === false) {
+            $this->checkInitMode();
             $this->syncContacts(AmoCrmMain::ENTITY_CONTACTS);
             $this->syncContacts(AmoCrmMain::ENTITY_LEADS);
             $this->syncContacts(AmoCrmMain::ENTITY_COMPANIES);
-            if($type === 'init'){
-                exit();
+            if($this->initTime > 0){
+                // Очищаем все записи, что не были обновлены при init.
+                ConnectorDb::invoke('deleteWithFailTime', [$this->initTime]);
             }
             sleep(10);
+        }
+    }
+
+    /**
+     * Проверка на режим инициализации.
+     * @return void
+     */
+    private function checkInitMode():void
+    {
+        $settings = ConnectorDb::invoke('getModuleSettings', [true])['ModuleAmoCrm']??[];
+        $syncTime = (int)($settings['lastContactsSyncTime']??0) + (int)($settings['lastCompaniesSyncTime']??0) + (int)($settings['lastLeadsSyncTime']??0);
+        if($syncTime === 0){
+            // Это INIT режим, активируется раз в сутки по cron.
+            // Контакты и лиды синхронизируются с начала.
+            $this->columnName = self::COLUMN_CREATE_NAME;
+            $this->initTime = time();
+            ConnectorDb::invoke('updateInitTime', [$this->initTime]);
+        }else{
+            $this->columnName = self::COLUMN_UPDATE_NAME;
+            $this->initTime = 0;
         }
     }
 
