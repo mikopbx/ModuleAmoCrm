@@ -136,7 +136,7 @@ class AmoCrmConf extends ConfigClass
                 'worker' => AmoCdrDaemon::class,
             ],
             [
-                'type'   => WorkerSafeScriptsCore::CHECK_BY_BEANSTALK,
+                'type'   => WorkerSafeScriptsCore::CHECK_BY_PID_NOT_ALERT,
                 'worker' => ConnectorDb::class,
             ],
             [

@@ -181,7 +181,7 @@ class ConnectorDb extends WorkerBase
             $tube->reply(false);
             return;
         }
-        $this->logger->writeInfo($data);
+        // $this->logger->writeInfo($data);
         $res_data = [];
         if($data['action'] === 'entity-update'){
             $this->updatePhoneBook($data['data']['contacts']??[]);
@@ -283,6 +283,14 @@ class ConnectorDb extends WorkerBase
      * @return void
      */
     public function updatePhoneBook(array $updates):void{
+        if(isset($updates['initTime'])){
+            $initTime = (int)$updates['initTime'];
+            if($initTime !== $this->initTime){
+                $this->initTime = $initTime;
+                $this->logger->writeInfo("New initTime: $initTime");
+            }
+        }
+
         $idEntityFields = [
             'contact' => 'idEntity',
             'company' => 'linked_company_id',
@@ -493,6 +501,14 @@ class ConnectorDb extends WorkerBase
      */
     public function updateLeads(array $updates):void
     {
+        if(isset($updates['initTime'])){
+            $initTime = (int)$updates['initTime'];
+            if($initTime !== $this->initTime){
+                $this->initTime = $initTime;
+                $this->logger->writeInfo("New initTime: $initTime");
+            }
+        }
+
         $actions = ['update', 'add', 'delete'];
         foreach ($actions as $action){
             $leads = $updates[$action]??[];
@@ -806,7 +822,7 @@ class ConnectorDb extends WorkerBase
         try {
             if($retVal){
                 $req['need-ret'] = true;
-                $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), 20);
+                $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), 60);
             }else{
                 $client->publish(json_encode($req, JSON_THROW_ON_ERROR));
                 return true;
@@ -927,5 +943,6 @@ class ConnectorDb extends WorkerBase
 
 if(isset($argv) && count($argv) !== 1
     && Util::getFilePathByClassName(ConnectorDb::class) === $argv[0]){
+    ini_set('memory_limit', '1024M');
     ConnectorDb::startWorker($argv??[]);
 }

@@ -65,6 +65,8 @@ class SyncDaemon extends WorkerBase
             if($this->initTime > 0){
                 // Очищаем все записи, что не были обновлены при init.
                 ConnectorDb::invoke('deleteWithFailTime', [$this->initTime]);
+                // Запустим синхронизацию контактов по полю "COLUMN_UPDATE_NAME"
+                ConnectorDb::invoke('saveNewSettings', [['lastContactsSyncTime'=>1, 'lastCompaniesSyncTime' => 1, 'lastLeadsSyncTime' => 1]]);
             }
             sleep(10);
         }
@@ -83,7 +85,6 @@ class SyncDaemon extends WorkerBase
             // Контакты и лиды синхронизируются с начала.
             $this->columnName = self::COLUMN_CREATE_NAME;
             $this->initTime = time();
-            ConnectorDb::invoke('updateInitTime', [$this->initTime]);
         }else{
             $this->columnName = self::COLUMN_UPDATE_NAME;
             $this->initTime = 0;
@@ -137,15 +138,19 @@ class SyncDaemon extends WorkerBase
         while(!empty($nextPage)){
             $result   = WorkerAmoHTTP::invokeAmoApi('getChangedEntity', [$nextPage, $entityType]);
             $nextPage = $result->data['nextPage'];
-            $chunks   = array_chunk($result->data[$entityType], 50, false);
+            $chunks   = array_chunk($result->data[$entityType], 25, false);
             foreach ($chunks as $chunk){
                 $this->logger->writeInfo($chunk);
-                ConnectorDb::invoke($updateFunc[$entityType], [[ 'update' => $chunk]]);
-                sleep(1);
+                $data = [ 'update' => $chunk];
+                if($this->initTime > 0){
+                    $data['initTime'] = $this->initTime;
+                }
+                ConnectorDb::invoke($updateFunc[$entityType], [$data]);
+                usleep(100000);
             }
             $this->logger->rotate();
         }
-        ConnectorDb::invoke('saveNewSettings', [[$fieldName => $endTime]]);
+        ConnectorDb::invoke('saveNewSettings', [[$fieldName => $endTime]],false);
     }
 }
 
