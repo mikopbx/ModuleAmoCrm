@@ -363,6 +363,6 @@ class AmoCrmConf extends ConfigClass
         $findPath   = Util::which('find');
         $phpPath    = Util::which('php');
         $tasks[]    = "*/1 * * * * $findPath $tmpDir -mmin +1 -type f -delete> /dev/null 2>&1".PHP_EOL;
-        $tasks[]    = "* 1 * * * $phpPath $this->moduleDir/bin/start-init-sync.php > /dev/null 2>&1".PHP_EOL;
+        $tasks[]    = "0 1 * * * $phpPath $this->moduleDir/bin/start-init-sync.php > /dev/null 2>&1".PHP_EOL;
     }
 }
