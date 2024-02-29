@@ -84,4 +84,5 @@ return [
     'mod_amo_SaveSettingsError' => 'Se produjo un error al guardar la configuración. Es posible que el servicio ConnectorDB no se esté ejecutando.',
     'mod_amo_NeedWaitSyncTitle' => 'Sincronizar contactos',
     'mod_amo_NeedWaitSyncBody' => 'Los contactos y transacciones están sincronizados. Espere a que se complete el proceso. Se detuvo la carga de llamadas al portal.',
+    'mod_amo_panelIsEnable' => 'Utilice el panel de control de llamadas',
 ];

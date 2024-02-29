@@ -317,6 +317,11 @@ class AmoCdrDaemon extends WorkerBase
                 $phoneCol  = 'dst_num';
                 $amoUserId = $this->users[$srcNum]??null;
                 $userPhone = $srcNum;
+            }elseif(strlen($srcNum) > 6 && empty($dstNum)){
+                // Исходящий.
+                $direction = 'inbound';
+                $amoUserId = null;
+                $userPhone = '';
             }else{
                 $this->offset = $row['id'];
                 continue;
@@ -822,6 +827,10 @@ class AmoCdrDaemon extends WorkerBase
         if(empty($this->newContacts)){
             return;
         }
+        $contactsData = [
+            'add' => []
+        ];
+        
         $resultCreateContacts = WorkerAmoHTTP::invokeAmoApi('createContacts', [$this->newContacts]);
         $contacts = $resultCreateContacts->data['_embedded']['contacts']??[];
         foreach ($contacts as $contact){
@@ -843,11 +852,30 @@ class AmoCdrDaemon extends WorkerBase
             if( isset($this->incompleteAnswered[$contact['request_id']]) ){
                 $this->incompleteAnswered[$contact['request_id']]['client'] = $contact['id'];
             }
+            $contactsData['add'][] = [
+                'type'                  => 'contact',
+                'id'                    => $contact['id'],
+                'name'                  =>  $this->newContacts[$contact['request_id']]['contactName'],
+                'responsible_user_id'   => $this->newContacts[$contact['request_id']]['responsible_user_id'],
+                'company_name'          => '',
+                'linked_company_id'     => '',
+                'custom_fields'         => [
+                    [
+                        'code'   => 'PHONE', 
+                        'values' => [
+                            ['value' => $this->newContacts[$contact['request_id']]['phone']]
+                        ]
+                    ]
+                ]
+            ];
+            
         }
         if(!$resultCreateContacts->success){
             $this->logger->writeInfo("Error create contacts:".json_encode($this->newContacts));
             $this->logger->writeInfo("Error create contacts:".json_encode($resultCreateContacts));
         }
+        // Сохраним данные о контакте в базе.
+        ConnectorDb::invoke('updatePhoneBook', [$contactsData], false);
     }
 
     /**
@@ -859,6 +887,9 @@ class AmoCdrDaemon extends WorkerBase
         if(empty($this->newLeads)){
             return;
         }
+        $leadData = [
+            'add' => []
+        ];
         $resultCreateLeads    = WorkerAmoHTTP::invokeAmoApi('addLeads', [array_values($this->newLeads)]);
         $leads = $resultCreateLeads->data['_embedded']['leads']??[];
         foreach ($leads as $lead){
@@ -869,12 +900,20 @@ class AmoCdrDaemon extends WorkerBase
             if( isset($this->incompleteAnswered[$lead['request_id']]) ){
                 $this->incompleteAnswered[$lead['request_id']]['lead'] = $lead['id'];
             }
+            $leadData['add'][] = [
+                'id'                    => $lead['id'],
+                'name'                  => $this->newLeads[$lead['request_id']]['name'],
+                'responsible_user_id'   => $this->newLeads[$lead['request_id']]['responsible_user_id'],
+                'status_id'             => $this->newLeads[$lead['request_id']]['status_id'],
+                'pipeline_id'           => $this->newLeads[$lead['request_id']]['pipeline_id'],
+                '_embedded'             => $this->newLeads[$lead['request_id']]['_embedded']
+            ];
         }
         if(!$resultCreateLeads->success) {
-
             $this->logger->writeInfo("Error create tasks (REQ):".json_encode($this->newLeads));
             $this->logger->writeInfo("Error create leads (RES):".json_encode($resultCreateLeads));
         }
+        ConnectorDb::invoke('updateLeads', [$leadData], false);
     }
 
     /**

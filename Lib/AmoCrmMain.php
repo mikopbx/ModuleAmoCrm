@@ -410,6 +410,7 @@ class AmoCrmMain extends AmoCrmMainBase
      */
     public static function getPhoneIndex($number)
     {
+        $number = preg_replace('/\D+/', '', $number);
         if(!is_numeric(str_replace('+', '', $number))){
             return $number;
         }

@@ -84,4 +84,5 @@ return [
     'mod_amo_SaveSettingsError' => 'Er is een fout opgetreden bij het opslaan van de instellingen. De ConnectorDB-service is mogelijk niet actief.',
     'mod_amo_NeedWaitSyncTitle' => 'Contacten synchroniseren',
     'mod_amo_NeedWaitSyncBody' => 'Contacten en transacties worden gesynchroniseerd. Wacht tot het proces is voltooid. Het uploaden van oproepen naar de portal is gestopt.',
+    'mod_amo_panelIsEnable' => 'Gebruik het oproepbedieningspaneel',
 ];

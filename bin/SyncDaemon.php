@@ -30,8 +30,14 @@ class SyncDaemon extends WorkerBase
     public const COLUMN_UPDATE_NAME = "updated_at";
     public const COLUMN_CREATE_NAME = "created_at";
 
-    private string $columnName = self::COLUMN_UPDATE_NAME;
     private Logger $logger;
+
+    private int $initTime = 0;
+    private int $portalId = 0;
+
+    public int $lastContactsSyncTime = 0;
+    public int $lastCompaniesSyncTime = 0;
+    public int $lastLeadsSyncTime = 0;
 
     /**
      * Handles the received signal.
@@ -55,19 +61,40 @@ class SyncDaemon extends WorkerBase
     {
         $this->logger =  new Logger('SyncDaemon', 'ModuleAmoCrm');
         $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
-
-        $type = $argv[2]??'';
-        if($type === 'init'){
-            $this->columnName = self::COLUMN_CREATE_NAME;
-        }
         while ($this->needRestart === false) {
+            $this->checkInitMode();
             $this->syncContacts(AmoCrmMain::ENTITY_CONTACTS);
             $this->syncContacts(AmoCrmMain::ENTITY_LEADS);
             $this->syncContacts(AmoCrmMain::ENTITY_COMPANIES);
-            if($type === 'init'){
-                exit();
+            if($this->initTime > 0){
+                // Очищаем все записи, что не были обновлены при init.
+                ConnectorDb::invoke('deleteWithFailTime', [$this->initTime]);
+                // Запустим синхронизацию контактов по полю "COLUMN_UPDATE_NAME"
+                ConnectorDb::invoke('saveNewSettings', [['lastContactsSyncTime'=>1, 'lastCompaniesSyncTime' => 1, 'lastLeadsSyncTime' => 1]]);
             }
             sleep(10);
+        }
+    }
+
+    /**
+     * Проверка на режим инициализации.
+     * @return void
+     */
+    private function checkInitMode():void
+    {
+        $settings = ConnectorDb::invoke('getModuleSettings', [true])['ModuleAmoCrm']??[];
+        $this->portalId              = (int)($settings['portalId']??0);
+        $this->lastContactsSyncTime  = (int)($settings['lastContactsSyncTime']??0);
+        $this->lastCompaniesSyncTime = (int)($settings['lastCompaniesSyncTime']??0);
+        $this->lastLeadsSyncTime     = (int)($settings['lastLeadsSyncTime']??0);
+
+        $syncTime = $this->lastContactsSyncTime + $this->lastCompaniesSyncTime + $this->lastLeadsSyncTime;
+        if($syncTime === 0){
+            // Это INIT режим, активируется раз в сутки по cron.
+            // Контакты и лиды синхронизируются с начала.
+            $this->initTime = time();
+        }else{
+            $this->initTime = 0;
         }
     }
 
@@ -78,60 +105,51 @@ class SyncDaemon extends WorkerBase
      */
     private function syncContacts(string $entityType):void
     {
-        $fieldName = "last".ucfirst($entityType)."SyncTime";
-        $updateFunc = [
-            AmoCrmMain::ENTITY_CONTACTS => 'updatePhoneBook',
-            AmoCrmMain::ENTITY_COMPANIES => 'updatePhoneBook',
-            AmoCrmMain::ENTITY_LEADS => 'updateLeads'
-        ];
-
-        $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
-        if(!empty($allSettings) && is_array($allSettings)){
-            $settings = (object)$allSettings['ModuleAmoCrm'];
-            if($this->columnName === self::COLUMN_CREATE_NAME){
-                $columnName = $this->columnName;
-                $settings->$fieldName = 0;
-            }elseif($settings->$fieldName === "0"){
-                $columnName = self::COLUMN_CREATE_NAME;
-            }else{
-                $columnName = self::COLUMN_UPDATE_NAME;
-            }
-        }else{
-            return;
-        }
-        if((int)$settings->portalId <=0 ){
+        if($this->portalId <=0 ){
             // Нет подключения к порталу.
             return;
         }
         $endTime = time();
-        $url = "https://".AmoCrmMain::EMPTY_HOST_VALUE."/api/v4/$entityType";
-        $params = [
-            'order['.$columnName.']' => 'desc',
-            'filter['.$columnName.'][from]'  => $settings->$fieldName,
-            'filter['.$columnName.'][to]'    => $endTime,
-            'limit' => self::LIMIT_PART
+        $fieldName = "last".ucfirst($entityType)."SyncTime";
+        $updateFunc = [
+            AmoCrmMain::ENTITY_CONTACTS  => 'updatePhoneBook',
+            AmoCrmMain::ENTITY_COMPANIES => 'updatePhoneBook',
+            AmoCrmMain::ENTITY_LEADS     => 'updateLeads'
         ];
+        if($this->initTime === 0){
+            $params = [
+                'order['.self::COLUMN_UPDATE_NAME.']' => 'desc',
+                'filter['.self::COLUMN_UPDATE_NAME.'][from]'  => $this->$fieldName,
+                'filter['.self::COLUMN_UPDATE_NAME.'][to]'    => $endTime,
+                'limit' => self::LIMIT_PART
+            ];
+        }else{
+            $params = [
+                'order[id]' => 'desc',
+                'limit' => self::LIMIT_PART
+            ];
+        }
+        $url = "https://".AmoCrmMain::EMPTY_HOST_VALUE."/api/v4/$entityType";
         if($entityType === AmoCrmMain::ENTITY_LEADS){
             $params['with'] = 'contacts';
         }
         $nextPage = $url."?".http_build_query($params);
-        $startMsgSend = false;
         while(!empty($nextPage)){
             $result   = WorkerAmoHTTP::invokeAmoApi('getChangedEntity', [$nextPage, $entityType]);
             $nextPage = $result->data['nextPage'];
-            $chunks   = array_chunk($result->data[$entityType], 50, false);
+            $chunks   = array_chunk($result->data[$entityType], 25, false);
             foreach ($chunks as $chunk){
-                if($startMsgSend === false){
-                    $startMsgSend = true;
-                    $this->logger->writeInfo("Synchronization $entityType, column name: $columnName  from time {$settings->$fieldName}");
-                }
                 $this->logger->writeInfo($chunk);
-                ConnectorDb::invoke($updateFunc[$entityType], [[ 'update' => $chunk]]);
-                sleep(1);
+                $data = [ 'update' => $chunk];
+                if($this->initTime > 0){
+                    $data['initTime'] = $this->initTime;
+                }
+                ConnectorDb::invoke($updateFunc[$entityType], [$data]);
+                usleep(100000);
             }
             $this->logger->rotate();
         }
-        ConnectorDb::invoke('saveNewSettings', [[$fieldName => $endTime]]);
+        ConnectorDb::invoke('saveNewSettings', [[$fieldName => $endTime]],false);
     }
 }
 

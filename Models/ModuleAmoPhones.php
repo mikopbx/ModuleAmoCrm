@@ -17,6 +17,7 @@ use MikoPBX\Modules\Models\ModulesModelsBase;
  *     [name='linked_company_id', columns=['linked_company_id'], type=''],
  *     [name='portalId', columns=['portalId'], type=''],
  *     [name='entityType', columns=['entityType'], type=''],
+ *     [name='initTime', columns=['initTime'], type=''],
  *     [name='idPhone', columns=['idPhone'], type='']
  * )
  */
@@ -73,6 +74,11 @@ class ModuleAmoPhones extends ModulesModelsBase
      * @Column(type="integer", nullable=true)
      */
     public $portalId = 0;
+
+    /**
+     * @Column(type="integer", nullable=true)
+     */
+    public $initTime = 0;
 
     /**
      * @param $calledModelObject

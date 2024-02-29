@@ -42,7 +42,8 @@ class ConnectorDb extends WorkerBase
 {
     private array   $users = [];
     private int     $portalId = 0;
-    private Logger $logger;
+    private int     $initTime = 0;
+    private Logger  $logger;
 
     /**
      * Handles the received signal.
@@ -180,12 +181,12 @@ class ConnectorDb extends WorkerBase
             $tube->reply(false);
             return;
         }
-        $this->logger->writeInfo($data);
+        // $this->logger->writeInfo($data);
+        $res_data = [];
         if($data['action'] === 'entity-update'){
             $this->updatePhoneBook($data['data']['contacts']??[]);
             $this->updateLeads($data['data']['leads']??[]);
         }elseif($data['action'] === 'invoke'){
-            $res_data = [];
             $funcName = $data['function']??'';
             if(method_exists($this, $funcName)){
                 if(count($data['args']) === 0){
@@ -195,7 +196,6 @@ class ConnectorDb extends WorkerBase
                 }
                 $res_data = $this->saveResultInTmpFile($res_data);
             }
-            $tube->reply($res_data);
         }elseif($data['action'] === 'interception'){
             $clientData = $this->findContacts( [$data['phone']] );
             $userId = $clientData[0]['userId']??null;
@@ -255,11 +255,42 @@ class ConnectorDb extends WorkerBase
     }
 
     /**
+     * Старт новой синхронизации контактов.
+     * @param int $initTime
+     * @return void
+     */
+    public function updateInitTime(int $initTime):void
+    {
+        $this->initTime = $initTime;
+    }
+
+    /**
+     * Удаляет все записи, что не соответствуют $initTime
+     * Используется при синхронизации / актуализации контактов
+     * @param int $initTime
+     * @return void
+     */
+    public function deleteWithFailTime(int $initTime):void
+    {
+        $this->initTime = $initTime;
+        ModuleAmoLeads::find("initTime<>'$initTime'")->delete();
+        ModuleAmoPhones::find("initTime<>'$initTime'")->delete();
+    }
+
+    /**
      * Сохранение изменных данных контактов. Наполнение телефонной книги.
      * @param array $updates
      * @return void
      */
     public function updatePhoneBook(array $updates):void{
+        if(isset($updates['initTime'])){
+            $initTime = (int)$updates['initTime'];
+            if($initTime !== $this->initTime){
+                $this->initTime = $initTime;
+                $this->logger->writeInfo("New initTime: $initTime");
+            }
+        }
+
         $idEntityFields = [
             'contact' => 'idEntity',
             'company' => 'linked_company_id',
@@ -270,12 +301,7 @@ class ConnectorDb extends WorkerBase
             $entities = $updates[$action]??[];
             foreach ($entities as $entity){
                 $idEntity = $idEntityFields[$entity['type']];
-                /** @var ModuleAmoPhones $oldRecord */
-                $oldData = ModuleAmoPhones::find("$idEntity='${entity['id']}'");
-                foreach ($oldData as $oldRecord){
-                    $oldRecord->delete();
-                }
-                unset($oldData);
+                ModuleAmoPhones::find("$idEntity='${entity['id']}'")->delete();
                 if($action === 'delete'){
                     continue;
                 }
@@ -296,6 +322,7 @@ class ConnectorDb extends WorkerBase
                         $newRecord->name                = $entity['name']??'';
                         $newRecord->company_name        = $entity['company_name']??'';
                         $newRecord->linked_company_id   = $entity['linked_company_id']??'';
+                        $newRecord->initTime            = $this->initTime;
                         $newRecord->writeAttribute($idEntity,$entity['id']);
                         if(!$newRecord->save()){
                             $this->logger->writeError(['error' => 'Fail save contact', 'msg' => $newRecord->getMessages(), 'data' => $entity]);
@@ -374,7 +401,8 @@ class ConnectorDb extends WorkerBase
                 'columns'    => ['idEntity as id,name,company_name as company,responsible_user_id as userId,phone as number,entityType as entity'],
                 'bind'       => [
                     'phone' => AmoCrmMain::getPhoneIndex($phone)
-                ]
+                ],
+                'order' => 'id'
             ];
             $res = ModuleAmoPhones::findFirst($filter);
             if($res){
@@ -473,11 +501,18 @@ class ConnectorDb extends WorkerBase
      */
     public function updateLeads(array $updates):void
     {
+        if(isset($updates['initTime'])){
+            $initTime = (int)$updates['initTime'];
+            if($initTime !== $this->initTime){
+                $this->initTime = $initTime;
+                $this->logger->writeInfo("New initTime: $initTime");
+            }
+        }
+
         $actions = ['update', 'add', 'delete'];
         foreach ($actions as $action){
             $leads = $updates[$action]??[];
             foreach ($leads as $lead){
-                /** @var ModuleAmoPhones $oldRecord */
                 $oldData = ModuleAmoLeads::find("idAmo='{$lead['id']}'");
                 foreach ($oldData as $oldRecord){
                     $oldRecord->delete();
@@ -500,6 +535,7 @@ class ConnectorDb extends WorkerBase
                     $newRecord->companyId           = $company;
                     $newRecord->isMainContact       = $contact['is_main']?'1':'0';
                     $newRecord->closed_at           = $lead['closed_at']??0;
+                    $newRecord->initTime            = $this->initTime;
                     if(!$newRecord->save()){
                         $this->logger->writeError(['error' => 'Fail save contact', 'msg' => $newRecord->getMessages(), 'data' => $contact]);
                     }
@@ -516,6 +552,7 @@ class ConnectorDb extends WorkerBase
                     $newRecord->companyId           = $company;
                     $newRecord->isMainContact       = '0';
                     $newRecord->closed_at           = $lead['closed_at']??0;
+                    $newRecord->initTime            = $this->initTime;
                     if(!$newRecord->save()){
                         $this->logger->writeError(['error' => 'Fail save contact', 'msg' => $newRecord->getMessages(), 'data' => $lead]);
                     }
@@ -552,6 +589,7 @@ class ConnectorDb extends WorkerBase
             $newRecord->entityType          = 'contact';
             $newRecord->idPhone             = $phone;
             $newRecord->idEntity            = $contactId;
+            $newRecord->initTime            = $this->initTime;
             $newRecord->save();
         }
         return true;
@@ -784,7 +822,7 @@ class ConnectorDb extends WorkerBase
         try {
             if($retVal){
                 $req['need-ret'] = true;
-                $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), 20);
+                $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), 60);
             }else{
                 $client->publish(json_encode($req, JSON_THROW_ON_ERROR));
                 return true;
@@ -905,5 +943,6 @@ class ConnectorDb extends WorkerBase
 
 if(isset($argv) && count($argv) !== 1
     && Util::getFilePathByClassName(ConnectorDb::class) === $argv[0]){
+    ini_set('memory_limit', '1024M');
     ConnectorDb::startWorker($argv??[]);
 }
