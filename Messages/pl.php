@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Nieodebrane ze znanego numeru',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Odebrałem wychodząc na nieznany numer',
     'mod_amo_type_OUTGOING_KNOWN' => 'Odebrałem wychodząc na znany numer',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Nieodebrane połączenie wychodzące ze znanym numerem',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Nieudane połączenie wychodzące na znany numer',
     'mod_amo_task_responsible_type' => 'Odpowiedzialny za zadanie',
     'mod_amo_task_responsible_type_' => 'Nie zaznaczone',
     'mod_amo_task_responsible_type_firstMissedUser' => 'Pierwsza osoba, która nie odebrała połączenia',
