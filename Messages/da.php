@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Savnet fra et kendt nummer',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Besvaret udgående til ukendt nummer',
     'mod_amo_type_OUTGOING_KNOWN' => 'Besvaret udgående til et kendt nummer',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Ubesvaret udgående opkald til et kendt nummer',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Mislykket udgående til et kendt nummer',
     'mod_amo_task_responsible_type' => 'Ansvarlig for opgaven',
     'mod_amo_task_responsible_type_' => 'Ikke valgt',
     'mod_amo_task_responsible_type_firstMissedUser' => 'Den første person, der går glip af et opkald',
