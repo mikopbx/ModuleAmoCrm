@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => '既知の番号から不在になりました',
     'mod_amo_type_OUTGOING_UNKNOWN' => '不明な番号への発信に応答しました',
     'mod_amo_type_OUTGOING_KNOWN' => '既知の番号への発信に応答しました',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => '既知の番号への発信通話に応答がない',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => '既知の番号への発信が失敗する',
     'mod_amo_task_responsible_type' => 'タスクの責任者',
     'mod_amo_task_responsible_type_' => '選択されていない',
     'mod_amo_task_responsible_type_firstMissedUser' => '最初に電話に出られなかった人',
