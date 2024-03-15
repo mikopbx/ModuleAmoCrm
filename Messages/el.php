@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Έχασε από γνωστό αριθμό',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Απάντησε εξερχόμενη σε άγνωστο αριθμό',
     'mod_amo_type_OUTGOING_KNOWN' => 'Απάντησε εξερχόμενη σε γνωστό αριθμό',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Αναπάντητη εξερχόμενη κλήση σε γνωστό αριθμό',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Ανεπιτυχής έξοδος σε γνωστό αριθμό',
     'mod_amo_task_responsible_type' => 'Υπεύθυνος για το έργο',
     'mod_amo_task_responsible_type_' => 'Μη επιλεγμένο',
     'mod_amo_task_responsible_type_firstMissedUser' => 'Το πρώτο άτομο που χάνει μια κλήση',
