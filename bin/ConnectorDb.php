@@ -621,11 +621,12 @@ class ConnectorDb extends WorkerBase
                 'portalId' => $this->portalId
             ],
             'columns'    => [
-                'idPhone'            => 'ModuleAmoPhones.idPhone',
-                'responsible_user_id'=> 'MAX(ModuleAmoPhones.responsible_user_id)',
-                'contactId'          => 'MAX(ModuleAmoPhones.idEntity)',
-                'companyId'          => 'MAX(ModuleAmoPhones.linked_company_id)',
-                'leadId'             => 'MAX(ModuleAmoLeads.idAmo)',
+                'idPhone'             => 'ModuleAmoPhones.idPhone',
+                'responsible_user_id' => 'MAX(ModuleAmoPhones.responsible_user_id)',
+                'contactId'           => 'MAX(ModuleAmoPhones.idEntity)',
+                'companyId'           => 'MAX(ModuleAmoPhones.linked_company_id)',
+                'leadId'              => 'MAX(ModuleAmoLeads.idAmo)',
+                'resp_contact_user_id'=> 'MAX(IIF(ModuleAmoPhones.linked_company_id = "", ModuleAmoPhones.responsible_user_id , ""))',
             ],
             'group'      => [
                 'ModuleAmoPhones.idPhone'

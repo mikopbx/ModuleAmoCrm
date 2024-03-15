@@ -21,6 +21,7 @@ namespace Modules\ModuleAmoCrm\bin;
 require_once('Globals.php');
 
 use MikoPBX\Common\Models\LanInterfaces;
+use MikoPBX\Core\System\Storage;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
@@ -29,6 +30,7 @@ use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use MikoPBX\Common\Providers\CDRDatabaseProvider;
 use DateTime;
 use MikoPBX\Common\Models\Extensions;
+use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Throwable;
 use DateTimeInterface;
 use Exception;
@@ -48,6 +50,12 @@ class AmoCdrDaemon extends WorkerBase
     private int $lastSyncTime = 0;
     private int $portalId = 0;
     private array $entitySettings = [];
+
+    private bool $disableDetailedCdr = false;
+    public string $respCallAnsweredHaveClient = '';
+    public string $respCallAnsweredNoClient = '';
+    public string $respCallMissedNoClient = '';
+    public string $respCallMissedHaveClient = '';
 
     private array $newContacts = [];
     private array $newLeads = [];
@@ -119,6 +127,13 @@ class AmoCdrDaemon extends WorkerBase
             $this->offset        = max(1*$allSettings['ModuleAmoCrm']['offsetCdr']??1,1);
             $this->referenceDate = $allSettings['ModuleAmoCrm']['referenceDate']??'';
             $this->portalId      = (int)($allSettings['ModuleAmoCrm']['portalId']??0);
+
+            $this->disableDetailedCdr         = ($allSettings['ModuleAmoCrm']['disableDetailedCdr']??'0') === '1';
+            $this->respCallAnsweredHaveClient = ($allSettings['ModuleAmoCrm']['respCallAnsweredHaveClient']??'');
+            $this->respCallAnsweredNoClient   = ($allSettings['ModuleAmoCrm']['respCallAnsweredNoClient']??'');
+            $this->respCallMissedNoClient     = ($allSettings['ModuleAmoCrm']['respCallMissedNoClient']??'');
+            $this->respCallMissedHaveClient   = ($allSettings['ModuleAmoCrm']['respCallMissedHaveClient']??'');
+
             if($oldOffset !== $this->offset){
                 $this->logger->writeInfo("Update settings, Reference date: $this->referenceDate, offset: $this->offset");
             }
@@ -265,7 +280,7 @@ class AmoCdrDaemon extends WorkerBase
             'bind'    => [
                 'linkedid' => null,
             ],
-            'order'   => 'id',
+            'order'   => 'start,answer,id',
         ];
         $filter                        = [
             'id>:id: AND start>:referenceDate:',
@@ -299,12 +314,15 @@ class AmoCdrDaemon extends WorkerBase
                 $this->cdrRows[$row['linkedid']]['incompleteType'] = $this->incompleteAnswered[$srcNum]['type'];
             }
             unset($this->incompleteAnswered[$srcNum],$this->incompleteAnswered[$dstNum]);
-
+            if(file_exists($row['recordingfile'])){
+                $this->cdrRows[$row['linkedid']]['records'][] = $row['recordingfile'];
+                $this->cdrRows[$row['linkedid']]['duration'] += 1*$row['billsec'];
+            }
             if( in_array($srcNum, $this->innerNums, true)
                 && in_array($dstNum, $this->innerNums, true)){
                 // Это внутренний разговор.
                 // Не переносим его в AMO.
-                $this->offset = $row['id'];
+                $this->offset = max($this->offset,$row['id']);
                 continue;
             }
             $phoneCol  = 'src_num';
@@ -325,11 +343,13 @@ class AmoCdrDaemon extends WorkerBase
                 $amoUserId = null;
                 $userPhone = '';
             }else{
-                $this->offset = $row['id'];
+                $this->offset = max($this->offset,$row['id']);
                 continue;
             }
             if(!isset($this->cdrRows[$row['linkedid']])){
-                $this->cdrRows[$row['linkedid']]['first'] = $row['UNIQUEID'];
+                $this->cdrRows[$row['linkedid']]['first']    = $row['UNIQUEID'];
+                $this->cdrRows[$row['linkedid']]['haveUser'] = false;
+                $this->cdrRows[$row['linkedid']]['duration'] = 0;
             }
 
             if($row['billsec'] < 1){
@@ -347,12 +367,11 @@ class AmoCdrDaemon extends WorkerBase
             }
             $this->cdrRows[$row['linkedid']]['haveUser'] |= ($row['is_app'] !== '1');
 
+            $this->offset = max($this->offset,$row['id']);
             $created_at = $this->getTimestamp($row['start'], $row['UNIQUEID']);
             if($created_at === 0){
                 continue;
             }
-
-            $this->offset = $row['id'];
             if(strlen($row[$phoneCol])<5){
                 continue;
             }
@@ -536,28 +555,138 @@ class AmoCdrDaemon extends WorkerBase
      */
     private function cleanCalls($calls, $callCounter):array
     {
+        if(empty($calls)){
+            return [];
+        }
         foreach ($calls as $index => &$call){
             if($callCounter[$call['id']] === 1){
-                unset($call['id'],$call['is_app'],$call['did']);
                 continue;
             }
-            if($this->cdrRows[$call['id']]['haveUser'] === 1 && $call['is_app'] === '1') {
+            $haveUser = $this->cdrRows[$call['id']]['haveUser'] === 1;
+            if($call['is_app'] === '1' && $haveUser) {
                 // Этот вызов был направлен на сотрудника.
                 // Все вызовы на приложения чистим.
                 unset($calls[$index], $call);
-            }elseif($this->cdrRows[$call['id']]['haveUser'] === 0 && $this->cdrRows[$call['id']]['first'] !== $call['uniq']){
+            }elseif($this->cdrRows[$call['id']]['first'] !== $call['uniq'] && $haveUser){
                 // Этот вызов не попал на сотрудников, только приложения
                 // Оставляем только вызов на первое приложение
                 unset($calls[$index], $call);
-            }elseif( $this->cdrRows[$call['id']]['answered'] === 1 && $call['call_status'] === 6){
+            }elseif( $call['call_status'] === 6 && $haveUser){
                 // Если вызов отвечен, то не следует загружать информацию о пропущенных.
                 unset($calls[$index],$call);
-            }else{
-                unset($call['id'],$call['is_app'],$call['did']);
             }
+        }
+        unset($call);
+        if($this->disableDetailedCdr){
+            $calls = $this->reduceCdr($calls);
+        }
+
+        foreach ($calls as &$call) {
+            unset($call['id'],$call['is_app'],$call['did']);
         }
         return $calls;
     }
+
+    private function reduceCdr($calls):array
+    {
+        $resCalls = [];
+        // Объединение нескольких файлов в один.
+        //  sox -m f1.mp3 f2.mp3 out.mp3
+        $responsibleMap = [
+            self::MISSING_UNKNOWN => [
+                'settingName' => 'respCallMissedNoClient',
+                ModuleAmoCrm::RESP_TYPE_RULE    => 'responsibleRule',
+                ModuleAmoCrm::RESP_TYPE_LAST    => 'lastMissedUser',
+                ModuleAmoCrm::RESP_TYPE_FIRST   => 'firstMissedUser',
+            ],
+            self::MISSING_KNOWN => [
+                'settingName' => 'respCallMissedHaveClient',
+                ModuleAmoCrm::RESP_TYPE_RULE    => 'responsibleRule',
+                ModuleAmoCrm::RESP_TYPE_LAST    => 'lastMissedUser',
+                ModuleAmoCrm::RESP_TYPE_FIRST   => 'firstMissedUser',
+                ModuleAmoCrm::RESP_TYPE_CONTACT => 'resp_contact_user_id',
+            ],
+            self::INCOMING_KNOWN => [
+                'settingName' => 'respCallAnsweredHaveClient',
+                ModuleAmoCrm::RESP_TYPE_RULE    => 'responsibleRule',
+                ModuleAmoCrm::RESP_TYPE_LAST    => 'lastAnswerUser',
+                ModuleAmoCrm::RESP_TYPE_FIRST   => 'firstAnswerUser',
+                ModuleAmoCrm::RESP_TYPE_CONTACT => 'resp_contact_user_id',
+            ],
+            self::INCOMING_UNKNOWN => [
+                'settingName' => 'respCallAnsweredNoClient',
+                ModuleAmoCrm::RESP_TYPE_RULE    => 'responsibleRule',
+                ModuleAmoCrm::RESP_TYPE_LAST    => 'lastAnswerUser',
+                ModuleAmoCrm::RESP_TYPE_FIRST   => 'firstAnswerUser',
+            ]
+        ];
+
+        foreach ($calls as $call) {
+            if(isset($resCalls[$call['id']])){
+                continue;
+            }
+            $typeCall = $this->cdrRows[$call['id']]['type']??'';
+            if(empty($typeCall) ){
+                continue;
+            }
+            $settingName            = $responsibleMap[$typeCall]['settingName']??'';
+            if(!empty($settingName)){
+                $responsibleSettingName = $responsibleMap[$typeCall][$this->$settingName]??'';
+                $responsible            = $this->cdrRows[$call['id']][$responsibleSettingName]??0;
+                if (!empty($responsible)){
+                    $call['created_by'] = $responsible;
+                    $call['responsible_user_id'] = $responsible;
+                }
+            }
+            $call['link']       = $this->getCreateFileAndLink($call['id'], $call['created_at']);
+            $call['duration']   = $this->cdrRows[$call['id']]['duration'];
+            if($this->cdrRows[$call['id']]['answered'] === 1 ){
+                $call['call_status'] = 4;
+            }else{
+                $call['call_status'] = 6;
+            }
+            $resCalls[$call['id']] = $call;
+        }
+        return array_values($resCalls);
+    }
+
+    /**
+     * Объединяет несколько файлов в один и возвращает ссылку на скачивание файла.
+     * @param string $id
+     * @param int    $created_at
+     * @return string
+     */
+    private function getCreateFileAndLink(string $id, int $created_at):string
+    {
+        $link = '';
+        if(isset($this->cdrRows[$id]['records'])){
+            if(count($this->cdrRows[$id]['records']) === 1){
+                $fileName = $this->cdrRows[$id]['records'][0];
+            }else{
+                $monitor_dir = Storage::getMonitorDir();
+                $sub_dir = date('Y/m/d/H', $created_at);
+                $fileName = "$monitor_dir/amo/$sub_dir/$id.mp3";
+                Util::mwMkdir(dirname($fileName));
+
+                $pathSox = Util::which('sox');
+                $records = array_reverse($this->cdrRows[$id]['records']);
+                $cmd = '';
+                foreach ($records as $key => $value){
+                    if($key === array_key_first($records)){
+                        $cmd.= "$pathSox $value -p pad 3 0 | ";
+                    }elseif ($key === array_key_last($records)){
+                        $cmd.= "$pathSox - -m $value $fileName";
+                    }else{
+                        $cmd.= "$pathSox - -m $value -p pad 3 0 | ";
+                    }
+                }
+                shell_exec($cmd);
+            }
+            $link = "https://$this->extHostname/pbxcore/api/amo-crm/playback?view=$fileName";
+        }
+        return $link;
+    }
+
 
     /**
      * Подготавливает данные для создания сделок / контактов / задач.
@@ -636,8 +765,16 @@ class AmoCdrDaemon extends WorkerBase
                 }
                 continue;
             }
+            if($this->cdrRows[$call['id']]['answered'] === 1){
+                $responsibleField = $settings['responsible']."AnswerUser";
+            }else{
+                $responsibleField = $settings['responsible']."MissedUser";
+            }
             // Получим ответственного.
-            $responsible = 1*($this->cdrRows[$call['id']][$settings['responsible']."AnswerUser"]??$settings['def_responsible']);
+            $responsible = 1*($this->cdrRows[$call['id']][$responsibleField]??$settings['def_responsible']);
+            $this->cdrRows[$call['id']]['responsibleRule']      = $responsible;
+            $this->cdrRows[$call['id']]['resp_contact_user_id'] = 1*($contactsData[$call['phone']]['resp_contact_user_id']??'');
+
             $indexAction = AmoCrmMain::getPhoneIndex($call['phone']);
             if($settings['create_contact'] === '1' && !$contactExists){
                 $this->newContacts[$indexAction] = [

@@ -14,8 +14,12 @@
 <div class="ui top attached tabular menu">
   <a class="active item" data-tab="rules">{{ t._('mod_amo_rules') }}</a>
   <a class="item" data-tab="settings">{{ t._('mod_amo_settingsConnection') }}</a>
+  <a class="item" data-tab="calls">{{ t._('mod_amo_settingsCalls') }}</a>
 </div>
-<div class="ui bottom attached active tab segment disability" data-tab="rules">
+
+<form class="ui large grey form" id="module-amo-crm-form">
+
+<div class="ui bottom active tab segment disability" data-tab="rules">
     {{ link_to("module-amo-crm/modify/", '<i class="add circle icon"></i> '~t._('mod_amo_AddRules'), "class": "ui blue button", "id":"add-new-button") }}
     {% for rule in entitySettings %}
         {% if loop.first %}
@@ -103,7 +107,6 @@
     </div>
 </div>
 <div class="ui bottom attached tab segment" data-tab="settings">
-    <form class="ui large grey form" id="module-amo-crm-form">
         <div class="ui">
             {{ form.render('id') }}
             {{ form.render('referenceDate') }}
@@ -169,7 +172,45 @@
             </div>
         </div>
         <table id="ModuleAmoPipeLines-table" class="ui small very compact single line table"></table>
-        <br>
-        {{ partial("partials/submitbutton",['indexurl':'pbx-extension-modules/index/']) }}
-    </form>
 </div>
+
+<div class="ui bottom tab segment disability" data-tab="calls">
+
+    <div class="field">
+        <div class="ui toggle checkbox">
+            {{ form.render('disableDetailedCdr') }}
+            <label>{{ t._('mod_amo_disableDetailedCdr') }}</label>
+        </div>
+    </div>
+    <div class="ui visible message">
+        <p>{{ t._('mod_amo_respCommentMessage') }}</p>
+    </div>
+    <br>
+    <div class="field limited-cdr-settings">
+        <label >{{ t._('mod_amo_respCallAnsweredHaveClient') }}</label>
+        <div class="disability ui fluid action input">
+             {{ form.render('respCallAnsweredHaveClient') }}
+        </div>
+    </div>
+    <div class="field limited-cdr-settings">
+        <label >{{ t._('mod_amo_respCallAnsweredNoClient') }}</label>
+        <div class="disability ui fluid action input">
+             {{ form.render('respCallAnsweredNoClient') }}
+        </div>
+    </div>
+    <div class="field limited-cdr-settings">
+        <label >{{ t._('mod_amo_respCallMissedHaveClient') }}</label>
+        <div class="disability ui fluid action input">
+             {{ form.render('respCallMissedHaveClient') }}
+        </div>
+    </div>
+    <div class="field limited-cdr-settings">
+        <label >{{ t._('mod_amo_respCallMissedNoClient') }}</label>
+        <div class="disability ui fluid action input">
+             {{ form.render('respCallMissedNoClient') }}
+        </div>
+    </div>
+</div>
+
+{{ partial("partials/submitbutton",['indexurl':'pbx-extension-modules/index/']) }}
+</form>
