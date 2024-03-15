@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Gemist door een bekend nummer',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Uitgaand beantwoord naar onbekend nummer',
     'mod_amo_type_OUTGOING_KNOWN' => 'Uitgaand beantwoord naar een bekend nummer',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Onbeantwoorde uitgaande oproep naar een bekend nummer',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Mislukt uitgaand naar een bekend nummer',
     'mod_amo_task_responsible_type' => 'Verantwoordelijk voor de taak',
     'mod_amo_task_responsible_type_' => 'Niet geselecteerd',
     'mod_amo_task_responsible_type_firstMissedUser' => 'De eerste persoon die een oproep mist',
