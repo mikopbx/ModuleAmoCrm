@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'გამომრჩა ცნობილი ნომრიდან',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'გამავალი უპასუხა უცნობ ნომერზე',
     'mod_amo_type_OUTGOING_KNOWN' => 'უპასუხა გამავალი ცნობილ ნომერზე',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'უპასუხო გამავალი ზარი ცნობილ ნომერზე',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'წარუმატებელი გასვლა ცნობილ ნომერზე',
     'mod_amo_task_responsible_type' => 'პასუხისმგებელია დავალებაზე',
     'mod_amo_task_responsible_type_' => 'Არ არის მონიშნული',
     'mod_amo_task_responsible_type_firstMissedUser' => 'პირველი ადამიანი, ვინც გამოტოვებს ზარს',
