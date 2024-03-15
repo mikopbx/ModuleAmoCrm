@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Məlum nömrədən buraxılıb',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Naməlum nömrəyə gedən cavab',
     'mod_amo_type_OUTGOING_KNOWN' => 'Məlum nömrəyə gedən cavab verildi',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Məlum nömrəyə cavabsız gedən zəng',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Məlum nömrəyə uğursuz çıxış',
     'mod_amo_task_responsible_type' => 'Tapşırığa cavabdehdir',
     'mod_amo_task_responsible_type_' => 'Seçilməyib',
     'mod_amo_task_responsible_type_firstMissedUser' => 'Zəngi qaçıran ilk şəxs',
