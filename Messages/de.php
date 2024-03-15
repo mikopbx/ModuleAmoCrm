@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Von einer bekannten Nummer verpasst',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Ausgehender Anruf an unbekannte Nummer beantwortet',
     'mod_amo_type_OUTGOING_KNOWN' => 'Ausgehend an eine bekannte Nummer geantwortet',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Unbeantworteter ausgehender Anruf an eine bekannte Nummer',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Ausgehender Anruf an eine bekannte Nummer fehlgeschlagen',
     'mod_amo_task_responsible_type' => 'Verantwortlich für die Aufgabe',
     'mod_amo_task_responsible_type_' => 'Nicht ausgewählt',
     'mod_amo_task_responsible_type_firstMissedUser' => 'Die erste Person, die einen Anruf verpasst',
