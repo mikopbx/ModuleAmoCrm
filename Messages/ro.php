@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'A ratat de la un număr cunoscut',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'S-a răspuns la un număr necunoscut',
     'mod_amo_type_OUTGOING_KNOWN' => 'S-a răspuns la un număr cunoscut',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Apel de ieșire fără răspuns către un număr cunoscut',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Ieșire nereușită către un număr cunoscut',
     'mod_amo_task_responsible_type' => 'Responsabil pentru sarcina',
     'mod_amo_task_responsible_type_' => 'Nu a fost ales',
     'mod_amo_task_responsible_type_firstMissedUser' => 'Prima persoană care a ratat un apel',
