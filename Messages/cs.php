@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Zmeškané ze známého čísla',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Odpovědí odchozí na neznámé číslo',
     'mod_amo_type_OUTGOING_KNOWN' => 'Odpovědí odchozí na známé číslo',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Nepřijatý odchozí hovor na známé číslo',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Neúspěšné odeslání na známé číslo',
     'mod_amo_task_responsible_type' => 'Zodpovědný za úkol',
     'mod_amo_task_responsible_type_' => 'Nevybraný',
     'mod_amo_task_responsible_type_firstMissedUser' => 'První, kdo zmeškal hovor',
