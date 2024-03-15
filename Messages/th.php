@@ -52,7 +52,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'พลาดจากหมายเลขที่ทราบ',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'ตอบรับไปเบอร์ที่ไม่รู้จัก',
     'mod_amo_type_OUTGOING_KNOWN' => 'ตอบไปเป็นเบอร์ที่รู้จัก',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'ไม่ได้รับสายโทรออกไปยังหมายเลขที่รู้จัก',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'โทรออกไปยังหมายเลขที่รู้จักไม่สำเร็จ',
     'mod_amo_task_responsible_type' => 'รับผิดชอบงาน',
     'mod_amo_task_responsible_type_' => 'ไม่ได้เลือก',
     'mod_amo_task_responsible_type_firstMissedUser' => 'คนแรกที่ไม่ได้รับสาย',
