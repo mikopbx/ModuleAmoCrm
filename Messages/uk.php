@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Пропущений із відомого номера',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Відповідний на невідомий номер',
     'mod_amo_type_OUTGOING_KNOWN' => 'Відповідний, що виходить на відомий номер',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Не відповісти на відомий номер',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Невдалий, що виходить на відомий номер',
     'mod_amo_task_responsible_type' => 'Відповідальний за завдання',
     'mod_amo_task_responsible_type_' => 'Не вибраний',
     'mod_amo_task_responsible_type_firstMissedUser' => 'Перший, на кого пропустив виклик',
