@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Bị nhỡ từ một số đã biết',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Đã trả lời gửi tới số chưa biết',
     'mod_amo_type_OUTGOING_KNOWN' => 'Đã trả lời gửi đi tới số đã biết',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Số đã biết chưa được trả lời',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Gửi đi không thành công đến một số đã biết',
     'mod_amo_task_responsible_type' => 'Chịu trách nhiệm về nhiệm vụ',
     'mod_amo_task_responsible_type_' => 'Không được chọn',
     'mod_amo_task_responsible_type_firstMissedUser' => 'Cuộc gọi nhỡ đầu tiên',
