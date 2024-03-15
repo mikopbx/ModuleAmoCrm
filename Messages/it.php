@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Perso da un numero noto',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Risposto in uscita a numero sconosciuto',
     'mod_amo_type_OUTGOING_KNOWN' => 'Risposto in uscita ad un numero noto',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Chiamata in uscita senza risposta verso un numero noto',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Chiamata in uscita verso un numero noto non riuscita',
     'mod_amo_task_responsible_type' => 'Responsabile del compito',
     'mod_amo_task_responsible_type_' => 'Non selezionato',
     'mod_amo_task_responsible_type_firstMissedUser' => 'La prima persona a perdere una chiamata',
