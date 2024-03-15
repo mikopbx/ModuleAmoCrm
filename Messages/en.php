@@ -42,7 +42,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Missed from a known number',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Answered outgoing to unknown number',
     'mod_amo_type_OUTGOING_KNOWN' => 'Answered outgoing to known number',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Outgoing unanswered known number',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Unsuccessful outgoing to a known number',
     'mod_amo_task_responsible_type' => 'Responsible for the task',
     'mod_amo_task_responsible_type_' => 'Not selected',
     'mod_amo_task_responsible_type_firstMissedUser' => 'First missed call',
