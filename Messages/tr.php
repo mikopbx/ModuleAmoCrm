@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Bilinen bir numaradan cevapsız kaldım',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Bilinmeyen numaraya giden kişiyi yanıtladı',
     'mod_amo_type_OUTGOING_KNOWN' => 'Bilinen bir numaraya giden kişiyi yanıtladı',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Bilinen bir numaraya cevapsız giden çağrı',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Bilinen bir numaraya başarısız giden giden',
     'mod_amo_task_responsible_type' => 'Görevden sorumlu',
     'mod_amo_task_responsible_type_' => 'Seçili değil',
     'mod_amo_task_responsible_type_firstMissedUser' => 'Bir çağrıyı kaçıran ilk kişi',
