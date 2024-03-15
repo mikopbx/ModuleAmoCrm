@@ -187,25 +187,25 @@
     </div>
     <br>
     <div class="field limited-cdr-settings">
-        <label >{{ t._('mod_amo_respCallAnsweredHaveClient') }}</label>
+        <label >{{ t._('mod_amo_type_INCOMING_KNOWN') }}</label>
         <div class="disability ui fluid action input">
              {{ form.render('respCallAnsweredHaveClient') }}
         </div>
     </div>
     <div class="field limited-cdr-settings">
-        <label >{{ t._('mod_amo_respCallAnsweredNoClient') }}</label>
+        <label >{{ t._('mod_amo_type_INCOMING_UNKNOWN') }}</label>
         <div class="disability ui fluid action input">
              {{ form.render('respCallAnsweredNoClient') }}
         </div>
     </div>
     <div class="field limited-cdr-settings">
-        <label >{{ t._('mod_amo_respCallMissedHaveClient') }}</label>
+        <label >{{ t._('mod_amo_type_MISSING_KNOWN') }}</label>
         <div class="disability ui fluid action input">
              {{ form.render('respCallMissedHaveClient') }}
         </div>
     </div>
     <div class="field limited-cdr-settings">
-        <label >{{ t._('mod_amo_respCallMissedNoClient') }}</label>
+        <label >{{ t._('mod_amo_type_MISSING_UNKNOWN') }}</label>
         <div class="disability ui fluid action input">
              {{ form.render('respCallMissedNoClient') }}
         </div>

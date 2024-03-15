@@ -71,7 +71,7 @@ return [
     'mod_amo_type_MISSING_KNOWN'                => 'Пропущенный с известного номера',
     'mod_amo_type_OUTGOING_UNKNOWN'             => 'Отвеченный исходящий на неизвестный номер',
     'mod_amo_type_OUTGOING_KNOWN'               => 'Отвеченный исходящий на известный номер',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL'          => 'Не отвеченный исходящий на известный номер',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL'          => 'Неудачный исходящий на известный номер',
 
     'mod_amo_task_responsible_type'                  => 'Ответственный по задаче',
     'mod_amo_task_responsible_type_'                 => 'Не выбран',
