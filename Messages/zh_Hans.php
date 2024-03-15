@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => '未接已知号码',
     'mod_amo_type_OUTGOING_UNKNOWN' => '已应答拨出至未知号码',
     'mod_amo_type_OUTGOING_KNOWN' => '已应答拨出至已知号码',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => '拨打已知号码无人接听',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => '无法成功拨出至已知号码',
     'mod_amo_task_responsible_type' => '负责任务',
     'mod_amo_task_responsible_type_' => '未选中的',
     'mod_amo_task_responsible_type_firstMissedUser' => '第一个错过电话的人',
