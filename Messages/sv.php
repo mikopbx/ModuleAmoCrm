@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Missat från ett känt nummer',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Svarade utgående till okänt nummer',
     'mod_amo_type_OUTGOING_KNOWN' => 'Svarade utgående till ett känt nummer',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Obesvarat utgående samtal till ett känt nummer',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Misslyckad utgående till ett känt nummer',
     'mod_amo_task_responsible_type' => 'Ansvarig för uppgiften',
     'mod_amo_task_responsible_type_' => 'Ej valt',
     'mod_amo_task_responsible_type_firstMissedUser' => 'Den första personen som missar ett samtal',
