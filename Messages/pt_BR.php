@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Perdido em um número conhecido',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Atendeu saída para número desconhecido',
     'mod_amo_type_OUTGOING_KNOWN' => 'Atendeu a saída para um número conhecido',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Chamada não atendida para um número conhecido',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Saída sem sucesso para um número conhecido',
     'mod_amo_task_responsible_type' => 'Responsável pela tarefa',
     'mod_amo_task_responsible_type_' => 'Não selecionado',
     'mod_amo_task_responsible_type_firstMissedUser' => 'A primeira pessoa a perder uma chamada',
