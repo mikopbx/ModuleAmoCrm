@@ -49,7 +49,7 @@ return [
     'mod_amo_type_MISSING_KNOWN' => 'Manqué d\'un numéro connu',
     'mod_amo_type_OUTGOING_UNKNOWN' => 'Répondu sortant vers un numéro inconnu',
     'mod_amo_type_OUTGOING_KNOWN' => 'Répondu vers un numéro connu',
-    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Appel sortant sans réponse vers un numéro connu',
+    'mod_amo_type_OUTGOING_KNOWN_FAIL' => 'Échec d\'un appel sortant vers un numéro connu',
     'mod_amo_task_responsible_type' => 'Responsable de la tâche',
     'mod_amo_task_responsible_type_' => 'Non séléctionné',
     'mod_amo_task_responsible_type_firstMissedUser' => 'La première personne à manquer un appel',
