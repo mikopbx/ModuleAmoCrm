@@ -537,13 +537,11 @@ class AmoCdrDaemon extends WorkerBase
         }
         // Пытаемся добавить вызовы. Это получится, если контакты существуют.
         $result =  WorkerAmoHTTP::invokeAmoApi('addCalls', [$calls]);
-        if(!$result->success){
-            try {
-                $this->logger->writeInfo("Error create calls (REQ):". json_encode($calls, JSON_THROW_ON_ERROR));
-                $this->logger->writeInfo("Error create calls (RES):". json_encode($result, JSON_THROW_ON_ERROR));
-            }catch (Throwable $e){
-                $this->logger->writeInfo("CDR synchronization. " . $e->getMessage());
-            }
+        try {
+            $this->logger->writeInfo("Create calls (REQ):". json_encode($calls, JSON_THROW_ON_ERROR));
+            $this->logger->writeInfo("Create calls (RES):". json_encode($result, JSON_THROW_ON_ERROR));
+        }catch (Throwable $e){
+            $this->logger->writeInfo("CDR synchronization. " . $e->getMessage());
         }
     }
 
