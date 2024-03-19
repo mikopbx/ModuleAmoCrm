@@ -409,7 +409,7 @@ class AmoCdrDaemon extends WorkerBase
         ////
         // Обработка и создание контактов
         ////
-        $this->prepareDataCreatingEntities($calls);
+        $this->prepareDataCreatingEntities($calls, $callCounter);
 
         ////
         // Создание сущностей amoCRM
@@ -558,27 +558,31 @@ class AmoCdrDaemon extends WorkerBase
         if(empty($calls)){
             return [];
         }
-        foreach ($calls as $index => &$call){
-            if($callCounter[$call['id']] === 1){
-                continue;
-            }
-            $haveUser = $this->cdrRows[$call['id']]['haveUser'] === 1;
-            if($call['is_app'] === '1' && $haveUser) {
-                // Этот вызов был направлен на сотрудника.
-                // Все вызовы на приложения чистим.
-                unset($calls[$index], $call);
-            }elseif($this->cdrRows[$call['id']]['first'] !== $call['uniq'] && $haveUser){
-                // Этот вызов не попал на сотрудников, только приложения
-                // Оставляем только вызов на первое приложение
-                unset($calls[$index], $call);
-            }elseif( $call['call_status'] === 6 && $haveUser){
-                // Если вызов отвечен, то не следует загружать информацию о пропущенных.
-                unset($calls[$index],$call);
-            }
-        }
-        unset($call);
         if($this->disableDetailedCdr){
             $calls = $this->reduceCdr($calls);
+        }else{
+            foreach ($calls as $index => &$call){
+                if($callCounter[$call['id']] === 1){
+                    continue;
+                }
+                $haveUser = $this->cdrRows[$call['id']]['haveUser'] === 1;
+                if(!isset($call['responsible_user_id']) && $haveUser){
+                    unset($calls[$index], $call);
+                    continue;
+                }
+                if($call['is_app'] === '1' && $haveUser) {
+                    // Этот вызов был направлен на сотрудника.
+                    // Все вызовы на приложения чистим.
+                    unset($calls[$index], $call);
+                }elseif($this->cdrRows[$call['id']]['first'] !== $call['uniq'] && $haveUser === false){
+                    // Этот вызов не попал на сотрудников, только приложения
+                    // Оставляем только вызов на первое приложение
+                    unset($calls[$index], $call);
+                }elseif( $this->cdrRows[$call['id']]['answered'] === 1 && $call['call_status'] === 6 && $haveUser){
+                    // Если вызов отвечен, то не следует загружать информацию о пропущенных.
+                    unset($calls[$index],$call);
+                }
+            }
         }
 
         foreach ($calls as &$call) {
@@ -691,8 +695,9 @@ class AmoCdrDaemon extends WorkerBase
     /**
      * Подготавливает данные для создания сделок / контактов / задач.
      * @param array $calls
+     * @param array $callCounter
      */
-    private function prepareDataCreatingEntities(array &$calls):void
+    private function prepareDataCreatingEntities(array &$calls, array &$callCounter):void
     {
         $this->newContacts = [];
         $this->newLeads = [];
@@ -737,7 +742,8 @@ class AmoCdrDaemon extends WorkerBase
         // Завершенные вызовы.
         foreach ($calls as $index => $call) {
             if($this->cdrRows[$call['id']]['answered'] === 1 && $call['duration'] === 0){
-                unset($calls[$index]);
+                $callCounter[$call['id']]--;
+                unset($calls[$index],$call);
                 continue;
             }
             if (isset($this->cdrRows[$call['id']]['type'])) {
@@ -761,6 +767,7 @@ class AmoCdrDaemon extends WorkerBase
                 // Ничего не делаем, не загружаем.
                 if(!$contactExists){
                     // Это неизвестный клиент. Некуда прикреплять телефонный звонок.
+                    $callCounter[$call['id']]--;
                     unset($calls[$index],$call);
                 }
                 continue;
