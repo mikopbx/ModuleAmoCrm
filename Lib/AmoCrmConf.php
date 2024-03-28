@@ -48,8 +48,8 @@ class AmoCrmConf extends ConfigClass
                 'same => n,ExecIf($["${origCidName}x" != "x"]?Set(CALLERID(name)=${origCidName}))'.PHP_EOL."\t".
                 'same => n,Gosub(set-dial-contacts,${EXTEN},1)'.PHP_EOL."\t".
                 'same => n,Set(DST_USER_AGENT=${TOUPPER(${PJSIP_CONTACT(${PJSIP_AOR(${EXTEN},contact)},user_agent)})})'.PHP_EOL."\t".
-                'same => n,ExecIf($["${INTECEPTION_CNANNEL}x" != "x" && "${STRREPLACE(DST_USER_AGENT,TELEPHONE)}" != "${DST_USER_AGENT}"]?Set(_PT1C_SIP_HEADER=Call-Info:\;answer-after=0))'.PHP_EOL."\t".
-                'same => n,ExecIf($["${INTECEPTION_CNANNEL}x" != "x" && "${STRREPLACE(DST_USER_AGENT,MICROSIP)}" != "${DST_USER_AGENT}"]?Set(_PT1C_SIP_HEADER=Call-Info:\;answer-after=0))'.PHP_EOL."\t".
+                'same => n,ExecIf($["${INTECEPTION_CNANNEL}x" == "x" && "${STRREPLACE(DST_USER_AGENT,TELEPHONE)}" != "${DST_USER_AGENT}"]?Set(_PT1C_SIP_HEADER=Call-Info:\;answer-after=0))'.PHP_EOL."\t".
+                'same => n,ExecIf($["${INTECEPTION_CNANNEL}x" == "x" && "${STRREPLACE(DST_USER_AGENT,MICROSIP)}" != "${DST_USER_AGENT}"]?Set(_PT1C_SIP_HEADER=Call-Info:\;answer-after=0))'.PHP_EOL."\t".
                 'same => n,GosubIf($["${INTECEPTION_CNANNEL}x" != "x"]?amo-set-periodic-hook,s,1)'.PHP_EOL."\t".
                 'same => n,ExecIf($["${FIELDQTY(CONTACTS,&)}" != "0" && "${ALLOW_MULTY_ANSWER}" != "1"]?Set(_PT1C_SIP_HEADER=${EMPTY_VAR}))'.PHP_EOL."\t".
                 'same => n,Dial(${DST_CONTACT},30,b(originate-create-channel,${EXTEN},1)G(amo-orig-leg-2^${CALLERID(num)}^1))'.PHP_EOL.

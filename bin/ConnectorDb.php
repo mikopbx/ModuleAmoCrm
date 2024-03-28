@@ -501,6 +501,9 @@ class ConnectorDb extends WorkerBase
      */
     public function updateLeads(array $updates):void
     {
+        if(isset($updates['source'])){
+            $this->logger->writeInfo("Get task:". json_encode($updates, JSON_THROW_ON_ERROR));
+        }
         if(isset($updates['initTime'])){
             $initTime = (int)$updates['initTime'];
             if($initTime !== $this->initTime){
@@ -621,11 +624,12 @@ class ConnectorDb extends WorkerBase
                 'portalId' => $this->portalId
             ],
             'columns'    => [
-                'idPhone'            => 'ModuleAmoPhones.idPhone',
-                'responsible_user_id'=> 'MAX(ModuleAmoPhones.responsible_user_id)',
-                'contactId'          => 'MAX(ModuleAmoPhones.idEntity)',
-                'companyId'          => 'MAX(ModuleAmoPhones.linked_company_id)',
-                'leadId'             => 'MAX(ModuleAmoLeads.idAmo)',
+                'idPhone'             => 'ModuleAmoPhones.idPhone',
+                'responsible_user_id' => 'MAX(ModuleAmoPhones.responsible_user_id)',
+                'contactId'           => 'MAX(ModuleAmoPhones.idEntity)',
+                'companyId'           => 'MAX(ModuleAmoPhones.linked_company_id)',
+                'leadId'              => 'MAX(ModuleAmoLeads.idAmo)',
+                'resp_contact_user_id'=> 'MAX(IIF(ModuleAmoPhones.linked_company_id = "", ModuleAmoPhones.responsible_user_id , ""))',
             ],
             'group'      => [
                 'ModuleAmoPhones.idPhone'

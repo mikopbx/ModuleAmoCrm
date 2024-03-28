@@ -17,6 +17,10 @@ use MikoPBX\Modules\Models\ModulesModelsBase;
 
 class ModuleAmoCrm extends ModulesModelsBase
 {
+    public const RESP_TYPE_FIRST    = 'first';
+    public const RESP_TYPE_LAST     = 'last';
+    public const RESP_TYPE_CONTACT  = 'contact';
+    public const RESP_TYPE_RULE     = 'rule';
 
     /**
      * @Primary
@@ -105,6 +109,37 @@ class ModuleAmoCrm extends ModulesModelsBase
      * @Column(type="integer", default="0", nullable=true)
      */
     public $portalId = 0;
+
+    /**
+     * Disable detailed CDRs
+     * @Column(type="integer", default="0", nullable=true)
+     */
+    public $disableDetailedCdr = 0;
+
+
+    /**
+     * first last fromContact fromRule
+     * @Column(type="string", nullable=true)
+     */
+    public $respCallAnsweredHaveClient = '';
+
+    /**
+     * first last fromRule
+     * @Column(type="string", nullable=true)
+     */
+    public $respCallAnsweredNoClient = '';
+
+    /**
+     * first last fromRule
+     * @Column(type="string", nullable=true)
+     */
+    public $respCallMissedNoClient = '';
+
+    /**
+     * first last fromContact fromRule
+     * @Column(type="string", nullable=true)
+     */
+    public $respCallMissedHaveClient = '';
 
     /**
      * Returns dynamic relations between module models and common models

@@ -132,6 +132,11 @@ const ModuleAmoCrm = {
 		}else{
 			$('#private-fields').hide();
 		}
+		if($('#disableDetailedCdr').parent().checkbox('is checked')){
+			$('.limited-cdr-settings').show();
+		}else{
+			$('.limited-cdr-settings').hide();
+		}
 	},
 	/**
 	 * Deletes an extension with the given ID.

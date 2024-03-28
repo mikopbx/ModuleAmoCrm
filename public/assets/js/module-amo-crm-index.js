@@ -139,6 +139,12 @@ var ModuleAmoCrm = {
     } else {
       $('#private-fields').hide();
     }
+
+    if ($('#disableDetailedCdr').parent().checkbox('is checked')) {
+      $('.limited-cdr-settings').show();
+    } else {
+      $('.limited-cdr-settings').hide();
+    }
   },
 
   /**

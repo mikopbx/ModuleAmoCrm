@@ -174,7 +174,7 @@ class ModuleAmoCrmController extends BaseController
                 if(in_array($key, ['id','offsetCdr','authData'], true)){
                     continue;
                 }
-                if(in_array($key, ['useInterception', 'isPrivateWidget', 'panelIsEnable'])){
+                if(in_array($key, ['useInterception', 'isPrivateWidget', 'disableDetailedCdr', 'panelIsEnable'])){
                     $settings[$key] = ($value === 'on') ? '1' : '0';
                 } else {
                     $settings[$key]  = $value;
@@ -194,7 +194,7 @@ class ModuleAmoCrmController extends BaseController
                 if(in_array($key, ['id','offsetCdr','authData'], true)){
                     continue;
                 }
-                if('useInterception' === $key || 'isPrivateWidget' === $key ){
+                if('useInterception' === $key || 'isPrivateWidget' === $key || 'disableDetailedCdr' === $key ){
                     $record->$key = ($data[$key] === 'on') ? '1' : '0';
                 } elseif (array_key_exists($key, $data)) {
                     if($record->$key !== trim($data[$key])){

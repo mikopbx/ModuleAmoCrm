@@ -8,8 +8,11 @@
  */
 namespace Modules\ModuleAmoCrm\App\Forms;
 
+use MikoPBX\Core\System\Util;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMainBase;
+use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Phalcon\Forms\Element\Check;
+use Phalcon\Forms\Element\Select;
 use Phalcon\Forms\Form;
 use Phalcon\Forms\Element\Text;
 use Phalcon\Forms\Element\Hidden;
@@ -45,5 +48,66 @@ class ModuleAmoCrmForm extends Form
         $this->add(new Check('isPrivateWidget', $isPrivateWidget));
         $this->add(new Text('privateClientId'));
         $this->add(new Text('privateClientSecret'));
+
+
+        $values = ['value' => null];
+        if ($entity->disableDetailedCdr === '1') {
+            $values = ['checked' => 'checked', 'value' => null];
+        }
+        $this->add(new Check('disableDetailedCdr', $values));
+
+        $variants = [
+            ModuleAmoCrm::RESP_TYPE_FIRST      => Util::translate('mod_amo_type_responsible_answered_first', false),
+            ModuleAmoCrm::RESP_TYPE_LAST       => Util::translate('mod_amo_type_responsible_answered_last',  false),
+            ModuleAmoCrm::RESP_TYPE_CONTACT    => Util::translate('mod_amo_type_responsible_contact',  false),
+            ModuleAmoCrm::RESP_TYPE_RULE       => Util::translate('mod_amo_type_responsible_rule',  false),
+        ];
+        $type = new Select(
+            'respCallAnsweredHaveClient', $variants, [
+                             'useEmpty' => false,
+                             'class' => 'ui selection dropdown search',
+                         ]
+        );
+        $this->add($type);
+
+        $variants = [
+            ModuleAmoCrm::RESP_TYPE_FIRST      => Util::translate('mod_amo_type_responsible_answered_first', false),
+            ModuleAmoCrm::RESP_TYPE_LAST       => Util::translate('mod_amo_type_responsible_answered_last',  false),
+            ModuleAmoCrm::RESP_TYPE_RULE       => Util::translate('mod_amo_type_responsible_rule',  false),
+        ];
+        $type = new Select(
+            'respCallAnsweredNoClient', $variants, [
+                                            'useEmpty' => false,
+                                            'class' => 'ui selection dropdown search',
+                                        ]
+        );
+        $this->add($type);
+
+        $variants = [
+            ModuleAmoCrm::RESP_TYPE_FIRST      => Util::translate('mod_amo_type_responsible_missed_first', false),
+            ModuleAmoCrm::RESP_TYPE_LAST       => Util::translate('mod_amo_type_responsible_missed_last',  false),
+            ModuleAmoCrm::RESP_TYPE_RULE       => Util::translate('mod_amo_type_responsible_rule',  false),
+        ];
+        $type = new Select(
+            'respCallMissedNoClient', $variants, [
+                                            'useEmpty' => false,
+                                            'class' => 'ui selection dropdown search',
+                                        ]
+        );
+        $this->add($type);
+
+        $variants = [
+            ModuleAmoCrm::RESP_TYPE_FIRST      => Util::translate('mod_amo_type_responsible_missed_first', false),
+            ModuleAmoCrm::RESP_TYPE_LAST       => Util::translate('mod_amo_type_responsible_missed_last',  false),
+            ModuleAmoCrm::RESP_TYPE_CONTACT    => Util::translate('mod_amo_type_responsible_contact',  false),
+            ModuleAmoCrm::RESP_TYPE_RULE       => Util::translate('mod_amo_type_responsible_rule',  false),
+        ];
+        $type = new Select(
+            'respCallMissedHaveClient', $variants, [
+                                            'useEmpty' => false,
+                                            'class' => 'ui selection dropdown search',
+                                        ]
+        );
+        $this->add($type);
     }
 }
