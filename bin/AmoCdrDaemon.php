@@ -1051,7 +1051,8 @@ class AmoCdrDaemon extends WorkerBase
             return;
         }
         $leadData = [
-            'add' => []
+            'add' => [],
+            'source' => self::class
         ];
         $resultCreateLeads    = WorkerAmoHTTP::invokeAmoApi('addLeads', [array_values($this->newLeads)]);
         $leads = $resultCreateLeads->data['_embedded']['leads']??[];
@@ -1080,6 +1081,8 @@ class AmoCdrDaemon extends WorkerBase
                 $this->logger->writeError($e->getMessage());
             }
         }
+
+        $this->logger->writeInfo("Send task 'updateLeads':". json_encode($leadData, JSON_THROW_ON_ERROR));
         ConnectorDb::invoke('updateLeads', [$leadData], false);
     }
 

@@ -501,6 +501,9 @@ class ConnectorDb extends WorkerBase
      */
     public function updateLeads(array $updates):void
     {
+        if(isset($updates['source'])){
+            $this->logger->writeInfo("Get task:". json_encode($updates, JSON_THROW_ON_ERROR));
+        }
         if(isset($updates['initTime'])){
             $initTime = (int)$updates['initTime'];
             if($initTime !== $this->initTime){
