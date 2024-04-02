@@ -54,7 +54,7 @@ class ClientHTTP
             Util::sysLogMsg('ModuleAmoCrm', "GuzzleException");
             $code = 0;
         }
-        return ClientHTTP::parseResponse($resultHttp, $message, $code);
+        return self::parseResponse($resultHttp, $message, $code);
     }
 
     /**
@@ -86,7 +86,7 @@ class ClientHTTP
             Util::sysLogMsg('ModuleAmoCrm', "GuzzleException");
             $code = 0;
         }
-        return ClientHTTP::parseResponse($resultHttp, $message, $code);
+        return self::parseResponse($resultHttp, $message, $code);
     }
 
     /**
