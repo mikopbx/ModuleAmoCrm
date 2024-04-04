@@ -585,6 +585,7 @@ class AmoCdrDaemon extends WorkerBase
                     unset($calls[$index],$call);
                 }
             }
+            unset($call);
         }
 
         foreach ($calls as &$call) {
@@ -640,8 +641,8 @@ class AmoCdrDaemon extends WorkerBase
                 $responsibleSettingName = $responsibleMap[$typeCall][$this->$settingName]??'';
                 $responsible            = $this->cdrRows[$call['id']][$responsibleSettingName]??0;
                 if (!empty($responsible)){
-                    $call['created_by'] = $responsible;
-                    $call['responsible_user_id'] = $responsible;
+                    $call['created_by']          = 1*$responsible;
+                    $call['responsible_user_id'] = 1*$responsible;
                 }
             }
             $call['params']['link']       = $this->getCreateFileAndLink($call['id'], $call['created_at']);
@@ -728,16 +729,16 @@ class AmoCdrDaemon extends WorkerBase
             $this->incompleteAnswered[$id]['type']  = $type;
 
             $settings = $this->entitySettings[$type][$call['did']]??$this->entitySettings[$type]['']??[];
-            if(empty($settings) && $settings['responsible'] === 'first'){
+            if(empty($settings) || $settings['responsible'] !== 'first'){
                 continue;
             }
             // Получим ответственного.
             $params = ['params' => ['phone' => $call['phone']]];
             if($settings['create_contact'] === '1' && !$contactExists){
                 $this->newContacts[$indexAction] = [
-                    'phone'       => $call['phone'],
-                    'contactName' => $this->replaceTagTemplate($settings['template_contact_name'], $params),
-                    'request_id'  => $indexAction,
+                    'phone'               => $call['phone'],
+                    'contactName'         => $this->replaceTagTemplate($settings['template_contact_name'], $params),
+                    'request_id'          => $indexAction,
                     'responsible_user_id' =>  $call['responsible'],
                 ];
             }
@@ -797,10 +798,10 @@ class AmoCdrDaemon extends WorkerBase
                     $calls[$phoneId][$index]['entity_id'] = 1*$contData['contactId'];
                 }elseif($settings['create_contact'] === '1'){
                     $this->newContacts[$indexAction] = [
-                        'phone'       => $phone,
-                        'contactName' => $this->replaceTagTemplate($settings['template_contact_name'], $call),
-                        'request_id'  => $indexAction,
-                        'responsible_user_id' =>  $responsible,
+                        'phone'               => $phone,
+                        'contactName'         => $this->replaceTagTemplate($settings['template_contact_name'], $call),
+                        'request_id'          => $indexAction,
+                        'responsible_user_id' => $responsible,
                     ];
                 }
 
