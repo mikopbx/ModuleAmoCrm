@@ -62,6 +62,7 @@ class AmoCdrDaemon extends WorkerBase
     private array $newUnsorted = [];
     private array $newTasks = [];
     private array $incompleteAnswered = [];
+    private array $createdLeads = []; // Кэш создана ли сделка для звонка. 1 звонок = 1 сделка
 
     // ВИДЫ ЗВОНКОВ.
     // Входящие
@@ -733,7 +734,7 @@ class AmoCdrDaemon extends WorkerBase
                 continue;
             }
             // Получим ответственного.
-            $params = ['params' => ['phone' => $call['phone']]];
+            $params = ['id' => $call['id'], 'params' => ['phone' => $call['phone']]];
             if($settings['create_contact'] === '1' && !$contactExists){
                 $this->newContacts[$indexAction] = [
                     'phone'               => $call['phone'],
@@ -809,6 +810,12 @@ class AmoCdrDaemon extends WorkerBase
                 $this->addNewTask($settings, $call, $contData);
                 $this->addNewUnsorted($settings,$calls, $call, $responsible);
             }
+        }
+
+        // Чистим кэш.
+        $tmpCalls = array_merge(... array_values($calls));
+        foreach ($tmpCalls as $tmpCall){
+            unset($this->createdLeads[$tmpCall['id']]);
         }
     }
 
@@ -938,9 +945,13 @@ class AmoCdrDaemon extends WorkerBase
     private function addNewLead($settings, $call, $contData, $responsible):void
     {
         $lead = $contData['leadId']??'';
-        if($settings['create_lead'] !== '1' || !empty($lead)){
+        if($settings['create_lead'] !== '1' || !empty($lead) || isset($this->createdLeads[$call['id']])){
+            // Лид уже был создан ранее
+            // Или Лид не должен быть создан.
             return;
         }
+        $this->createdLeads[$call['id']] = true;
+
         $indexAction = AmoCrmMain::getPhoneIndex($call['params']['phone']);
         $leadData = [
             'name'        =>  $this->replaceTagTemplate($settings['template_lead_name'], $call),
