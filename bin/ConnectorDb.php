@@ -121,9 +121,7 @@ class ConnectorDb extends WorkerBase
     {
         $this->updateSettings();
         $this->logger =  new Logger('ConnectorDb', 'ModuleAmoCrm');
-        $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
-        $this->logger->writeInfo($argv);
-
+        $this->logger->writeInfo($argv, 'Starting');
         $beanstalk      = new BeanstalkClient(self::class);
         $amoUsers       = ModuleAmoUsers::find('enable=1');
         foreach ($amoUsers as $user){
@@ -133,7 +131,7 @@ class ConnectorDb extends WorkerBase
             $this->users[1*$user->amoUserId] = preg_replace('/[D]/', '', $user->number);
         }
 
-        $this->logger->writeInfo($this->users);
+        $this->logger->writeInfo($this->users, 'amoCRM Users');
 
         $beanstalk->subscribe(self::class, [$this, 'onEvents']);
         $beanstalk->subscribe($this->makePingTubeName(self::class), [$this, 'pingCallBack']);
@@ -181,7 +179,6 @@ class ConnectorDb extends WorkerBase
             $tube->reply(false);
             return;
         }
-        // $this->logger->writeInfo($data);
         $res_data = [];
         if($data['action'] === 'entity-update'){
             $this->updatePhoneBook($data['data']['contacts']??[]);
@@ -223,22 +220,17 @@ class ConnectorDb extends WorkerBase
         }catch (\JsonException $e){
             return '';
         }
-        $downloadCacheDir = '/tmp/';
-        $tmpDir = '/tmp/';
-        $di = Di::getDefault();
-        if ($di) {
-            $dirsConfig = $di->getShared('config');
-            $tmoDirName = $dirsConfig->path('core.tempDir') . '/ModuleAmoCrm';
-            Util::mwMkdir($tmoDirName);
-            chown($tmoDirName, 'www');
-            if (file_exists($tmoDirName)) {
-                $tmpDir = $tmoDirName;
-            }
-
-            $downloadCacheDir = $dirsConfig->path('www.downloadCacheDir');
-            if (!file_exists($downloadCacheDir)) {
-                $downloadCacheDir = '';
-            }
+        $dirsConfig = $this->di->getShared('config');
+        $tmoDirName = $dirsConfig->path('core.tempDir') . '/ModuleAmoCrm';
+        Util::mwMkdir($tmoDirName, true);
+        if (file_exists($tmoDirName)) {
+            $tmpDir = $tmoDirName;
+        }else{
+            $tmpDir = '/tmp/';
+        }
+        $downloadCacheDir = $dirsConfig->path('www.downloadCacheDir');
+        if (!file_exists($downloadCacheDir)) {
+            $downloadCacheDir = '';
         }
         $fileBaseName = md5(microtime(true));
         // "temp-" in the filename is necessary for the file to be automatically deleted after 5 minutes.
@@ -501,17 +493,15 @@ class ConnectorDb extends WorkerBase
      */
     public function updateLeads(array $updates):void
     {
-        if(isset($updates['source'])){
-            $this->logger->writeInfo("Get task:". json_encode($updates, JSON_THROW_ON_ERROR));
-        }
         if(isset($updates['initTime'])){
-            $initTime = (int)$updates['initTime'];
-            if($initTime !== $this->initTime){
-                $this->initTime = $initTime;
-                $this->logger->writeInfo("New initTime: $initTime");
+            $initTimeValue = (int)$updates['initTime'];
+            if($initTimeValue !== $this->initTime){
+                $this->initTime = $initTimeValue;
+                $this->logger->writeInfo($initTimeValue, "New initTime");
             }
+        }elseif(isset($updates['source'])){
+            $this->logger->writeInfo($updates, "Get task");
         }
-
         $actions = ['update', 'add', 'delete'];
         foreach ($actions as $action){
             $leads = $updates[$action]??[];

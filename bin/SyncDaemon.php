@@ -140,7 +140,10 @@ class SyncDaemon extends WorkerBase
             $chunks   = array_chunk($result->data[$entityType], 25, false);
             foreach ($chunks as $chunk){
                 $this->logger->writeInfo($chunk);
-                $data = [ 'update' => $chunk];
+                $data = [
+                    'update' => $chunk,
+                    'source' => self::class
+                ];
                 if($this->initTime > 0){
                     $data['initTime'] = $this->initTime;
                 }
