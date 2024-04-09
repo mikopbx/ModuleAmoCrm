@@ -90,24 +90,32 @@ class Logger
     /**
      * Записать в лог ошибку.
      * @param $data
+     * @param string $preMessage
      * @return void
      */
-    public function writeError($data): void
+    public function writeError($data, string $preMessage=''): void
     {
         if ($this->debug) {
-            $this->logger->error($this->getDecodedString($data));
+            if(!empty($preMessage)){
+                $preMessage.= ': ';
+            }
+            $this->logger->error('['.getmypid().'] '.$preMessage.$this->getDecodedString($data));
         }
     }
 
     /**
      * Записать в лог информационное сообщение.
      * @param $data
+     * @param string $preMessage
      * @return void
      */
-    public function writeInfo($data): void
+    public function writeInfo($data, string $preMessage=''): void
     {
         if ($this->debug) {
-            $this->logger->info($this->getDecodedString($data));
+            if(!empty($preMessage)){
+                $preMessage.= ': ';
+            }
+            $this->logger->info('['.getmypid().'] '.$preMessage.$this->getDecodedString($data));
         }
     }
 
@@ -128,7 +136,7 @@ class Logger
         }else{
             $result = urldecode($printedData);
         }
-        return getmypid().': '.$result;
+        return $result;
     }
 
 }

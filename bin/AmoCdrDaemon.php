@@ -175,10 +175,10 @@ class AmoCdrDaemon extends WorkerBase
             ],
             'columns' => 'number,callerid,type'
         ];
-        $result = [];
+        $data = [];
         $extensions = Extensions::find($extensionFilter);
         foreach ($extensions as $extension){
-            $result[] = [
+            $data[] = [
                 'number' => $extension->number,
                 'name' => $extension->callerid,
                 'amoId' => $amoUsersArray[$extension->number]??'',
@@ -187,13 +187,14 @@ class AmoCdrDaemon extends WorkerBase
         }
         unset($extensions);
         // Оповещение только если изменилось состояние.
-        $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $result, 'action' => 'USERS']);
+        $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $data, 'action' => 'USERS']);
         if(!$result->success){
-            $this->logger->writeInfo("Update user list. Count: ".count($result));
+            $this->logger->writeError("Update user list. Count: ".count($data));
             try {
-                $this->logger->writeInfo("Result: ". json_encode($result, JSON_THROW_ON_ERROR));
+                $this->logger->writeError("Send data: ". json_encode($data, JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));
+                $this->logger->writeError("Result: ". json_encode($result, JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));
             }catch (Throwable $e){
-                $this->logger->writeInfo("Result: ". $e->getMessage());
+                $this->logger->writeError($e->getMessage());
             }
         }
     }
@@ -224,6 +225,7 @@ class AmoCdrDaemon extends WorkerBase
                     'responsible'         => $dstUser,
                     'type'                => null
                 ];
+                $this->logger->writeInfo($this->incompleteAnswered[$srcNum], "New incomplete answered");
             }
 
             $endTime    = '';
@@ -255,14 +257,8 @@ class AmoCdrDaemon extends WorkerBase
         }
         $md5Cdr = md5(print_r($params, true));
         if($md5Cdr !== $this->lastCacheCdr){
-            $this->logger->writeInfo("Update active call. Count: ".count($params));
             // Оповещаме только если изменилось состояние.
-            $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $params, 'action' => 'CDRs']);
-            try {
-                $this->logger->writeInfo("Result: ". json_encode($result, JSON_THROW_ON_ERROR));
-            }catch (Throwable $e){
-                $this->logger->writeInfo("Result: ". print_r($e->getMessage(), true));
-            }
+            ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $params, 'action' => 'CDRs']);
             $this->lastCacheCdr = $md5Cdr;
         }
     }
@@ -308,22 +304,25 @@ class AmoCdrDaemon extends WorkerBase
         }
         $callCounter = [];
         foreach ($rows as $row){
+            $id = $row['linkedid'];
             // Чистим незавершенные вызовы, если необходимо.
             $srcNum = AmoCrmMain::getPhoneIndex($row['src_num']);
             $dstNum = AmoCrmMain::getPhoneIndex($row['dst_num']);
+            $this->logger->writeInfo("From $srcNum to $dstNum, linkedid: $id, UNIQUEID:{$row['UNIQUEID']}, id: {$row['id']}");
             if(isset($this->incompleteAnswered[$srcNum])){
-                $this->cdrRows[$row['linkedid']]['incompleteType'] = $this->incompleteAnswered[$srcNum]['type'];
+                $this->cdrRows[$id]['incompleteType'] = $this->incompleteAnswered[$srcNum]['type'];
             }
             unset($this->incompleteAnswered[$srcNum],$this->incompleteAnswered[$dstNum]);
             if(file_exists($row['recordingfile'])){
-                $this->cdrRows[$row['linkedid']]['records'][] = $row['recordingfile'];
-                $this->cdrRows[$row['linkedid']]['duration'] += 1*$row['billsec'];
+                $this->cdrRows[$id]['records'][] = $row['recordingfile'];
+                $this->cdrRows[$id]['duration'] += 1*$row['billsec'];
             }
             if( in_array($srcNum, $this->innerNums, true)
                 && in_array($dstNum, $this->innerNums, true)){
                 // Это внутренний разговор.
                 // Не переносим его в AMO.
                 $this->offset = max($this->offset,$row['id']);
+                $this->logger->writeInfo("Is Inner call... linkedid: $id");
                 continue;
             }
             $phoneCol  = 'src_num';
@@ -345,35 +344,38 @@ class AmoCdrDaemon extends WorkerBase
                 $userPhone = '';
             }else{
                 $this->offset = max($this->offset,$row['id']);
+                $this->logger->writeInfo("Is unknown call... linkedid: $id");
                 continue;
             }
-            if(!isset($this->cdrRows[$row['linkedid']])){
-                $this->cdrRows[$row['linkedid']]['first']    = $row['UNIQUEID'];
-                $this->cdrRows[$row['linkedid']]['haveUser'] = false;
-                $this->cdrRows[$row['linkedid']]['duration'] = 0;
+            if(!isset($this->cdrRows[$id])){
+                $this->cdrRows[$id]['first']    = $row['UNIQUEID'];
+                $this->cdrRows[$id]['haveUser'] = false;
+                $this->cdrRows[$id]['duration'] = 0;
             }
 
             if($row['billsec'] < 1){
                 // Пропущенный вызов.
                 $call_status = 6;
                 $link = '';
-                $this->cdrRows[$row['linkedid']]['answered'] |= false;
-                $this->setMissedData($row['linkedid'], $row['start'], $amoUserId);
+                $this->cdrRows[$id]['answered'] |= false;
+                $this->setMissedData($id, $row['start'], $amoUserId);
             }else{
                 // Это точно не пропущенный вызов.
-                $this->cdrRows[$row['linkedid']]['answered'] |= true;
+                $this->cdrRows[$id]['answered'] |= true;
                 $link = "https://$this->extHostname/pbxcore/api/amo-crm/playback?view={$row['recordingfile']}";
                 $call_status = 4;
-                $this->setAnswerData($row['linkedid'], $row['answer'], $amoUserId);
+                $this->setAnswerData($id, $row['answer'], $amoUserId);
             }
-            $this->cdrRows[$row['linkedid']]['haveUser'] |= ($row['is_app'] !== '1');
+            $this->cdrRows[$id]['haveUser'] |= ($row['is_app'] !== '1');
 
             $this->offset = max($this->offset,$row['id']);
             $created_at = $this->getTimestamp($row['start'], $row['UNIQUEID']);
             if($created_at === 0){
+                $this->logger->writeInfo("Skip it: fail parse date: {$row['start']}, linkedid: $id");
                 continue;
             }
             if(strlen($row[$phoneCol])<5){
+                $this->logger->writeInfo("Skip it: str len: {$row[$phoneCol]} < 5, linkedid: $id");
                 continue;
             }
             $call = [
@@ -389,17 +391,17 @@ class AmoCdrDaemon extends WorkerBase
                     'phone'     => $row[$phoneCol],
                     'call_status' => $call_status,
                 ],
-                'id'                  => $row['linkedid'],
+                'id'                  => $id,
                 'is_app'              => $row['is_app'],
             ];
             if(!empty($row['did'])){
-                $this->cdrRows[$row['linkedid']]['did'] = $row['did'];
+                $this->cdrRows[$id]['did'] = $row['did'];
                 $call['params']['call_result'] = "dst: $userPhone, did: {$row['did']}";
             }
-            if(!isset($callCounter[$row['linkedid']])){
-                $callCounter[$row['linkedid']] = 1;
+            if(!isset($callCounter[$id])){
+                $callCounter[$id] = 1;
             }else{
-                $callCounter[$row['linkedid']]++;
+                $callCounter[$id]++;
             }
 
             if(isset($amoUserId)){
@@ -411,13 +413,18 @@ class AmoCdrDaemon extends WorkerBase
 
             $calls[$phoneId][] = $call;
             $this->cdrRows[$row['UNIQUEID']] = $call;
+            $this->logger->writeInfo($call, "Result call data");
         }
 
         ////
         // Обработка и создание контактов
         ////
-        $this->prepareDataCreatingEntities($calls, $callCounter);
-
+        $ok = $this->prepareDataCreatingEntities($calls, $callCounter);
+        if($ok === false){
+            $this->offset = $oldOffset;
+            // Произошел сбой, повторим запрос через некоторое время.
+            return;
+        }
         ////
         // Создание сущностей amoCRM
         ////
@@ -448,6 +455,7 @@ class AmoCdrDaemon extends WorkerBase
                 continue;
             }
             if(!empty($call['lead']) || !empty($call['client']) || !empty($call['company'])){
+                $this->logger->writeInfo($call, "alertIncompleteAnswered");
                 ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $call, 'action' => 'open-card']);
             }
             $this->incompleteAnswered[$id]['finished'] = true;
@@ -532,22 +540,23 @@ class AmoCdrDaemon extends WorkerBase
     {
         $calls  = array_merge(... array_values($calls));
         if(!empty($calls)){
-            $this->logger->writeInfo("CDR synchronization. Step 1. Count: ".count($calls));
+            $this->logger->writeInfo($calls, "CDR synchronization. Step 1 Count: ".count($calls));
+            $calls = $this->cleanCalls($calls, $callCounter);
         }
-        $calls = $this->cleanCalls($calls, $callCounter);
         if(empty($calls)){
             return;
         }
-        $this->logger->writeInfo("CDR synchronization. Step 2. Count: ".count($calls));
-
+        $this->logger->writeInfo($calls, "CDR synchronization. Step 2. Count: ".count($calls));
+        $ids = '';
+        foreach ($calls as &$call) {
+            $ids.= $call['id'].'|';
+            unset($call['id'],$call['is_app'],$call['did']);
+        }
+        unset($call);
         // Пытаемся добавить вызовы. Это получится, если контакты существуют.
         $result = WorkerAmoHTTP::invokeAmoApi('addCalls', [$calls]);
-        try {
-            $this->logger->writeInfo("Create calls (REQ):". json_encode($calls, JSON_THROW_ON_ERROR));
-            $this->logger->writeInfo("Create calls (RES):". json_encode($result, JSON_THROW_ON_ERROR));
-        }catch (Throwable $e){
-            $this->logger->writeInfo("CDR synchronization. " . $e->getMessage());
-        }
+        $this->logger->writeInfo($calls, "Create calls (REQ): $ids");
+        $this->logger->writeInfo($result, "Create calls (RES): $ids");
     }
 
     /**
@@ -558,9 +567,6 @@ class AmoCdrDaemon extends WorkerBase
      */
     private function cleanCalls($calls, $callCounter):array
     {
-        if(empty($calls)){
-            return [];
-        }
         if($this->disableDetailedCdr){
             $calls = $this->reduceCdr($calls);
         }else{
@@ -570,27 +576,27 @@ class AmoCdrDaemon extends WorkerBase
                 }
                 $haveUser = $this->cdrRows[$call['id']]['haveUser'] === 1;
                 if(!isset($call['responsible_user_id']) && $haveUser){
+                    $this->logger->writeError($call, "Unsetted responsible_user_id for {$call['id']}, drop it");
                     unset($calls[$index], $call);
                     continue;
                 }
                 if($call['is_app'] === '1' && $haveUser) {
                     // Этот вызов был направлен на сотрудника.
                     // Все вызовы на приложения чистим.
+                    $this->logger->writeInfo($call, "Is app {$call['id']}, drop it");
                     unset($calls[$index], $call);
                 }elseif($this->cdrRows[$call['id']]['first'] !== $call['params']['uniq'] && $haveUser === false){
                     // Этот вызов не попал на сотрудников, только приложения
                     // Оставляем только вызов на первое приложение
+                    $this->logger->writeInfo($call, "Is app only {$call['id']}, drop it");
                     unset($calls[$index], $call);
                 }elseif( $this->cdrRows[$call['id']]['answered'] === 1 && $call['params']['call_status'] === 6 && $haveUser){
                     // Если вызов отвечен, то не следует загружать информацию о пропущенных.
+                    $this->logger->writeInfo($call, "The Cdr was missed, the call was answered {$call['id']}, drop it");
                     unset($calls[$index],$call);
                 }
             }
             unset($call);
-        }
-
-        foreach ($calls as &$call) {
-            unset($call['id'],$call['is_app'],$call['did']);
         }
         return $calls;
     }
@@ -631,15 +637,20 @@ class AmoCdrDaemon extends WorkerBase
 
         foreach ($calls as $call) {
             if(isset($resCalls[$call['id']])){
+                $this->logger->writeError($call, "A call with this ID has been processed {$call['id']}, drop it");
                 continue;
             }
             $typeCall = $this->cdrRows[$call['id']]['type']??'';
             if(empty($typeCall) ){
+                $this->logger->writeError($call, "the type of call is not defined {$call['id']}, drop it");
                 continue;
             }
-            $settingName            = $responsibleMap[$typeCall]['settingName']??'';
+            $this->logger->writeInfo($call, "Successful cdr verification {$call['id']}");
+            $settingName = $responsibleMap[$typeCall]['settingName']??'';
+            $this->logger->writeInfo($settingName, "Responsible map {$call['id']}");
             if(!empty($settingName)){
                 $responsibleSettingName = $responsibleMap[$typeCall][$this->$settingName]??'';
+                $this->logger->writeInfo($responsibleMap[$typeCall], "Responsible map settings {$call['id']}");
                 $responsible            = $this->cdrRows[$call['id']][$responsibleSettingName]??0;
                 if (!empty($responsible)){
                     $call['created_by']          = 1*$responsible;
@@ -654,6 +665,8 @@ class AmoCdrDaemon extends WorkerBase
                 $call['params']['call_status'] = 6;
             }
             $resCalls[$call['id']] = $call;
+            $this->logger->writeInfo($settingName, "Result cdr {$call['id']}");
+
         }
         return array_values($resCalls);
     }
@@ -700,25 +713,39 @@ class AmoCdrDaemon extends WorkerBase
      * Подготавливает данные для создания сделок / контактов / задач.
      * @param array $calls
      * @param array $callCounter
+     * @return void
      */
-    private function prepareDataCreatingEntities(array &$calls, array &$callCounter):void
+    private function prepareDataCreatingEntities(array &$calls, array &$callCounter):bool
     {
         $this->newContacts = [];
         $this->newLeads = [];
         $this->newUnsorted = [];
         $this->newTasks = [];
 
-        $phones = array_merge(array_keys($this->incompleteAnswered), array_keys($calls));
-        $contactsData = ConnectorDb::invoke('getContactsData', [array_unique($phones)]);
+        $phones       = array_unique(array_merge(array_keys($this->incompleteAnswered), array_keys($calls)));
+        $contactsData = ConnectorDb::invoke('getContactsData', [$phones]);
+        if(count($phones) !== count($contactsData)){
+            // getContactsData - должен вернуть столько элементов, сколько передано уникальных номеров телевонов.
+            $this->logger->writeError($contactsData, "An incorrect response was received when requesting getContactsData");
+            return false;
+        }
         // Не завершенные вызовы
         foreach ($this->incompleteAnswered as $id => $call){
             if(isset($this->incompleteAnswered[$id]['finished'])){
+                if(!isset($this->incompleteAnswered[$id]['skip'])){
+                    $this->logger->writeInfo($this->incompleteAnswered[$id], "Call was finished (incompleteAnswered), skip it)");
+                }
+                $this->incompleteAnswered[$id]['skip'] = true;
                 continue;
             }
+            $this->logger->writeInfo($call, "Check incomplete answered call");
+
             $indexAction   = AmoCrmMain::getPhoneIndex($call['phone']);
             $contData      = $contactsData[$indexAction];
             $contactId     = $contData['contactId']??null;
             $contactExists = !empty($contactId);
+
+            $this->logger->writeInfo($contData, "Contact data for id: {$call['id']}");
 
             if($contactExists){
                 $this->incompleteAnswered[$id]['client']  =  $contData['contactId'];
@@ -731,9 +758,9 @@ class AmoCdrDaemon extends WorkerBase
 
             $settings = $this->entitySettings[$type][$call['did']]??$this->entitySettings[$type]['']??[];
             if(empty($settings) || $settings['responsible'] !== 'first'){
+                $this->logger->writeInfo($settings, "Automatic card opening for incoming calls only: {$call['id']}");
                 continue;
             }
-            // Получим ответственного.
             $params = ['id' => $call['id'], 'params' => ['phone' => $call['phone']]];
             if($settings['create_contact'] === '1' && !$contactExists){
                 $this->newContacts[$indexAction] = [
@@ -742,6 +769,7 @@ class AmoCdrDaemon extends WorkerBase
                     'request_id'          => $indexAction,
                     'responsible_user_id' =>  $call['responsible'],
                 ];
+                $this->logger->writeInfo("Need add contact: {$call['id']}");
             }
             $this->addNewLead($settings, $params, $contData, $call['responsible']);
             unset($params);
@@ -749,16 +777,20 @@ class AmoCdrDaemon extends WorkerBase
         // Завершенные вызовы.
         foreach ($calls as $phoneId => $subCalls){
             foreach ($subCalls as $index => $call) {
+                $this->logger->writeInfo($call, "Complete call: {$call['id']}");
                 if($this->cdrRows[$call['id']]['answered'] === 1 && $call['params']['duration'] === 0){
+                    $this->logger->writeInfo("Сdr not answered the call was generally answered: {$call['id']}. skip it");
                     $callCounter[$call['id']]--;
                     unset($calls[$phoneId][$index],$call);
                     continue;
                 }
                 if (isset($this->cdrRows[$call['id']]['type'])) {
+                    $this->logger->writeInfo("The type of call has already been determined earlier: {$call['id']}. skip it");
                     continue;
                 }
                 $phone         = $call['params']['phone'];
                 $contData      = $contactsData[$phoneId];
+                $this->logger->writeInfo($contData, "Contact data for id: {$call['id']}");
 
                 $contactId     = $contData['contactId']??null;
                 $contactExists = !empty($contactId);
@@ -774,7 +806,10 @@ class AmoCdrDaemon extends WorkerBase
                 }
                 $this->cdrRows[$call['id']]['type'] = $type;
                 $settings = $this->entitySettings[$type][$did]??$this->entitySettings[$type]['']??[];
+
+                $this->logger->writeInfo($settings, "the type of call: $type, id: {$call['id']}");
                 if(empty($settings)){
+                    $this->logger->writeInfo('skip it', "the type of call: $type, id: {$call['id']}");
                     // Нет настроек для этого типа звонка.
                     // Ничего не делаем, не загружаем.
                     if(!$contactExists){
@@ -804,6 +839,7 @@ class AmoCdrDaemon extends WorkerBase
                         'request_id'          => $indexAction,
                         'responsible_user_id' => $responsible,
                     ];
+                    $this->logger->writeInfo("Need add contact: {$call['id']}");
                 }
 
                 $this->addNewLead($settings, $call, $contData, $responsible);
@@ -817,6 +853,8 @@ class AmoCdrDaemon extends WorkerBase
         foreach ($tmpCalls as $tmpCall){
             unset($this->createdLeads[$tmpCall['id']]);
         }
+
+        return true;
     }
 
     /**
@@ -950,6 +988,8 @@ class AmoCdrDaemon extends WorkerBase
             // Или Лид не должен быть создан.
             return;
         }
+        $this->logger->writeInfo("Need add Lead: {$call['id']}");
+
         $this->createdLeads[$call['id']] = true;
 
         $indexAction = AmoCrmMain::getPhoneIndex($call['params']['phone']);
@@ -1008,6 +1048,7 @@ class AmoCdrDaemon extends WorkerBase
 
     /**
      * Создание контактов на оснве подготовленных данных.
+     * @param $calls
      * @return void
      */
     private function createContacts(&$calls):void
@@ -1018,7 +1059,6 @@ class AmoCdrDaemon extends WorkerBase
         $contactsData = [
             'add' => []
         ];
-        
         $resultCreateContacts = WorkerAmoHTTP::invokeAmoApi('createContacts', [$this->newContacts]);
         $contacts = $resultCreateContacts->data['_embedded']['contacts']??[];
         foreach ($contacts as $contact){
@@ -1067,12 +1107,8 @@ class AmoCdrDaemon extends WorkerBase
             
         }
         if(!$resultCreateContacts->success){
-            try {
-                $this->logger->writeInfo("Error create contacts:". json_encode($this->newContacts, JSON_THROW_ON_ERROR));
-                $this->logger->writeInfo("Error create contacts:". json_encode($resultCreateContacts, JSON_THROW_ON_ERROR));
-            }catch (Throwable $e){
-                $this->logger->writeError($e->getMessage());
-            }
+            $this->logger->writeError($this->newContacts, "Error create contacts");
+            $this->logger->writeError($resultCreateContacts, "Error create contacts");
         }
         // Сохраним данные о контакте в базе.
         ConnectorDb::invoke('updatePhoneBook', [$contactsData], false);
@@ -1111,15 +1147,10 @@ class AmoCdrDaemon extends WorkerBase
             ];
         }
         if(!$resultCreateLeads->success) {
-            try {
-                $this->logger->writeInfo("Error create tasks (REQ):". json_encode($this->newLeads, JSON_THROW_ON_ERROR));
-                $this->logger->writeInfo("Error create leads (RES):". json_encode($resultCreateLeads, JSON_THROW_ON_ERROR));
-            }catch (Throwable $e){
-                $this->logger->writeError($e->getMessage());
-            }
+            $this->logger->writeError($this->newLeads, "Error create tasks (REQ)");
+            $this->logger->writeError($resultCreateLeads, "Error create leads (RES):");
         }
-
-        $this->logger->writeInfo("Send task 'updateLeads':". json_encode($leadData, JSON_THROW_ON_ERROR));
+        $this->logger->writeInfo($leadData, "Send task 'updateLeads'");
         ConnectorDb::invoke('updateLeads', [$leadData], false);
     }
 
@@ -1134,12 +1165,8 @@ class AmoCdrDaemon extends WorkerBase
         }
         $resultCreateTasks    = WorkerAmoHTTP::invokeAmoApi('addTasks', [array_values($this->newTasks)]);
         if(!$resultCreateTasks->success) {
-            try {
-                $this->logger->writeInfo("Error create tasks (REQ):". json_encode($this->newTasks, JSON_THROW_ON_ERROR));
-                $this->logger->writeInfo("Error create tasks (RES):". json_encode($resultCreateTasks,JSON_THROW_ON_ERROR));
-            }catch (Throwable $e){
-                $this->logger->writeError("Error:".$e->getMessage());
-            }
+            $this->logger->writeError($this->newTasks, "Error create tasks (REQ)");
+            $this->logger->writeError($resultCreateTasks, "Error create tasks (RES)");
         }
     }
 
@@ -1161,12 +1188,8 @@ class AmoCdrDaemon extends WorkerBase
                 ConnectorDb::invoke('addContactLeadFromUnsorted', [$phone, $contactId, $leadId]);
             }
         }else{
-            try {
-                $this->logger->writeInfo("Error create unsorted (REQ):". json_encode($this->newUnsorted, JSON_THROW_ON_ERROR));
-                $this->logger->writeInfo("Error create unsorted (RES):". json_encode($resultCreateUnsorted, JSON_THROW_ON_ERROR));
-            }catch (Throwable $e){
-                $this->logger->writeError("Error:".$e->getMessage());
-            }
+            $this->logger->writeError($this->newUnsorted, "Error create unsorted (REQ)");
+            $this->logger->writeError($resultCreateUnsorted, "Error create unsorted (RES)");
        }
     }
 }
