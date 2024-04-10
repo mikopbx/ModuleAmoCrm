@@ -506,18 +506,38 @@ class ConnectorDb extends WorkerBase
         foreach ($actions as $action){
             $leads = $updates[$action]??[];
             foreach ($leads as $lead){
-                $oldData = ModuleAmoLeads::find("idAmo='{$lead['id']}'");
-                foreach ($oldData as $oldRecord){
-                    $oldRecord->delete();
-                }
-                unset($oldData);
-                if($action === 'delete'){
-                    continue;
-                }
                 $contacts = $lead['_embedded']['contacts']??[];
                 $company  = $lead['_embedded']['companies'][0]['id']??'';
+
+                $oldData = ModuleAmoLeads::find("idAmo='{$lead['id']}' AND {$this->portalId}=portalId");
+                if($action === 'delete'){
+                    $this->logger->writeInfo($lead, "Remove all lead data (action '$action')");
+                    $oldData->delete();
+                    unset($oldData);
+                    continue;
+                }
+                foreach ($oldData as $oldRecord){
+                    $haveContact = false;
+                    foreach ($contacts as $contact) {
+                        if(1*$oldRecord->contactId === $contact['id']){
+                            $haveContact = true;
+                        }
+                    }
+                    if($oldRecord->contactId === '' && $company === 1*$oldRecord->companyId){
+                        $haveContact = true;
+                    }
+                    if($haveContact === false){
+                        $this->logger->writeInfo($oldRecord->toArray(), "Remove data for removed contact (action '$action')");
+                        $oldRecord->delete();
+                    }
+                }
+                unset($oldData);
+
                 foreach ($contacts as $contact){
-                    $newRecord = new ModuleAmoLeads();
+                    $newRecord = ModuleAmoLeads::findFirst("idAmo='{$lead['id']}' AND contactId={$contact['id']} AND {$this->portalId}=portalId");
+                    if(!$newRecord){
+                        $newRecord = new ModuleAmoLeads();
+                    }
                     $newRecord->portalId            = $this->portalId;
                     $newRecord->idAmo               = $lead['id'];
                     $newRecord->name                = $lead['name'];
@@ -534,7 +554,10 @@ class ConnectorDb extends WorkerBase
                     }
                 }
                 if(!empty($company) && count($contacts) === 0){
-                    $newRecord = new ModuleAmoLeads();
+                    $newRecord = ModuleAmoLeads::findFirst("idAmo='{$lead['id']}' AND companyId={$company} AND {$this->portalId}=portalId");
+                    if(!$newRecord){
+                        $newRecord = new ModuleAmoLeads();
+                    }
                     $newRecord->portalId            = $this->portalId;
                     $newRecord->idAmo               = $lead['id'];
                     $newRecord->name                = $lead['name'];
