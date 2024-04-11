@@ -555,6 +555,7 @@ class ConnectorDb extends WorkerBase
                 unset($oldData);
 
                 if($isSync){
+                    // В этом случае есть данные о контактах.
                     foreach ($contacts as $contact) {
                         $newRecord = $this->findOrCreateAmoLead($lead['id'], $contact['id']);
                         $newRecord->portalId = $this->portalId;
@@ -585,7 +586,7 @@ class ConnectorDb extends WorkerBase
                         $this->saveAmoLead($newRecord, $lead);
                     }
                 }else{
-                    // Поиск записи в базе данных по указанным условиям
+                    // В этом случае нет информации о контактах. Обновляем поля сделки.
                     $records = ModuleAmoLeads::find("idAmo = '{$lead['id']}' AND $this->portalId = portalId");
                     foreach ($records as $record){
                         $record->name = $lead['name'];
