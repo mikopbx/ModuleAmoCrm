@@ -186,7 +186,6 @@ class AmoCdrDaemon extends WorkerBase
             ];
         }
         unset($extensions);
-        // Оповещение только если изменилось состояние.
         $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $data, 'action' => 'USERS']);
         if(!$result->success){
             $this->logger->writeError("Update user list. Count: ".count($data));

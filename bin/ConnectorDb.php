@@ -493,6 +493,7 @@ class ConnectorDb extends WorkerBase
      */
     public function updateLeads(array $updates):void
     {
+        $isSync = true;
         if(isset($updates['initTime'])){
             $initTimeValue = (int)$updates['initTime'];
             if($initTimeValue !== $this->initTime){
@@ -501,6 +502,9 @@ class ConnectorDb extends WorkerBase
             }
         }elseif(isset($updates['source'])){
             $this->logger->writeInfo($updates, "Get task");
+        }else{
+            $isSync = false;
+            $this->logger->writeInfo($updates, "Get other task");
         }
         $actions = ['update', 'add', 'delete'];
         foreach ($actions as $action){
@@ -526,7 +530,7 @@ class ConnectorDb extends WorkerBase
                     if($oldRecord->contactId === '' && $company === 1*$oldRecord->companyId){
                         $haveContact = true;
                     }
-                    if($haveContact === false){
+                    if($haveContact === false && $isSync){
                         $this->logger->writeInfo($oldRecord->toArray(), "Remove data for removed contact (action '$action')");
                         $oldRecord->delete();
                     }
