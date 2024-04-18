@@ -95,40 +95,61 @@ define(function (require) {
             });
         },
         initSocket: function (chan){
-            let url = `${window.location.protocol}//${self.settings.pbxHost}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`;
-            $.ajax(url, {
-                timeout:5000,
-                type: 'GET',
-                success: (response) => {
-                    let protocol = 'wss:';
-                    if(window.location.protocol === 'http:'){
-                        protocol = 'ws:';
-                    }
-                    self.eventSource[chan] = new WebSocket(`${protocol}//${self.settings.pbxHost}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`);
-                    self.eventSource[chan].onopen = function() {
-                        console.debug('onopen ws MikoPBX:', chan);
-                    };
-                    self.eventSource[chan].onmessage = self.onPbxMessage;
-                    self.eventSource[chan].onclose = function(e) {
-                        console.debug('chan', 'Socket MikoPBX is closed. Reconnect will be attempted in 1 second.', e.reason);
-                        setTimeout(function() {
-                            self.initSocket(chan);
-                        }, 1000);
-                    };
-                    self.eventSource[chan].onerror = function(err) {
-                        console.debug('chan', 'Socket MikoPBX encountered error: ', err.message, 'Closing socket');
-                        setTimeout(function() {
-                            self.initSocket(chan);
-                        }, 5000);
-                    };
-                }
-            })
-            .fail((jqXHR, textStatus) => {
-                if(jqXHR.status === 403){
-                    delete  self.eventSource[chan];
-                    PubSub.publish('CALLS', {action: "error", code: 'errorAuthAPI'});
-                }
-            });
+            let protocol = 'wss:';
+            if(window.location.protocol === 'http:'){
+                protocol = 'ws:';
+            }
+            self.eventSource[chan] = new WebSocket(`${protocol}//${self.settings.pbxHost}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`);
+            self.eventSource[chan].onopen = function() {
+                console.debug('onopen ws MikoPBX:', chan);
+            };
+            self.eventSource[chan].onmessage = self.onPbxMessage;
+            self.eventSource[chan].onclose = function(e) {
+                console.debug('chan', 'Socket MikoPBX is closed. Reconnect will be attempted in 1 second.', e.reason);
+                setTimeout(function() {
+                    self.initSocket(chan);
+                }, 1000);
+            };
+            self.eventSource[chan].onerror = function(err) {
+                console.debug('chan', 'Socket MikoPBX encountered error: ', err.message, 'Closing socket');
+                setTimeout(function() {
+                    self.initSocket(chan);
+                }, 5000);
+            };
+            // let url = `${window.location.protocol}//${self.settings.pbxHost}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`;
+            // $.ajax(url, {
+            //     timeout:5000,
+            //     type: 'GET',
+            //     success: (response) => {
+            //         let protocol = 'wss:';
+            //         if(window.location.protocol === 'http:'){
+            //             protocol = 'ws:';
+            //         }
+            //         self.eventSource[chan] = new WebSocket(`${protocol}//${self.settings.pbxHost}/pbxcore/api/nchan/sub/${chan}?token=${self.settings.token}`);
+            //         self.eventSource[chan].onopen = function() {
+            //             console.debug('onopen ws MikoPBX:', chan);
+            //         };
+            //         self.eventSource[chan].onmessage = self.onPbxMessage;
+            //         self.eventSource[chan].onclose = function(e) {
+            //             console.debug('chan', 'Socket MikoPBX is closed. Reconnect will be attempted in 1 second.', e.reason);
+            //             setTimeout(function() {
+            //                 self.initSocket(chan);
+            //             }, 1000);
+            //         };
+            //         self.eventSource[chan].onerror = function(err) {
+            //             console.debug('chan', 'Socket MikoPBX encountered error: ', err.message, 'Closing socket');
+            //             setTimeout(function() {
+            //                 self.initSocket(chan);
+            //             }, 5000);
+            //         };
+            //     }
+            // })
+            // .fail((jqXHR, textStatus) => {
+            //     if(jqXHR.status === 403){
+            //         delete  self.eventSource[chan];
+            //         PubSub.publish('CALLS', {action: "error", code: 'errorAuthAPI'});
+            //     }
+            // });
         },
 
         onPbxMessage: function(event) {

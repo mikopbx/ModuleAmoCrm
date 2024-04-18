@@ -121,9 +121,7 @@ class ConnectorDb extends WorkerBase
     {
         $this->updateSettings();
         $this->logger =  new Logger('ConnectorDb', 'ModuleAmoCrm');
-        $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
-        $this->logger->writeInfo($argv);
-
+        $this->logger->writeInfo($argv, 'Starting');
         $beanstalk      = new BeanstalkClient(self::class);
         $amoUsers       = ModuleAmoUsers::find('enable=1');
         foreach ($amoUsers as $user){
@@ -133,7 +131,7 @@ class ConnectorDb extends WorkerBase
             $this->users[1*$user->amoUserId] = preg_replace('/[D]/', '', $user->number);
         }
 
-        $this->logger->writeInfo($this->users);
+        $this->logger->writeInfo($this->users, 'amoCRM Users');
 
         $beanstalk->subscribe(self::class, [$this, 'onEvents']);
         $beanstalk->subscribe($this->makePingTubeName(self::class), [$this, 'pingCallBack']);
@@ -181,7 +179,6 @@ class ConnectorDb extends WorkerBase
             $tube->reply(false);
             return;
         }
-        // $this->logger->writeInfo($data);
         $res_data = [];
         if($data['action'] === 'entity-update'){
             $this->updatePhoneBook($data['data']['contacts']??[]);
@@ -212,6 +209,17 @@ class ConnectorDb extends WorkerBase
     }
 
     /**
+     * Обновление данных сущности через REST.
+     * @param $data
+     * @return void
+     */
+    public function entityUpdate($data):void
+    {
+        $this->updatePhoneBook($data['contacts']??[]);
+        $this->updateLeads($data['leads']??[]);
+    }
+
+    /**
      * Сериализует данные и сохраняет их во временный файл.
      * @param $data
      * @return string
@@ -223,22 +231,17 @@ class ConnectorDb extends WorkerBase
         }catch (\JsonException $e){
             return '';
         }
-        $downloadCacheDir = '/tmp/';
-        $tmpDir = '/tmp/';
-        $di = Di::getDefault();
-        if ($di) {
-            $dirsConfig = $di->getShared('config');
-            $tmoDirName = $dirsConfig->path('core.tempDir') . '/ModuleAmoCrm';
-            Util::mwMkdir($tmoDirName);
-            chown($tmoDirName, 'www');
-            if (file_exists($tmoDirName)) {
-                $tmpDir = $tmoDirName;
-            }
-
-            $downloadCacheDir = $dirsConfig->path('www.downloadCacheDir');
-            if (!file_exists($downloadCacheDir)) {
-                $downloadCacheDir = '';
-            }
+        $dirsConfig = $this->di->getShared('config');
+        $tmoDirName = $dirsConfig->path('core.tempDir') . '/ModuleAmoCrm';
+        Util::mwMkdir($tmoDirName, true);
+        if (file_exists($tmoDirName)) {
+            $tmpDir = $tmoDirName;
+        }else{
+            $tmpDir = '/tmp/';
+        }
+        $downloadCacheDir = $dirsConfig->path('www.downloadCacheDir');
+        if (!file_exists($downloadCacheDir)) {
+            $downloadCacheDir = '';
         }
         $fileBaseName = md5(microtime(true));
         // "temp-" in the filename is necessary for the file to be automatically deleted after 5 minutes.
@@ -501,66 +504,146 @@ class ConnectorDb extends WorkerBase
      */
     public function updateLeads(array $updates):void
     {
-        if(isset($updates['source'])){
-            $this->logger->writeInfo("Get task:". json_encode($updates, JSON_THROW_ON_ERROR));
-        }
-        if(isset($updates['initTime'])){
-            $initTime = (int)$updates['initTime'];
-            if($initTime !== $this->initTime){
-                $this->initTime = $initTime;
-                $this->logger->writeInfo("New initTime: $initTime");
+        $isSync = true;
+        if (isset($updates['initTime'])) {
+            $initTimeValue = (int)$updates['initTime'];
+            if ($initTimeValue !== $this->initTime) {
+                $this->initTime = $initTimeValue;
+                $logMessage = "Updated initTime to $initTimeValue";
             }
+        } elseif (isset($updates['source'])) {
+            $logMessage = "Received task";
+        } else {
+            $isSync = false;
+            $logMessage = "Received other task";
         }
+        $this->logger->writeInfo($updates, $logMessage);
 
         $actions = ['update', 'add', 'delete'];
         foreach ($actions as $action){
             $leads = $updates[$action]??[];
             foreach ($leads as $lead){
-                $oldData = ModuleAmoLeads::find("idAmo='{$lead['id']}'");
-                foreach ($oldData as $oldRecord){
-                    $oldRecord->delete();
-                }
-                unset($oldData);
-                if($action === 'delete'){
-                    continue;
-                }
                 $contacts = $lead['_embedded']['contacts']??[];
                 $company  = $lead['_embedded']['companies'][0]['id']??'';
-                foreach ($contacts as $contact){
-                    $newRecord = new ModuleAmoLeads();
-                    $newRecord->portalId            = $this->portalId;
-                    $newRecord->idAmo               = $lead['id'];
-                    $newRecord->name                = $lead['name'];
-                    $newRecord->responsible_user_id = $lead['responsible_user_id'];
-                    $newRecord->status_id           = $lead['status_id'];
-                    $newRecord->pipeline_id         = $lead['pipeline_id'];
-                    $newRecord->contactId           = $contact['id'];
-                    $newRecord->companyId           = $company;
-                    $newRecord->isMainContact       = $contact['is_main']?'1':'0';
-                    $newRecord->closed_at           = $lead['closed_at']??0;
-                    $newRecord->initTime            = $this->initTime;
-                    if(!$newRecord->save()){
-                        $this->logger->writeError(['error' => 'Fail save contact', 'msg' => $newRecord->getMessages(), 'data' => $contact]);
+
+                $oldData = ModuleAmoLeads::find("idAmo='{$lead['id']}' AND {$this->portalId}=portalId");
+                if($action === 'delete'){
+                    $this->logger->writeInfo($lead, "Remove all lead data (action '$action')");
+                    $oldData->delete();
+                    unset($oldData);
+                    continue;
+                }
+                if ($isSync) {
+                    foreach ($oldData as $oldRecord) {
+                        $haveContact = false;
+                        foreach ($contacts as $contact) {
+                            if ((int)$oldRecord->contactId === $contact['id']) {
+                                $haveContact = true;
+                                break;
+                            }
+                        }
+                        // Если контакт не найден и $oldRecord->contactId пустой и $company совпадает, считаем, что контакт есть
+                        if (!$haveContact && $oldRecord->contactId === '' && $company === (int)$oldRecord->companyId) {
+                            $haveContact = true;
+                        }
+                        if (!$haveContact) {
+                            $this->logger->writeInfo($oldRecord->toArray(), "Remove data for removed contact (action '$action')");
+                            $oldRecord->delete();
+                        }
                     }
                 }
-                if(!empty($company) && count($contacts) === 0){
-                    $newRecord = new ModuleAmoLeads();
-                    $newRecord->portalId            = $this->portalId;
-                    $newRecord->idAmo               = $lead['id'];
-                    $newRecord->name                = $lead['name'];
-                    $newRecord->responsible_user_id = $lead['responsible_user_id'];
-                    $newRecord->status_id           = $lead['status_id'];
-                    $newRecord->pipeline_id         = $lead['pipeline_id'];
-                    $newRecord->contactId           = '';
-                    $newRecord->companyId           = $company;
-                    $newRecord->isMainContact       = '0';
-                    $newRecord->closed_at           = $lead['closed_at']??0;
-                    $newRecord->initTime            = $this->initTime;
-                    if(!$newRecord->save()){
-                        $this->logger->writeError(['error' => 'Fail save contact', 'msg' => $newRecord->getMessages(), 'data' => $lead]);
+                unset($oldData);
+
+                if($isSync){
+                    // В этом случае есть данные о контактах.
+                    foreach ($contacts as $contact) {
+                        $newRecord = $this->findOrCreateAmoLead($lead['id'], $contact['id']);
+                        $newRecord->portalId = $this->portalId;
+                        $newRecord->idAmo = $lead['id'];
+                        $newRecord->name = $lead['name'];
+                        $newRecord->responsible_user_id = $lead['responsible_user_id'];
+                        $newRecord->status_id = $lead['status_id'];
+                        $newRecord->pipeline_id = $lead['pipeline_id'];
+                        $newRecord->contactId = $contact['id'];
+                        $newRecord->companyId = $company;
+                        $newRecord->isMainContact = $contact['is_main'] ? '1' : '0';
+                        $newRecord->closed_at = $lead['closed_at'] ?? 0;
+                        $newRecord->initTime = $this->initTime;
+                        $this->saveAmoLead($newRecord, $contact);
+                    }
+
+                    if (!empty($company) && empty($contacts)) {
+                        $newRecord = $this->findOrCreateAmoLead($lead['id'], null, $company);
+                        $newRecord->portalId = $this->portalId;
+                        $newRecord->idAmo = $lead['id'];
+                        $newRecord->name = $lead['name'];
+                        $newRecord->responsible_user_id = $lead['responsible_user_id'];
+                        $newRecord->status_id = $lead['status_id'];
+                        $newRecord->pipeline_id = $lead['pipeline_id'];
+                        $newRecord->companyId = $company;
+                        $newRecord->closed_at = $lead['closed_at'] ?? 0;
+                        $newRecord->initTime = $this->initTime;
+                        $this->saveAmoLead($newRecord, $lead);
+                    }
+                }else{
+                    // В этом случае нет информации о контактах. Обновляем поля сделки.
+                    $records = ModuleAmoLeads::find("idAmo = '{$lead['id']}' AND $this->portalId = portalId");
+                    foreach ($records as $record){
+                        $record->name = $lead['name'];
+                        $record->responsible_user_id = $lead['responsible_user_id'];
+                        $record->status_id = $lead['status_id'];
+                        $record->pipeline_id = $lead['pipeline_id'];
+                        $record->closed_at = $lead['closed_at'] ?? 0;
+                        $this->saveAmoLead($record, $lead);
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Находит существующую запись или создает новую запись в таблице ModuleAmoLeads
+     *
+     * @param  $leadId
+     * @param  $contactId
+     * @param  $companyId
+     *
+     * @return ModuleAmoLeads     Возвращает объект записи ModuleAmoLeads
+     */
+    private function findOrCreateAmoLead($leadId, $contactId = null, $companyId = null):ModuleAmoLeads
+    {
+        // Формирование условий для поиска записи в базе данных
+        $conditions = "idAmo = '$leadId' AND ";
+        if(!empty($companyId)){
+            $conditions .= "contactId = $contactId AND ";
+        }
+        if(!empty($companyId)){
+            $conditions .= "companyId = $companyId AND ";
+        }
+        $conditions .= "$this->portalId = portalId";
+        // Поиск записи в базе данных по указанным условиям
+        $newRecord = ModuleAmoLeads::findFirst($conditions);
+        // Если запись не найдена, создается новая запись
+        if (!$newRecord) {
+            $newRecord = new ModuleAmoLeads();
+        }
+        return $newRecord;
+    }
+
+    /**
+     * Сохраняем в базу данных измененный лид
+     * @param $record
+     * @param $data
+     * @return void
+     */
+    private function saveAmoLead($record, $data):void
+    {
+        if (!$record->save()) {
+            $this->logger->writeError([
+                                          'error' => 'Fail save contact',
+                                          'msg' => $record->getMessages(),
+                                          'data' => $data
+                                      ]);
         }
     }
 
