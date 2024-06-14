@@ -504,7 +504,7 @@ class ConnectorDb extends WorkerBase
      */
     public function updateLeads(array $updates):void
     {
-        $isSync = true;
+        $isSync = true; $logMessage = '';
         if (isset($updates['initTime'])) {
             $initTimeValue = (int)$updates['initTime'];
             if ($initTimeValue !== $this->initTime) {
@@ -614,7 +614,7 @@ class ConnectorDb extends WorkerBase
     {
         // Формирование условий для поиска записи в базе данных
         $conditions = "idAmo = '$leadId' AND ";
-        if(!empty($companyId)){
+        if(!empty($contactId)){
             $conditions .= "contactId = $contactId AND ";
         }
         if(!empty($companyId)){
