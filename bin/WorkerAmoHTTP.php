@@ -20,13 +20,13 @@
 namespace Modules\ModuleAmoCrm\bin;
 require_once 'Globals.php';
 
+use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\PBXAmoResult;
-use Phalcon\Di;
 
 class WorkerAmoHTTP extends WorkerBase
 {
@@ -105,7 +105,12 @@ class WorkerAmoHTTP extends WorkerBase
         }
         $downloadCacheDir = '/tmp/';
         $tmpDir = '/tmp/';
-        $di = Di::getDefault();
+        $pbxVersion = PbxSettings::getValueByKey('PBXVersion');
+        if (version_compare($pbxVersion, '2024.2.30', '>')) {
+            $di     = \Phalcon\Di\Di::getDefault();
+        } else {
+            $di     = \Phalcon\Di::getDefault();
+        }
         if ($di) {
             $dirsConfig = $di->getShared('config');
             $tmoDirName = $dirsConfig->path('core.tempDir') . '/ModuleAmoCrm';
