@@ -2,6 +2,7 @@
     "name": "mikopbx/moduleamocrm",
     "description": "ModuleAmoCrm",
     "require": {
+        "php": ">=7.4.6",
         "cesargb/php-log-rotation": ">=2.5.0"
     },
     "autoload": {
@@ -54,7 +55,7 @@
     "config": {
         "sort-packages": true,
         "platform": {
-            "php": "7.4.6"
+            "php": ">=7.4.6"
         }
     }
 }
