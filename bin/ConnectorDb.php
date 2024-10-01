@@ -34,7 +34,6 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoLeads;
 use Modules\ModuleAmoCrm\Models\ModuleAmoPhones;
 use Modules\ModuleAmoCrm\Models\ModuleAmoPipeLines;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
-use Phalcon\Di;
 use Throwable;
 use Phalcon\Mvc\Model\Manager;
 
