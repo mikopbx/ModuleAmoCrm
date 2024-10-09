@@ -158,7 +158,7 @@ class ModuleAmoCrmController extends BaseController
         // Список выбора очередей.
         $this->view->queues = CallQueues::find(['columns' => ['id', 'name']]);
         $this->view->users  = Extensions::find(["type = 'SIP'", 'columns' => ['number', 'callerid']]);
-        $this->view->entitySettings  = $rules;
+        $this->view->entitySettings  = $rules??[];
     }
 
     /**
