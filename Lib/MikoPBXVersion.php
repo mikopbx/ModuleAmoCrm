@@ -19,8 +19,6 @@
  */
 namespace Modules\ModuleAmoCrm\Lib;
 
-use MikoPBX\Common\Models\PbxSettings;
-
 class MikoPBXVersion
 {
     /**
@@ -29,8 +27,7 @@ class MikoPBXVersion
      */
     public static function isPhalcon5Version(): bool
     {
-        $pbxVersion = PbxSettings::getValueByKey('PBXVersion');
-        return version_compare($pbxVersion, '2024.2.30', '>');
+        return class_exists('\Phalcon\Di\Di');
     }
 
     /**

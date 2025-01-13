@@ -20,6 +20,7 @@
 namespace Modules\ModuleAmoCrm\Lib;
 use MikoPBX\Core\System\System;
 use MikoPBX\Core\System\Util;
+use Modules\ModuleAutoDialer\Lib\MikoPBXVersion;
 use Phalcon\Logger\Adapter\Stream;
 use Cesargb\Log\Rotation;
 use Cesargb\Log\Exceptions\RotationFailed;
@@ -30,7 +31,7 @@ require_once(dirname(__DIR__).'/vendor/autoload.php');
 class Logger
 {
     public bool $debug;
-    private \Phalcon\Logger $logger;
+    private $logger;
     private string $module_name;
     private string $logFile;
 
@@ -59,7 +60,8 @@ class Logger
      */
     private function init():void
     {
-        $this->logger  = new \Phalcon\Logger(
+        $loggerClass = MikoPBXVersion::getLoggerClass();
+        $this->logger  = new $loggerClass(
             'messages',
             [
                 'main' =>  new Stream($this->logFile),

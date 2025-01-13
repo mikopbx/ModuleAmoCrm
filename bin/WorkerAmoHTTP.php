@@ -105,7 +105,7 @@ class WorkerAmoHTTP extends WorkerBase
         }
         $downloadCacheDir = '/tmp/';
         $tmpDir = '/tmp/';
-       $di = MikoPBXVersion::getDefaultDi();
+        $di = MikoPBXVersion::getDefaultDi();
         if ($di) {
             $dirsConfig = $di->getShared('config');
             $tmoDirName = $dirsConfig->path('core.tempDir') . '/ModuleAmoCrm';

@@ -826,7 +826,7 @@ class AmoCdrDaemon extends WorkerBase
                 // Получим ответственного.
                 $responsible = 1*($this->cdrRows[$call['id']][$responsibleField]??$settings['def_responsible']);
                 $this->cdrRows[$call['id']]['responsibleRule']      = $responsible;
-                $this->cdrRows[$call['id']]['resp_contact_user_id'] = 1*($contactsData[$phone]['resp_contact_user_id']??'');
+                $this->cdrRows[$call['id']]['resp_contact_user_id'] = (int)($contactsData[$phone]['resp_contact_user_id']??'');
 
                 $indexAction = AmoCrmMain::getPhoneIndex($phone);
                 if($contactExists){

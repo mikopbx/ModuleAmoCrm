@@ -98,12 +98,18 @@ class ModuleAmoCrmController extends BaseController
     public function checkAction():void
     {
         $result      = WorkerAmoHTTP::invokeAmoApi('checkConnection', []);
-        $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
-        $lastContactsSyncTime = (int)($allSettings['ModuleAmoCrm']['lastContactsSyncTime']??0);
-        $result->data['lastContactsSyncTime'] = $lastContactsSyncTime;
-        $this->view->success = $result->success;
-        $this->view->data    = $result->data;
-        $this->view->messages= $result->messages;
+        if($result){
+            $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
+            $lastContactsSyncTime = (int)($allSettings['ModuleAmoCrm']['lastContactsSyncTime']??0);
+            $result->data['lastContactsSyncTime'] = $lastContactsSyncTime;
+            $this->view->success = $result->success;
+            $this->view->data    = $result->data;
+            $this->view->messages= $result->messages;
+        }else{
+            $this->view->success = false;
+            $this->view->data = [];
+            $this->view->messages = [];
+        }
     }
 
     /**

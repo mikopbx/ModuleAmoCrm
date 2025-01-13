@@ -137,6 +137,9 @@ class SyncDaemon extends WorkerBase
         while(!empty($nextPage)){
             $result   = WorkerAmoHTTP::invokeAmoApi('getChangedEntity', [$nextPage, $entityType]);
             $nextPage = $result->data['nextPage'];
+            if(!isset($result->data[$entityType])){
+                continue;
+            }
             $chunks   = array_chunk($result->data[$entityType], 25, false);
             foreach ($chunks as $chunk){
                 $this->logger->writeInfo($chunk);
