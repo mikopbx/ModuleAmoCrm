@@ -761,7 +761,7 @@ class AmoCdrDaemon extends WorkerBase
                 continue;
             }
             $params = ['id' => $call['id'], 'params' => ['phone' => $call['phone']]];
-            if($settings['create_contact'] === '1' && !$contactExists){
+            if(intval($settings['create_contact']) === 1 && !$contactExists){
                 $this->newContacts[$indexAction] = [
                     'phone'               => $call['phone'],
                     'contactName'         => $this->replaceTagTemplate($settings['template_contact_name'], $params),
@@ -831,7 +831,7 @@ class AmoCdrDaemon extends WorkerBase
                 $indexAction = AmoCrmMain::getPhoneIndex($phone);
                 if($contactExists){
                     $calls[$phoneId][$index]['entity_id'] = 1*$contData['contactId'];
-                }elseif($settings['create_contact'] === '1'){
+                }elseif(intval($settings['create_contact']) === 1){
                     $this->newContacts[$indexAction] = [
                         'phone'               => $phone,
                         'contactName'         => $this->replaceTagTemplate($settings['template_contact_name'], $call),
@@ -933,7 +933,7 @@ class AmoCdrDaemon extends WorkerBase
      */
     private function addNewTask($settings, $call, $contData):void
     {
-        if($settings['create_task'] !== '1'){
+        if(intval($settings['create_task']) !== 1){
             return;
         }
         $indexAction = AmoCrmMain::getPhoneIndex($call['params']['phone']);
@@ -982,7 +982,7 @@ class AmoCdrDaemon extends WorkerBase
     private function addNewLead($settings, $call, $contData, $responsible):void
     {
         $lead = $contData['leadId']??'';
-        if($settings['create_lead'] !== '1' || !empty($lead) || isset($this->createdLeads[$call['id']])){
+        if(intval($settings['create_lead']) !== 1 || !empty($lead) || isset($this->createdLeads[$call['id']])){
             // Лид уже был создан ранее
             // Или Лид не должен быть создан.
             return;
@@ -1096,7 +1096,7 @@ class AmoCdrDaemon extends WorkerBase
                 'linked_company_id'     => '',
                 'custom_fields'         => [
                     [
-                        'code'   => 'PHONE', 
+                        'code'   => 'PHONE',
                         'values' => [
                             ['value' => $this->newContacts[$contact['request_id']]['phone']]
                         ]

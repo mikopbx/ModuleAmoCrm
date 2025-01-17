@@ -131,7 +131,7 @@ class ModuleAmoCrmController extends BaseController
 
 
         $ModuleSettings = PbxExtensionModules::findFirst(["uniqid='$this->moduleUniqueID'",'columns' => ['disabled']]);
-        if($ModuleSettings->disabled === '1'){
+        if(intval($ModuleSettings->disabled) === 1){
             // Если модуль отключен.
             $settings = ModuleAmoCrm::findFirst();
             if ($settings === null) {
@@ -146,6 +146,9 @@ class ModuleAmoCrmController extends BaseController
             $rules       = $allSettings['ModuleAmoEntitySettings'];
         }
         foreach ($rules as $index => $rule){
+            $rules[$index]['create_contact'] = (string)$rule['create_contact'];
+            $rules[$index]['create_lead']    = (string)$rule['create_lead'];
+            $rules[$index]['create_task']    = (string)$rule['create_task'];
             $rules[$index]['type_translate'] = 'mod_amo_type_'.$rule['type'];
         }
 
@@ -174,7 +177,7 @@ class ModuleAmoCrmController extends BaseController
     {
         $data   = $this->request->getPost();
         $ModuleSettings = PbxExtensionModules::findFirst(["uniqid='$this->moduleUniqueID'",'columns' => ['disabled']]);
-        if($ModuleSettings->disabled !== '1'){
+        if(intval($ModuleSettings->disabled) !== 1){
             $settings = [];
             foreach ($data as $key => $value) {
                 if(in_array($key, ['id','offsetCdr','authData'], true)){
