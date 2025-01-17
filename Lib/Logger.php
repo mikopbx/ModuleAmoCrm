@@ -20,7 +20,6 @@
 namespace Modules\ModuleAmoCrm\Lib;
 use MikoPBX\Core\System\System;
 use MikoPBX\Core\System\Util;
-use Modules\ModuleAutoDialer\Lib\MikoPBXVersion;
 use Phalcon\Logger\Adapter\Stream;
 use Cesargb\Log\Rotation;
 use Cesargb\Log\Exceptions\RotationFailed;
