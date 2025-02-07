@@ -193,13 +193,18 @@ class ConnectorDb extends WorkerBase
                 $res_data = $this->saveResultInTmpFile($res_data);
             }
         }elseif($data['action'] === 'interception'){
+            $this->logger->writeInfo('Get Event interception...');
             $clientData = $this->findContacts( [$data['phone']] );
+            $this->logger->writeInfo($clientData);
             $userId = $clientData[0]['userId']??null;
+            $this->logger->writeInfo($this->users);
+            $this->logger->writeInfo('$userId: '.$userId);
             if( isset($this->users[$userId])){
                 try {
+                    $this->logger->writeInfo('Start originate to ' .$this->users[$userId]);
                     $this->startInterception($data['channel'], $data['id'], $this->users[$userId], $data['phone']);
                 }catch (Throwable $e){
-                    Util::sysLogMsg(self::class, $e->getMessage());
+                    $this->logger->writeError('Fail startInterception. '.$e->getMessage());
                 }
             }
         }
