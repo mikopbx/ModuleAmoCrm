@@ -308,14 +308,7 @@ class AmoCdrDaemon extends WorkerBase
             $srcNum = AmoCrmMain::getPhoneIndex($row['src_num']);
             $dstNum = AmoCrmMain::getPhoneIndex($row['dst_num']);
             $this->logger->writeInfo("From $srcNum to $dstNum, linkedid: $id, UNIQUEID:{$row['UNIQUEID']}, id: {$row['id']}");
-            if(isset($this->incompleteAnswered[$srcNum])){
-                $this->cdrRows[$id]['incompleteType'] = $this->incompleteAnswered[$srcNum]['type'];
-            }
             unset($this->incompleteAnswered[$srcNum],$this->incompleteAnswered[$dstNum]);
-            if(file_exists($row['recordingfile'])){
-                $this->cdrRows[$id]['records'][] = $row['recordingfile'];
-                $this->cdrRows[$id]['duration'] += 1*$row['billsec'];
-            }
             if( in_array($srcNum, $this->innerNums, true)
                 && in_array($dstNum, $this->innerNums, true)){
                 // Это внутренний разговор.
@@ -347,11 +340,21 @@ class AmoCdrDaemon extends WorkerBase
                 continue;
             }
             if(!isset($this->cdrRows[$id])){
-                $this->cdrRows[$id]['first']    = $row['UNIQUEID'];
-                $this->cdrRows[$id]['haveUser'] = false;
-                $this->cdrRows[$id]['duration'] = 0;
+                $this->cdrRows[$id] = [
+                    'first'    => $row['UNIQUEID'],
+                    'haveUser' => false,
+                    'duration' => 0,
+                    'answered' => false,
+                    'records'  => []
+                ];
             }
-
+            if(isset($this->incompleteAnswered[$srcNum])){
+                $this->cdrRows[$id]['incompleteType'] = $this->incompleteAnswered[$srcNum]['type'];
+            }
+            if(file_exists($row['recordingfile'])){
+                $this->cdrRows[$id]['records'][] = $row['recordingfile'];
+                $this->cdrRows[$id]['duration'] += 1*$row['billsec'];
+            }
             if($row['billsec'] < 1){
                 // Пропущенный вызов.
                 $call_status = 6;
