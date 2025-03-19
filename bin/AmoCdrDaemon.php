@@ -180,6 +180,10 @@ class AmoCdrDaemon extends WorkerBase
         $data = [];
         $extensions = Extensions::find($extensionFilter);
         foreach ($extensions as $extension){
+            $amoId = $amoUsersArray[$extension->number]??'';
+            if($this->restrictCdrToKnownEmployees && empty($amoId)){
+                continue;
+            }
             $data[] = [
                 'number' => $extension->number,
                 'name' => $extension->callerid,
@@ -555,15 +559,27 @@ class AmoCdrDaemon extends WorkerBase
         }
         $this->logger->writeInfo($calls, "CDR synchronization. Step 2. Count: ".count($calls));
         $ids = '';
+
+        $callsArray = [
+            'contacts' => [],
+            'companies' => []
+        ];
         foreach ($calls as &$call) {
             $ids.= $call['id'].'|';
+            $entity_type = $this->cdrRows[$call['id']]['entity_type']??'contacts';
             unset($call['id'],$call['is_app'],$call['did']);
+            $callsArray[$entity_type][] = $call;
         }
-        unset($call);
-        // Пытаемся добавить вызовы. Это получится, если контакты существуют.
-        $result = WorkerAmoHTTP::invokeAmoApi('addCalls', [$calls]);
-        $this->logger->writeInfo($calls, "Create calls (REQ): $ids");
-        $this->logger->writeInfo($result, "Create calls (RES): $ids");
+        unset($call, $calls);
+        foreach ($callsArray as $entity_type => $callsData){
+            if(empty($callsData)){
+                continue;
+            }
+            // Пытаемся добавить вызовы. Это получится, если контакты существуют.
+            $result = WorkerAmoHTTP::invokeAmoApi('addCalls', [$callsData, $entity_type]);
+            $this->logger->writeInfo($callsData, "Create calls (REQ): $ids");
+            $this->logger->writeInfo($result, "Create calls (RES): $ids");
+        }
     }
 
     /**
@@ -750,7 +766,16 @@ class AmoCdrDaemon extends WorkerBase
             $indexAction   = AmoCrmMain::getPhoneIndex($call['phone']);
             $contData      = $contactsData[$indexAction];
             $contactId     = $contData['contactId']??null;
-            $contactExists = !empty($contactId);
+            $companyId     = $contData['companyId']??null;
+
+            $contactExists = false;
+            if(!empty($contactId)){
+                $this->cdrRows[$call['id']]['entity_type'] = 'contacts';
+                $contactExists = true;
+            }elseif(!empty($companyId)){
+                $contactExists = true;
+                $this->cdrRows[$call['id']]['entity_type'] = 'companies';
+            }
 
             $this->logger->writeInfo($contData, "Contact data for id: {$call['id']}");
 
@@ -800,7 +825,18 @@ class AmoCdrDaemon extends WorkerBase
                 $this->logger->writeInfo($contData, "Contact data for id: {$call['id']}");
 
                 $contactId     = $contData['contactId']??null;
-                $contactExists = !empty($contactId);
+                $companyId     = $contData['companyId']??null;
+
+                $contactExists = false;
+                if(!empty($contactId)){
+                    $this->cdrRows[$call['id']]['entity_type'] = 'contacts';
+                    $contactExists = true;
+                    $calls[$phoneId][$index]['entity_id'] = intval($contactId);
+                }elseif(!empty($companyId)){
+                    $contactExists = true;
+                    $this->cdrRows[$call['id']]['entity_type'] = 'companies';
+                    $calls[$phoneId][$index]['entity_id'] = intval($companyId);
+                }
 
                 $isMissed      = $this->cdrRows[$call['id']]['answered'] === 0;
                 $isIncoming    = $call['note_type'] === 'call_in';
@@ -837,9 +873,7 @@ class AmoCdrDaemon extends WorkerBase
                 $this->cdrRows[$call['id']]['resp_contact_user_id'] = (int)($contactsData[$phone]['resp_contact_user_id']??'');
 
                 $indexAction = AmoCrmMain::getPhoneIndex($phone);
-                if($contactExists){
-                    $calls[$phoneId][$index]['entity_id'] = 1*$contData['contactId'];
-                }elseif(intval($settings['create_contact']) === 1){
+                if(!$contactExists && intval($settings['create_contact']) === 1){
                     $this->newContacts[$indexAction] = [
                         'phone'               => $phone,
                         'contactName'         => $this->replaceTagTemplate($settings['template_contact_name'], $call),
@@ -1010,13 +1044,13 @@ class AmoCdrDaemon extends WorkerBase
         if($contData !== false){
             if(!empty($contData['contactId'])){
                 $leadData['_embedded']['contacts'][]=[
-                    'id' => (int)$contData['contactId'],
+                    'id' => intval($contData['contactId']),
                     'is_main' => true
                 ];
             }
             if(!empty($contData['companyId'])){
                 $leadData['_embedded']['companies'][]=[
-                    'id' => $contData['contactId'],
+                    'id' => intval($contData['companyId']),
                 ];
             }
         }
