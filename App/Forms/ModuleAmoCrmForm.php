@@ -37,6 +37,7 @@ class ModuleAmoCrmForm extends ModuleBaseForm
         $this->add(new Hidden('redirectUri', ['value' => AmoCrmMainBase::REDIRECT_URL]));
         $this->add(new Text('baseDomain'));
         $this->add(new Text('tokenForAmo'));
+        $this->addCheckBox('restrictCdrToKnownEmployees', intval($entity->restrictCdrToKnownEmployees) === 1);
         $this->addCheckBox('useInterception', intval($entity->useInterception) === 1);
         $this->addCheckBox('panelIsEnable', intval($entity->panelIsEnable) === 1);
         $this->addCheckBox('isPrivateWidget', intval($entity->isPrivateWidget) === 1);

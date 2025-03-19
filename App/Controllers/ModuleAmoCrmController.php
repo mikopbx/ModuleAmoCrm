@@ -177,13 +177,16 @@ class ModuleAmoCrmController extends BaseController
     {
         $data   = $this->request->getPost();
         $ModuleSettings = PbxExtensionModules::findFirst(["uniqid='$this->moduleUniqueID'",'columns' => ['disabled']]);
+
+        $ignoreColumns = ['id','offsetCdr','authData'];
+        $boolColumns = ['useInterception', 'isPrivateWidget', 'disableDetailedCdr', 'panelIsEnable', 'restrictCdrToKnownEmployees'];
         if(intval($ModuleSettings->disabled) !== 1){
             $settings = [];
             foreach ($data as $key => $value) {
-                if(in_array($key, ['id','offsetCdr','authData'], true)){
+                if(in_array($key, $ignoreColumns, true)){
                     continue;
                 }
-                if(in_array($key, ['useInterception', 'isPrivateWidget', 'disableDetailedCdr', 'panelIsEnable'])){
+                if(in_array($key, $boolColumns)){
                     $settings[$key] = ($value === 'on') ? '1' : '0';
                 } else {
                     $settings[$key]  = $value;
@@ -200,10 +203,10 @@ class ModuleAmoCrmController extends BaseController
                 $record = new ModuleAmoCrm();
             }
             foreach ($record as $key => $value) {
-                if(in_array($key, ['id','offsetCdr','authData'], true)){
+                if(in_array($key, $ignoreColumns, true)){
                     continue;
                 }
-                if('useInterception' === $key || 'isPrivateWidget' === $key || 'disableDetailedCdr' === $key ){
+                if(in_array($key, $boolColumns)){
                     $record->$key = ($data[$key] === 'on') ? '1' : '0';
                 } elseif (array_key_exists($key, $data)) {
                     if($record->$key !== trim($data[$key])){

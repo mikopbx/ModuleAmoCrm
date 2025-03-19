@@ -52,6 +52,7 @@ class AmoCdrDaemon extends WorkerBase
     private array $entitySettings = [];
 
     private bool $disableDetailedCdr = false;
+    private bool $restrictCdrToKnownEmployees = false;
     public string $respCallAnsweredHaveClient = '';
     public string $respCallAnsweredNoClient = '';
     public string $respCallMissedNoClient = '';
@@ -127,9 +128,10 @@ class AmoCdrDaemon extends WorkerBase
             $oldOffset = $this->offset;
             $this->offset        = max(1*$allSettings['ModuleAmoCrm']['offsetCdr']??1,1);
             $this->referenceDate = $allSettings['ModuleAmoCrm']['referenceDate']??'';
-            $this->portalId      = (int)($allSettings['ModuleAmoCrm']['portalId']??0);
+            $this->portalId      = intval($allSettings['ModuleAmoCrm']['portalId']??0);
 
-            $this->disableDetailedCdr         = ($allSettings['ModuleAmoCrm']['disableDetailedCdr']??'0') === '1';
+            $this->disableDetailedCdr         = (intval($allSettings['ModuleAmoCrm']['disableDetailedCdr']??'0')) === 1;
+            $this->restrictCdrToKnownEmployees= (intval($allSettings['ModuleAmoCrm']['restrictCdrToKnownEmployees']??'0')) === 1;
             $this->respCallAnsweredHaveClient = ($allSettings['ModuleAmoCrm']['respCallAnsweredHaveClient']??'');
             $this->respCallAnsweredNoClient   = ($allSettings['ModuleAmoCrm']['respCallAnsweredNoClient']??'');
             $this->respCallMissedNoClient     = ($allSettings['ModuleAmoCrm']['respCallMissedNoClient']??'');
@@ -410,6 +412,9 @@ class AmoCdrDaemon extends WorkerBase
                 $call['created_by']                 = $amoUserId;
                 $call['responsible_user_id']        = $amoUserId;
                 $call['params']['call_responsible'] = $amoUserId;
+            }elseif ($this->restrictCdrToKnownEmployees){
+                $this->logger->writeInfo($call, "The amoCRM user is not identified, the call will not be uploaded (restrictCdrToKnownEmployees = true)");
+                continue;
             }
             $phoneId = AmoCrmMain::getPhoneIndex($call['params']['phone']);
 
@@ -576,7 +581,7 @@ class AmoCdrDaemon extends WorkerBase
                 if($callCounter[$call['id']] === 1){
                     continue;
                 }
-                $haveUser = $this->cdrRows[$call['id']]['haveUser'] === 1;
+                $haveUser = intval($this->cdrRows[$call['id']]['haveUser']) === 1;
                 if(!isset($call['responsible_user_id']) && $haveUser){
                     $this->logger->writeError($call, "Unsetted responsible_user_id for {$call['id']}, drop it");
                     unset($calls[$index], $call);
