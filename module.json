@@ -5,5 +5,14 @@
   "version": "%ModuleVersion%",
   "min_pbx_version": "2022.2.1",
   "lic_product_id": 81,
-  "lic_feature_id": 45
+  "lic_feature_id": 45,
+  "release_settings": {
+    "publish_release": true,
+    "changelog_enabled": true,
+    "create_github_release": true
+  },
+  "wiki_links": {
+    "ru": {"https://wiki.mikopbx.com/module-amo-crm": "https://docs.mikopbx.com/mikopbx/modules/miko/amocrm"},
+    "en": {"https://wiki.mikopbx.com/module-amo-crm": "https://docs.mikopbx.com/mikopbx/modules/miko/amocrm"}
+  }
 }
