@@ -84,7 +84,7 @@ class ApiController extends ModulesControllerBase
 
     public function amoEntityUpdateAction():void
     {
-        ConnectorDb::invoke('entityUpdate', [$_REQUEST]);
+        ConnectorDb::invoke('entityUpdate', [$_REQUEST], false);
     }
 
     /**

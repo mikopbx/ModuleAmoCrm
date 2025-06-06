@@ -67,7 +67,9 @@ class ConnectorDb extends WorkerBase
     public function pingCallBack(BeanstalkClient $message): void
     {
         $this->logger->writeInfo(getmypid().': pingCallBack ...');
+        $this->logger =  new Logger('ConnectorDb', 'ModuleAmoCrm');
         $this->logger->rotate();
+
         parent::pingCallBack($message);
     }
 
