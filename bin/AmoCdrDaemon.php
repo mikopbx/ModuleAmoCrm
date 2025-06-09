@@ -40,6 +40,7 @@ class AmoCdrDaemon extends WorkerBase
     public const  SOURCE_ID    = 'miko-pbx';
     private const LIMIT_CDR   = 50;
     private int   $offset = 1;
+    private bool  $panelIsEnable = false;
     public array  $innerNums = [];
     private array $users = [];
     public string $referenceDate='';
@@ -126,6 +127,7 @@ class AmoCdrDaemon extends WorkerBase
         $allSettings = ConnectorDb::invoke('getModuleSettings', [false]);
         if(!empty($allSettings) && is_array($allSettings)){
             $oldOffset = $this->offset;
+            $this->panelIsEnable = intval($allSettings['ModuleAmoCrm']['panelIsEnable']??0) ===0;
             $this->offset        = max(1*$allSettings['ModuleAmoCrm']['offsetCdr']??1,1);
             $this->referenceDate = $allSettings['ModuleAmoCrm']['referenceDate']??'';
             $this->portalId      = intval($allSettings['ModuleAmoCrm']['portalId']??0);
@@ -261,7 +263,7 @@ class AmoCdrDaemon extends WorkerBase
             ];
         }
         $md5Cdr = md5(print_r($params, true));
-        if($md5Cdr !== $this->lastCacheCdr){
+        if($this->panelIsEnable && $md5Cdr !== $this->lastCacheCdr){
             // Оповещаме только если изменилось состояние.
             ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $params, 'action' => 'CDRs']);
             $this->lastCacheCdr = $md5Cdr;
