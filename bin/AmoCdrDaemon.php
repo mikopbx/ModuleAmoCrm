@@ -683,14 +683,14 @@ class AmoCdrDaemon extends WorkerBase
                 }
             }
             $call['params']['link']       = $this->getCreateFileAndLink($call['id'], $call['created_at']);
-            $call['params']['duration']   = $this->cdrRows[$call['id']]['duration'];
+            $call['params']['duration']   = $this->cdrRows[$call['id']]['duration']??$call['duration'];
             if($this->cdrRows[$call['id']]['answered'] === 1 ){
                 $call['params']['call_status'] = 4;
             }else{
                 $call['params']['call_status'] = 6;
             }
             $resCalls[$call['id']] = $call;
-            $this->logger->writeInfo($settingName, "Result cdr {$call['id']}");
+            $this->logger->writeInfo($call, "Result cdr {$call['id']}");
 
         }
         return array_values($resCalls);
