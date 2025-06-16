@@ -683,12 +683,14 @@ class AmoCdrDaemon extends WorkerBase
                 }
             }
             $call['params']['link']       = $this->getCreateFileAndLink($call['id'], $call['created_at']);
-            $call['params']['duration']   = $this->cdrRows[$call['id']]['duration']??$call['duration'];
+            $call['params']['duration']   = $this->cdrRows[$call['id']]['params']['duration']??0;
+
             if($this->cdrRows[$call['id']]['answered'] === 1 ){
                 $call['params']['call_status'] = 4;
             }else{
                 $call['params']['call_status'] = 6;
             }
+
             $resCalls[$call['id']] = $call;
             $this->logger->writeInfo($call, "Result cdr {$call['id']}");
 
@@ -812,7 +814,8 @@ class AmoCdrDaemon extends WorkerBase
         foreach ($calls as $phoneId => $subCalls){
             foreach ($subCalls as $index => $call) {
                 $this->logger->writeInfo($call, "Complete call: {$call['id']}");
-                if($this->cdrRows[$call['id']]['answered'] === 1 && $call['params']['duration'] === 0){
+                $answered = $this->cdrRows[$call['id']]['answered']??0;
+                if($answered === 1 && $call['params']['duration'] === 0){
                     $this->logger->writeInfo("Сdr not answered the call was generally answered: {$call['id']}. skip it");
                     $callCounter[$call['id']]--;
                     unset($calls[$phoneId][$index],$call);
@@ -840,7 +843,7 @@ class AmoCdrDaemon extends WorkerBase
                     $calls[$phoneId][$index]['entity_id'] = intval($companyId);
                 }
 
-                $isMissed      = $this->cdrRows[$call['id']]['answered'] === 0;
+                $isMissed      = $answered === 0;
                 $isIncoming    = $call['note_type'] === 'call_in';
 
                 $did           =  $this->cdrRows[$call['id']]['did']??'';
@@ -864,7 +867,7 @@ class AmoCdrDaemon extends WorkerBase
                     }
                     continue;
                 }
-                if($this->cdrRows[$call['id']]['answered'] === 1){
+                if($answered === 1){
                     $responsibleField = $settings['responsible']."AnswerUser";
                 }else{
                     $responsibleField = $settings['responsible']."MissedUser";
