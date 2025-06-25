@@ -71,8 +71,11 @@ class SyncDaemon extends WorkerBase
                 ConnectorDb::invoke('deleteWithFailTime', [$this->initTime]);
                 // Запустим синхронизацию контактов по полю "COLUMN_UPDATE_NAME"
                 ConnectorDb::invoke('saveNewSettings', [['lastContactsSyncTime'=>1, 'lastCompaniesSyncTime' => 1, 'lastLeadsSyncTime' => 1]]);
+                $this->logger->writeInfo('End init mode...');
+                sleep(1);
+            }else{
+                sleep(10);
             }
-            sleep(10);
         }
     }
 
@@ -93,6 +96,7 @@ class SyncDaemon extends WorkerBase
             // Это INIT режим, активируется раз в сутки по cron.
             // Контакты и лиды синхронизируются с начала.
             $this->initTime = time();
+            $this->logger->writeInfo('Start init mode...');
         }else{
             $this->initTime = 0;
         }
@@ -134,15 +138,30 @@ class SyncDaemon extends WorkerBase
             $params['with'] = 'contacts';
         }
         $nextPage = $url."?".http_build_query($params);
+        $count = 0;
         while(!empty($nextPage)){
-            $result   = WorkerAmoHTTP::invokeAmoApi('getChangedEntity', [$nextPage, $entityType]);
-            $nextPage = $result->data['nextPage'];
+            $this->logger->writeInfo("SYNC: $count, GET '$entityType' ".$nextPage);
+            $tryGetCount = 20;
+            do{
+                $result   = WorkerAmoHTTP::invokeAmoApi('getChangedEntity', [$nextPage, $entityType]);
+                $nextPage = $result->data['nextPage']??'';
+                $tryGetCount--;
+                if($result === false || !empty($result->messages)){
+                    $this->logger->writeError($result->data, 'Fail getChangedEntity... sleep...');
+                    sleep(10);
+                }else{
+                    break;
+                }
+            }while($tryGetCount >=0);
+
             if(!isset($result->data[$entityType])){
+                $this->logger->writeError($result->data, 'Fail getChangedEntity... stop...');
                 continue;
             }
+            $nextPage = $result->data['nextPage'];
+            $count += count($result->data[$entityType]);
             $chunks   = array_chunk($result->data[$entityType], 25, false);
             foreach ($chunks as $chunk){
-                $this->logger->writeInfo($chunk);
                 $data = [
                     'update' => $chunk,
                     'source' => self::class
@@ -150,7 +169,10 @@ class SyncDaemon extends WorkerBase
                 if($this->initTime > 0){
                     $data['initTime'] = $this->initTime;
                 }
-                ConnectorDb::invoke($updateFunc[$entityType], [$data]);
+                $resultSave = ConnectorDb::invoke($updateFunc[$entityType], [$data]);
+                if(!isset($resultSave['update-all']) && $entityType !== AmoCrmMain::ENTITY_LEADS){
+                    $this->logger->writeError($resultSave, 'Fail save contact data...');
+                }
                 usleep(100000);
             }
             $this->logger->rotate();

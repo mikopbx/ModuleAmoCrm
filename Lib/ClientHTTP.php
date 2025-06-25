@@ -109,7 +109,7 @@ class ClientHTTP
         }
         $client  = new GuzzleHttp\Client();
         $options = [
-            'timeout'       => 5,
+            'timeout'       => 8,
             'http_errors'   => false,
             'headers'       => $headers,
         ];

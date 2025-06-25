@@ -182,7 +182,7 @@ class ConnectorDb extends WorkerBase
         }
         $res_data = [];
         if($data['action'] === 'entity-update'){
-            $this->updatePhoneBook($data['data']['contacts']??[]);
+            $res_data['entity'] = $this->updatePhoneBook($data['data']['contacts']??[]);
             $this->updateLeads($data['data']['leads']??[]);
         }elseif($data['action'] === 'invoke'){
             $funcName = $data['function']??'';
@@ -289,9 +289,11 @@ class ConnectorDb extends WorkerBase
     /**
      * Сохранение изменных данных контактов. Наполнение телефонной книги.
      * @param array $updates
-     * @return void
+     * @return array
      */
-    public function updatePhoneBook(array $updates):void{
+    public function updatePhoneBook(array $updates):array
+    {
+        $result = [];
         if(isset($updates['initTime'])){
             $initTime = (int)$updates['initTime'];
             if($initTime !== $this->initTime){
@@ -299,7 +301,6 @@ class ConnectorDb extends WorkerBase
                 $this->logger->writeInfo("New initTime: $initTime");
             }
         }
-
         $idEntityFields = [
             'contact' => 'idEntity',
             'company' => 'linked_company_id',
@@ -308,6 +309,9 @@ class ConnectorDb extends WorkerBase
         $actions = ['update', 'add', 'delete'];
         foreach ($actions as $action){
             $entities = $updates[$action]??[];
+            $result[$action.'-all'] = count($entities);
+            $result[$action.'-saved'] = 0;
+            $result[$action.'-fail'] = 0;
             foreach ($entities as $entity){
                 $idEntity = $idEntityFields[$entity['type']];
                 ModuleAmoPhones::find("$idEntity='$entity[id]'")->delete();
@@ -334,12 +338,16 @@ class ConnectorDb extends WorkerBase
                         $newRecord->initTime            = $this->initTime;
                         $newRecord->writeAttribute($idEntity,$entity['id']);
                         if(!$newRecord->save()){
+                            $result[$action.'-fail']++;
                             $this->logger->writeError(['error' => 'Fail save contact', 'msg' => $newRecord->getMessages(), 'data' => $entity]);
+                        }else{
+                            $result[$action.'-saved']++ ;
                         }
                     }
                 }
             }
         }
+        return $result;
     }
 
     /** Запуск звонка "Перехват на ответственного".
