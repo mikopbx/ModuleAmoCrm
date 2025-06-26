@@ -685,7 +685,8 @@ class AmoCdrDaemon extends WorkerBase
             $call['params']['link']       = $this->getCreateFileAndLink($call['id'], $call['created_at']);
             $call['params']['duration']   = $this->cdrRows[$call['id']]['duration']??$this->cdrRows[$call['id']]['params']['duration']??0;
 
-            if($this->cdrRows[$call['id']]['answered'] === 1 ){
+            $answered = $this->cdrRows[$call['id']]['answered']??0;
+            if($answered === 1){
                 $call['params']['call_status'] = 4;
             }else{
                 $call['params']['call_status'] = 6;
@@ -728,7 +729,9 @@ class AmoCdrDaemon extends WorkerBase
                         $cmd.= "$pathSox - -m $value -p pad 3 0 | ";
                     }
                 }
-                shell_exec($cmd);
+                if(!empty($records)){
+                    shell_exec($cmd);
+                }
             }
             $link = "https://$this->extHostname/pbxcore/api/amo-crm/playback?view=$fileName";
         }
