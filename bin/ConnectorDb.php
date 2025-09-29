@@ -22,6 +22,7 @@ require_once 'Globals.php';
 
 use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Core\System\BeanstalkClient;
+use MikoPBX\Core\System\Processes;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
@@ -43,6 +44,9 @@ class ConnectorDb extends WorkerBase
     private int     $portalId = 0;
     private int     $initTime = 0;
     private Logger  $logger;
+    private float   $memoryWarnFraction = 0.8;   // 80% of memory_limit
+    private float   $memoryCritFraction = 0.82;  // 92% of memory_limit
+    private int     $lastMemoryLogTs = 0;        // throttle periodic logs
 
     /**
      * Handles the received signal.
@@ -66,11 +70,44 @@ class ConnectorDb extends WorkerBase
      */
     public function pingCallBack(BeanstalkClient $message): void
     {
+        $this->checkMemLimits();
+        if($this->needRestart === true){
+            return;
+        }
         $this->logger->writeInfo(getmypid().': pingCallBack ...');
-        $this->logger =  new Logger('ConnectorDb', 'ModuleAmoCrm');
-        $this->logger->rotate();
-
         parent::pingCallBack($message);
+    }
+
+    private function checkMemLimits()
+    {
+        $limitBytes = $this->getMemoryLimitBytes();
+        if ($limitBytes > 0) {
+            $usage = memory_get_usage(true);
+            $warnBytes = (int)($limitBytes * $this->memoryWarnFraction);
+            $critBytes = (int)($limitBytes * $this->memoryCritFraction);
+            $now = time();
+            if (($now - $this->lastMemoryLogTs) >= 30 || $usage >= $warnBytes) {
+                $this->lastMemoryLogTs = $now;
+                $this->logger->writeInfo([
+                                             'mem_usage_mb' => round($usage / 1048576, 2),
+                                             'mem_peak_mb'  => round(memory_get_peak_usage(true) / 1048576, 2),
+                                             'mem_limit_mb' => round($limitBytes / 1048576, 2),
+                                         ], 'Memory');
+            }
+            if ($usage >= $warnBytes) {
+                gc_collect_cycles();
+                $usageAfterGc = memory_get_usage(true);
+                if ($usageAfterGc >= $critBytes) {
+                    $this->logger->writeError([
+                                                  'mem_usage_mb' => round($usageAfterGc / 1048576, 2),
+                                                  'mem_limit_mb' => round($limitBytes / 1048576, 2),
+                                                  'action' => 'needRestart'
+                                              ], 'Memory threshold exceeded');
+                    $this->needRestart = true;
+                    Processes::mwExecBg("/usr/bin/php -f /offload/rootfs/usr/www/src/Core/Workers/Cron/WorkerSafeScriptsCore.php start","/dev/null",2);
+                }
+            }
+        }
     }
 
     /**
@@ -114,6 +151,34 @@ class ConnectorDb extends WorkerBase
     }
 
     /**
+     * Parse PHP memory_limit and return bytes. -1 means unlimited.
+     * @return int
+     */
+    private function getMemoryLimitBytes(): int
+    {
+        $val = ini_get('memory_limit');
+        if ($val === false) {
+            return -1;
+        }
+        $val = trim((string)$val);
+        if ($val === '' || $val === '-1') {
+            return -1;
+        }
+        $suffix = strtolower(substr($val, -1));
+        $num = (int)$val;
+        switch ($suffix) {
+            case 'g':
+                return $num * 1024 * 1024 * 1024;
+            case 'm':
+                return $num * 1024 * 1024;
+            case 'k':
+                return $num * 1024;
+            default:
+                return (int)$val;
+        }
+    }
+
+    /**
      * Старт работы листнера.
      *
      * @param $argv
@@ -123,6 +188,7 @@ class ConnectorDb extends WorkerBase
         $this->updateSettings();
         $this->logger =  new Logger('ConnectorDb', 'ModuleAmoCrm');
         $this->logger->writeInfo($argv, 'Starting');
+        gc_enable();
         $beanstalk      = new BeanstalkClient(self::class);
         $amoUsers       = ModuleAmoUsers::find('enable=1');
         foreach ($amoUsers as $user){
@@ -182,9 +248,13 @@ class ConnectorDb extends WorkerBase
         }
         $res_data = [];
         if($data['action'] === 'entity-update'){
+            $this->checkMemLimits();
+
             $res_data['entity'] = $this->updatePhoneBook($data['data']['contacts']??[]);
             $this->updateLeads($data['data']['leads']??[]);
         }elseif($data['action'] === 'invoke'){
+            $this->checkMemLimits();
+
             $funcName = $data['function']??'';
             if(method_exists($this, $funcName)){
                 if(count($data['args']) === 0){
@@ -199,7 +269,6 @@ class ConnectorDb extends WorkerBase
             $clientData = $this->findContacts( [$data['phone']] );
             $this->logger->writeInfo($clientData);
             $userId = $clientData[0]['userId']??null;
-            $this->logger->writeInfo($this->users);
             $this->logger->writeInfo('$userId: '.$userId);
             if( isset($this->users[$userId])){
                 try {
