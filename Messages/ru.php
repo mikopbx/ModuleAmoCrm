@@ -110,5 +110,5 @@ return [
     'mod_amo_SaveSettingsError'           => 'Возникла ошибка сохранения настроек. Возможно не запущен сервис ConnectorDB.',
     'mod_amo_rules'                       => 'Создание сущностей',
     'mod_amo_settingsConnection'          => 'Настройки подключения',
-
+    'mod_amo_restrictCdrToKnownEmployees' => 'Загружать звонки только если сотрудника удалось определить',
 ];

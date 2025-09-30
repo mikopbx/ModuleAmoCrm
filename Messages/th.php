@@ -98,4 +98,5 @@ return [
     'mod_amo_respCallMissedHaveClient' => 'ไม่ได้รับสาย มีลูกค้ารับผิดชอบ',
     'mod_amo_respCallMissedNoClient' => 'ไม่ได้รับสาย ลูกค้าใหม่ มีความรับผิดชอบ',
     'mod_amo_respCommentMessage' => 'ส่วนนี้จะกำหนดค่ากฎสำหรับการกำหนดบุคคลที่รับผิดชอบ <b>สายเรียกเข้า</b> เมื่อปิดใช้งานโหมด CDR โดยละเอียด',
+    'mod_amo_restrictCdrToKnownEmployees' => 'โหลดข้อมูลการโทรเฉพาะเมื่อสามารถระบุพนักงานได้',
 ];

@@ -40,6 +40,7 @@ class AmoCdrDaemon extends WorkerBase
     public const  SOURCE_ID    = 'miko-pbx';
     private const LIMIT_CDR   = 50;
     private int   $offset = 1;
+    private bool  $panelIsEnable = false;
     public array  $innerNums = [];
     private array $users = [];
     public string $referenceDate='';
@@ -52,6 +53,7 @@ class AmoCdrDaemon extends WorkerBase
     private array $entitySettings = [];
 
     private bool $disableDetailedCdr = false;
+    private bool $restrictCdrToKnownEmployees = false;
     public string $respCallAnsweredHaveClient = '';
     public string $respCallAnsweredNoClient = '';
     public string $respCallMissedNoClient = '';
@@ -125,11 +127,13 @@ class AmoCdrDaemon extends WorkerBase
         $allSettings = ConnectorDb::invoke('getModuleSettings', [false]);
         if(!empty($allSettings) && is_array($allSettings)){
             $oldOffset = $this->offset;
+            $this->panelIsEnable = intval($allSettings['ModuleAmoCrm']['panelIsEnable']??0) ===0;
             $this->offset        = max(1*$allSettings['ModuleAmoCrm']['offsetCdr']??1,1);
             $this->referenceDate = $allSettings['ModuleAmoCrm']['referenceDate']??'';
-            $this->portalId      = (int)($allSettings['ModuleAmoCrm']['portalId']??0);
+            $this->portalId      = intval($allSettings['ModuleAmoCrm']['portalId']??0);
 
-            $this->disableDetailedCdr         = ($allSettings['ModuleAmoCrm']['disableDetailedCdr']??'0') === '1';
+            $this->disableDetailedCdr         = (intval($allSettings['ModuleAmoCrm']['disableDetailedCdr']??'0')) === 1;
+            $this->restrictCdrToKnownEmployees= (intval($allSettings['ModuleAmoCrm']['restrictCdrToKnownEmployees']??'0')) === 1;
             $this->respCallAnsweredHaveClient = ($allSettings['ModuleAmoCrm']['respCallAnsweredHaveClient']??'');
             $this->respCallAnsweredNoClient   = ($allSettings['ModuleAmoCrm']['respCallAnsweredNoClient']??'');
             $this->respCallMissedNoClient     = ($allSettings['ModuleAmoCrm']['respCallMissedNoClient']??'');
@@ -178,6 +182,10 @@ class AmoCdrDaemon extends WorkerBase
         $data = [];
         $extensions = Extensions::find($extensionFilter);
         foreach ($extensions as $extension){
+            $amoId = $amoUsersArray[$extension->number]??'';
+            if($this->restrictCdrToKnownEmployees && empty($amoId)){
+                continue;
+            }
             $data[] = [
                 'number' => $extension->number,
                 'name' => $extension->callerid,
@@ -255,7 +263,7 @@ class AmoCdrDaemon extends WorkerBase
             ];
         }
         $md5Cdr = md5(print_r($params, true));
-        if($md5Cdr !== $this->lastCacheCdr){
+        if($this->panelIsEnable && $md5Cdr !== $this->lastCacheCdr){
             // Оповещаме только если изменилось состояние.
             ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $params, 'action' => 'CDRs']);
             $this->lastCacheCdr = $md5Cdr;
@@ -308,14 +316,7 @@ class AmoCdrDaemon extends WorkerBase
             $srcNum = AmoCrmMain::getPhoneIndex($row['src_num']);
             $dstNum = AmoCrmMain::getPhoneIndex($row['dst_num']);
             $this->logger->writeInfo("From $srcNum to $dstNum, linkedid: $id, UNIQUEID:{$row['UNIQUEID']}, id: {$row['id']}");
-            if(isset($this->incompleteAnswered[$srcNum])){
-                $this->cdrRows[$id]['incompleteType'] = $this->incompleteAnswered[$srcNum]['type'];
-            }
             unset($this->incompleteAnswered[$srcNum],$this->incompleteAnswered[$dstNum]);
-            if(file_exists($row['recordingfile'])){
-                $this->cdrRows[$id]['records'][] = $row['recordingfile'];
-                $this->cdrRows[$id]['duration'] += 1*$row['billsec'];
-            }
             if( in_array($srcNum, $this->innerNums, true)
                 && in_array($dstNum, $this->innerNums, true)){
                 // Это внутренний разговор.
@@ -347,11 +348,21 @@ class AmoCdrDaemon extends WorkerBase
                 continue;
             }
             if(!isset($this->cdrRows[$id])){
-                $this->cdrRows[$id]['first']    = $row['UNIQUEID'];
-                $this->cdrRows[$id]['haveUser'] = false;
-                $this->cdrRows[$id]['duration'] = 0;
+                $this->cdrRows[$id] = [
+                    'first'    => $row['UNIQUEID'],
+                    'haveUser' => false,
+                    'duration' => 0,
+                    'answered' => false,
+                    'records'  => []
+                ];
             }
-
+            if(isset($this->incompleteAnswered[$srcNum])){
+                $this->cdrRows[$id]['incompleteType'] = $this->incompleteAnswered[$srcNum]['type'];
+            }
+            if(file_exists($row['recordingfile'])){
+                $this->cdrRows[$id]['records'][] = $row['recordingfile'];
+                $this->cdrRows[$id]['duration'] += 1*$row['billsec'];
+            }
             if($row['billsec'] < 1){
                 // Пропущенный вызов.
                 $call_status = 6;
@@ -407,6 +418,9 @@ class AmoCdrDaemon extends WorkerBase
                 $call['created_by']                 = $amoUserId;
                 $call['responsible_user_id']        = $amoUserId;
                 $call['params']['call_responsible'] = $amoUserId;
+            }elseif ($this->restrictCdrToKnownEmployees){
+                $this->logger->writeInfo($call, "The amoCRM user is not identified, the call will not be uploaded (restrictCdrToKnownEmployees = true)");
+                continue;
             }
             $phoneId = AmoCrmMain::getPhoneIndex($call['params']['phone']);
 
@@ -547,15 +561,27 @@ class AmoCdrDaemon extends WorkerBase
         }
         $this->logger->writeInfo($calls, "CDR synchronization. Step 2. Count: ".count($calls));
         $ids = '';
+
+        $callsArray = [
+            'contacts' => [],
+            'companies' => []
+        ];
         foreach ($calls as &$call) {
             $ids.= $call['id'].'|';
+            $entity_type = $this->cdrRows[$call['id']]['entity_type']??'contacts';
             unset($call['id'],$call['is_app'],$call['did']);
+            $callsArray[$entity_type][] = $call;
         }
-        unset($call);
-        // Пытаемся добавить вызовы. Это получится, если контакты существуют.
-        $result = WorkerAmoHTTP::invokeAmoApi('addCalls', [$calls]);
-        $this->logger->writeInfo($calls, "Create calls (REQ): $ids");
-        $this->logger->writeInfo($result, "Create calls (RES): $ids");
+        unset($call, $calls);
+        foreach ($callsArray as $entity_type => $callsData){
+            if(empty($callsData)){
+                continue;
+            }
+            // Пытаемся добавить вызовы. Это получится, если контакты существуют.
+            $result = WorkerAmoHTTP::invokeAmoApi('addCalls', [$callsData, $entity_type]);
+            $this->logger->writeInfo($callsData, "Create calls (REQ): $ids");
+            $this->logger->writeInfo($result, "Create calls (RES): $ids");
+        }
     }
 
     /**
@@ -573,7 +599,7 @@ class AmoCdrDaemon extends WorkerBase
                 if($callCounter[$call['id']] === 1){
                     continue;
                 }
-                $haveUser = $this->cdrRows[$call['id']]['haveUser'] === 1;
+                $haveUser = intval($this->cdrRows[$call['id']]['haveUser']) === 1;
                 if(!isset($call['responsible_user_id']) && $haveUser){
                     $this->logger->writeError($call, "Unsetted responsible_user_id for {$call['id']}, drop it");
                     unset($calls[$index], $call);
@@ -657,14 +683,17 @@ class AmoCdrDaemon extends WorkerBase
                 }
             }
             $call['params']['link']       = $this->getCreateFileAndLink($call['id'], $call['created_at']);
-            $call['params']['duration']   = $this->cdrRows[$call['id']]['duration'];
-            if($this->cdrRows[$call['id']]['answered'] === 1 ){
+            $call['params']['duration']   = $this->cdrRows[$call['id']]['duration']??$this->cdrRows[$call['id']]['params']['duration']??0;
+
+            $answered = $this->cdrRows[$call['id']]['answered']??0;
+            if($answered === 1){
                 $call['params']['call_status'] = 4;
             }else{
                 $call['params']['call_status'] = 6;
             }
+
             $resCalls[$call['id']] = $call;
-            $this->logger->writeInfo($settingName, "Result cdr {$call['id']}");
+            $this->logger->writeInfo($call, "Result cdr {$call['id']}");
 
         }
         return array_values($resCalls);
@@ -700,7 +729,9 @@ class AmoCdrDaemon extends WorkerBase
                         $cmd.= "$pathSox - -m $value -p pad 3 0 | ";
                     }
                 }
-                shell_exec($cmd);
+                if(!empty($records)){
+                    shell_exec($cmd);
+                }
             }
             $link = "https://$this->extHostname/pbxcore/api/amo-crm/playback?view=$fileName";
         }
@@ -742,7 +773,16 @@ class AmoCdrDaemon extends WorkerBase
             $indexAction   = AmoCrmMain::getPhoneIndex($call['phone']);
             $contData      = $contactsData[$indexAction];
             $contactId     = $contData['contactId']??null;
-            $contactExists = !empty($contactId);
+            $companyId     = $contData['companyId']??null;
+
+            $contactExists = false;
+            if(!empty($contactId)){
+                $this->cdrRows[$call['id']]['entity_type'] = 'contacts';
+                $contactExists = true;
+            }elseif(!empty($companyId)){
+                $contactExists = true;
+                $this->cdrRows[$call['id']]['entity_type'] = 'companies';
+            }
 
             $this->logger->writeInfo($contData, "Contact data for id: {$call['id']}");
 
@@ -761,7 +801,7 @@ class AmoCdrDaemon extends WorkerBase
                 continue;
             }
             $params = ['id' => $call['id'], 'params' => ['phone' => $call['phone']]];
-            if($settings['create_contact'] === '1' && !$contactExists){
+            if(intval($settings['create_contact']) === 1 && !$contactExists){
                 $this->newContacts[$indexAction] = [
                     'phone'               => $call['phone'],
                     'contactName'         => $this->replaceTagTemplate($settings['template_contact_name'], $params),
@@ -777,7 +817,8 @@ class AmoCdrDaemon extends WorkerBase
         foreach ($calls as $phoneId => $subCalls){
             foreach ($subCalls as $index => $call) {
                 $this->logger->writeInfo($call, "Complete call: {$call['id']}");
-                if($this->cdrRows[$call['id']]['answered'] === 1 && $call['params']['duration'] === 0){
+                $answered = $this->cdrRows[$call['id']]['answered']??0;
+                if($answered === 1 && $call['params']['duration'] === 0){
                     $this->logger->writeInfo("Сdr not answered the call was generally answered: {$call['id']}. skip it");
                     $callCounter[$call['id']]--;
                     unset($calls[$phoneId][$index],$call);
@@ -792,9 +833,20 @@ class AmoCdrDaemon extends WorkerBase
                 $this->logger->writeInfo($contData, "Contact data for id: {$call['id']}");
 
                 $contactId     = $contData['contactId']??null;
-                $contactExists = !empty($contactId);
+                $companyId     = $contData['companyId']??null;
 
-                $isMissed      = $this->cdrRows[$call['id']]['answered'] === 0;
+                $contactExists = false;
+                if(!empty($contactId)){
+                    $this->cdrRows[$call['id']]['entity_type'] = 'contacts';
+                    $contactExists = true;
+                    $calls[$phoneId][$index]['entity_id'] = intval($contactId);
+                }elseif(!empty($companyId)){
+                    $contactExists = true;
+                    $this->cdrRows[$call['id']]['entity_type'] = 'companies';
+                    $calls[$phoneId][$index]['entity_id'] = intval($companyId);
+                }
+
+                $isMissed      = $answered === 0;
                 $isIncoming    = $call['note_type'] === 'call_in';
 
                 $did           =  $this->cdrRows[$call['id']]['did']??'';
@@ -818,7 +870,7 @@ class AmoCdrDaemon extends WorkerBase
                     }
                     continue;
                 }
-                if($this->cdrRows[$call['id']]['answered'] === 1){
+                if($answered === 1){
                     $responsibleField = $settings['responsible']."AnswerUser";
                 }else{
                     $responsibleField = $settings['responsible']."MissedUser";
@@ -826,12 +878,10 @@ class AmoCdrDaemon extends WorkerBase
                 // Получим ответственного.
                 $responsible = 1*($this->cdrRows[$call['id']][$responsibleField]??$settings['def_responsible']);
                 $this->cdrRows[$call['id']]['responsibleRule']      = $responsible;
-                $this->cdrRows[$call['id']]['resp_contact_user_id'] = 1*($contactsData[$phone]['resp_contact_user_id']??'');
+                $this->cdrRows[$call['id']]['resp_contact_user_id'] = intval($contactsData[$phoneId]['resp_contact_user_id']??'');
 
                 $indexAction = AmoCrmMain::getPhoneIndex($phone);
-                if($contactExists){
-                    $calls[$phoneId][$index]['entity_id'] = 1*$contData['contactId'];
-                }elseif($settings['create_contact'] === '1'){
+                if(!$contactExists && intval($settings['create_contact']) === 1){
                     $this->newContacts[$indexAction] = [
                         'phone'               => $phone,
                         'contactName'         => $this->replaceTagTemplate($settings['template_contact_name'], $call),
@@ -933,7 +983,7 @@ class AmoCdrDaemon extends WorkerBase
      */
     private function addNewTask($settings, $call, $contData):void
     {
-        if($settings['create_task'] !== '1'){
+        if(intval($settings['create_task']) !== 1){
             return;
         }
         $indexAction = AmoCrmMain::getPhoneIndex($call['params']['phone']);
@@ -982,7 +1032,7 @@ class AmoCdrDaemon extends WorkerBase
     private function addNewLead($settings, $call, $contData, $responsible):void
     {
         $lead = $contData['leadId']??'';
-        if($settings['create_lead'] !== '1' || !empty($lead) || isset($this->createdLeads[$call['id']])){
+        if(intval($settings['create_lead']) !== 1 || !empty($lead) || isset($this->createdLeads[$call['id']])){
             // Лид уже был создан ранее
             // Или Лид не должен быть создан.
             return;
@@ -1002,13 +1052,13 @@ class AmoCdrDaemon extends WorkerBase
         if($contData !== false){
             if(!empty($contData['contactId'])){
                 $leadData['_embedded']['contacts'][]=[
-                    'id' => (int)$contData['contactId'],
+                    'id' => intval($contData['contactId']),
                     'is_main' => true
                 ];
             }
             if(!empty($contData['companyId'])){
                 $leadData['_embedded']['companies'][]=[
-                    'id' => $contData['contactId'],
+                    'id' => intval($contData['companyId']),
                 ];
             }
         }
@@ -1096,7 +1146,7 @@ class AmoCdrDaemon extends WorkerBase
                 'linked_company_id'     => '',
                 'custom_fields'         => [
                     [
-                        'code'   => 'PHONE', 
+                        'code'   => 'PHONE',
                         'values' => [
                             ['value' => $this->newContacts[$contact['request_id']]['phone']]
                         ]

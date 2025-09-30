@@ -30,9 +30,10 @@ require_once(dirname(__DIR__).'/vendor/autoload.php');
 class Logger
 {
     public bool $debug;
-    private \Phalcon\Logger $logger;
+    private $logger;
     private string $module_name;
     private string $logFile;
+    private int $lastRotateCheckTs = 0;
 
     /**
      * Logger constructor.
@@ -59,7 +60,8 @@ class Logger
      */
     private function init():void
     {
-        $this->logger  = new \Phalcon\Logger(
+        $loggerClass = MikoPBXVersion::getLoggerClass();
+        $this->logger  = new $loggerClass(
             'messages',
             [
                 'main' =>  new Stream($this->logFile),
@@ -73,6 +75,13 @@ class Logger
      */
     public function rotate(): void
     {
+        // Throttle rotation checks to reduce overhead in tight loops (fixed interval).
+        $rotateInterval = 30;
+        $now = time();
+        if ($this->lastRotateCheckTs !== 0 && ($now - $this->lastRotateCheckTs) < $rotateInterval) {
+            return;
+        }
+        $this->lastRotateCheckTs = $now;
         $rotation = new Rotation([
              'files' => 5,
              'compress' => false,
@@ -95,6 +104,7 @@ class Logger
      */
     public function writeError($data, string $preMessage=''): void
     {
+        $this->rotate();
         if ($this->debug) {
             if(!empty($preMessage)){
                 $preMessage.= ': ';
@@ -111,6 +121,7 @@ class Logger
      */
     public function writeInfo($data, string $preMessage=''): void
     {
+        $this->rotate();
         if ($this->debug) {
             if(!empty($preMessage)){
                 $preMessage.= ': ';

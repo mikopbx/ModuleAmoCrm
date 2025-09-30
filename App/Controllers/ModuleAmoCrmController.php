@@ -98,12 +98,18 @@ class ModuleAmoCrmController extends BaseController
     public function checkAction():void
     {
         $result      = WorkerAmoHTTP::invokeAmoApi('checkConnection', []);
-        $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
-        $lastContactsSyncTime = (int)($allSettings['ModuleAmoCrm']['lastContactsSyncTime']??0);
-        $result->data['lastContactsSyncTime'] = $lastContactsSyncTime;
-        $this->view->success = $result->success;
-        $this->view->data    = $result->data;
-        $this->view->messages= $result->messages;
+        if($result){
+            $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
+            $lastContactsSyncTime = (int)($allSettings['ModuleAmoCrm']['lastContactsSyncTime']??0);
+            $result->data['lastContactsSyncTime'] = $lastContactsSyncTime;
+            $this->view->success = $result->success;
+            $this->view->data    = $result->data;
+            $this->view->messages= $result->messages;
+        }else{
+            $this->view->success = false;
+            $this->view->data = [];
+            $this->view->messages = [];
+        }
     }
 
     /**
@@ -125,7 +131,7 @@ class ModuleAmoCrmController extends BaseController
 
 
         $ModuleSettings = PbxExtensionModules::findFirst(["uniqid='$this->moduleUniqueID'",'columns' => ['disabled']]);
-        if($ModuleSettings->disabled === '1'){
+        if(intval($ModuleSettings->disabled) === 1){
             // Если модуль отключен.
             $settings = ModuleAmoCrm::findFirst();
             if ($settings === null) {
@@ -140,6 +146,9 @@ class ModuleAmoCrmController extends BaseController
             $rules       = $allSettings['ModuleAmoEntitySettings'];
         }
         foreach ($rules as $index => $rule){
+            $rules[$index]['create_contact'] = (string)$rule['create_contact'];
+            $rules[$index]['create_lead']    = (string)$rule['create_lead'];
+            $rules[$index]['create_task']    = (string)$rule['create_task'];
             $rules[$index]['type_translate'] = 'mod_amo_type_'.$rule['type'];
         }
 
@@ -158,7 +167,7 @@ class ModuleAmoCrmController extends BaseController
         // Список выбора очередей.
         $this->view->queues = CallQueues::find(['columns' => ['id', 'name']]);
         $this->view->users  = Extensions::find(["type = 'SIP'", 'columns' => ['number', 'callerid']]);
-        $this->view->entitySettings  = $rules;
+        $this->view->entitySettings  = $rules??[];
     }
 
     /**
@@ -168,13 +177,16 @@ class ModuleAmoCrmController extends BaseController
     {
         $data   = $this->request->getPost();
         $ModuleSettings = PbxExtensionModules::findFirst(["uniqid='$this->moduleUniqueID'",'columns' => ['disabled']]);
-        if($ModuleSettings->disabled !== '1'){
+
+        $ignoreColumns = ['id','offsetCdr','authData'];
+        $boolColumns = ['useInterception', 'isPrivateWidget', 'disableDetailedCdr', 'panelIsEnable', 'restrictCdrToKnownEmployees'];
+        if(intval($ModuleSettings->disabled) !== 1){
             $settings = [];
             foreach ($data as $key => $value) {
-                if(in_array($key, ['id','offsetCdr','authData'], true)){
+                if(in_array($key, $ignoreColumns, true)){
                     continue;
                 }
-                if(in_array($key, ['useInterception', 'isPrivateWidget', 'disableDetailedCdr', 'panelIsEnable'])){
+                if(in_array($key, $boolColumns)){
                     $settings[$key] = ($value === 'on') ? '1' : '0';
                 } else {
                     $settings[$key]  = $value;
@@ -191,10 +203,10 @@ class ModuleAmoCrmController extends BaseController
                 $record = new ModuleAmoCrm();
             }
             foreach ($record as $key => $value) {
-                if(in_array($key, ['id','offsetCdr','authData'], true)){
+                if(in_array($key, $ignoreColumns, true)){
                     continue;
                 }
-                if('useInterception' === $key || 'isPrivateWidget' === $key || 'disableDetailedCdr' === $key ){
+                if(in_array($key, $boolColumns)){
                     $record->$key = ($data[$key] === 'on') ? '1' : '0';
                 } elseif (array_key_exists($key, $data)) {
                     if($record->$key !== trim($data[$key])){

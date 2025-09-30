@@ -192,9 +192,9 @@ class AmoCrmMain extends AmoCrmMainBase
         return $connectionData;
     }
 
-    public function addCalls($calls):PBXApiResult
+    public function addCalls($calls, $entity_type):PBXApiResult
     {
-        $url = "https://$this->baseDomain/api/v4/contacts/notes";
+        $url = "https://$this->baseDomain/api/v4/$entity_type/notes";
         $headers = [
             'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
         ];

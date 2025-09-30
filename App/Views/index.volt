@@ -182,6 +182,13 @@
             <label>{{ t._('mod_amo_disableDetailedCdr') }}</label>
         </div>
     </div>
+    <div class="field">
+        <div class="ui toggle checkbox">
+            {{ form.render('restrictCdrToKnownEmployees') }}
+            <label>{{ t._('mod_amo_restrictCdrToKnownEmployees') }}</label>
+        </div>
+    </div>
+
     <div class="ui visible message">
         <p>{{ t._('mod_amo_respCommentMessage') }}</p>
     </div>

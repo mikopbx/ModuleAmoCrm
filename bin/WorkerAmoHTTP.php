@@ -25,8 +25,8 @@ use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
+use Modules\ModuleAmoCrm\Lib\MikoPBXVersion;
 use Modules\ModuleAmoCrm\Lib\PBXAmoResult;
-use Phalcon\Di;
 
 class WorkerAmoHTTP extends WorkerBase
 {
@@ -105,7 +105,7 @@ class WorkerAmoHTTP extends WorkerBase
         }
         $downloadCacheDir = '/tmp/';
         $tmpDir = '/tmp/';
-        $di = Di::getDefault();
+        $di = MikoPBXVersion::getDefaultDi();
         if ($di) {
             $dirsConfig = $di->getShared('config');
             $tmoDirName = $dirsConfig->path('core.tempDir') . '/ModuleAmoCrm';

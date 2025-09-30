@@ -47,7 +47,11 @@ class ClientHTTP
             $code       = $resultHttp->getStatusCode();
         }catch (GuzzleHttp\Exception\ConnectException $e ){
             $message = $e->getMessage();
-            Util::sysLogMsg('ModuleAmoCrm', "ConnectException");
+
+            $errorMessage = "Error: " . $e->getMessage() . ',';
+            $errorMessage .= "Request URL: " . $e->getRequest()->getUri() . ',';
+            $errorMessage .= "Request Method: " . $e->getRequest()->getMethod() . ',';
+            Util::sysLogMsg('ModuleAmoCrm', "ConnectException: ".$errorMessage);
             $code = 0;
         } catch (GuzzleException $e) {
             $message = $e->getMessage();
@@ -79,7 +83,10 @@ class ClientHTTP
             $code       = $resultHttp->getStatusCode();
         }catch (GuzzleHttp\Exception\ConnectException $e ){
             $message = $e->getMessage();
-            Util::sysLogMsg('ModuleAmoCrm', "ConnectException");
+            $errorMessage = "Error: " . $e->getMessage() . ',';
+            $errorMessage .= "Request URL: " . $e->getRequest()->getUri() . ',';
+            $errorMessage .= "Request Method: " . $e->getRequest()->getMethod() . ',';
+            Util::sysLogMsg('ModuleAmoCrm', "ConnectException: ".$errorMessage);
             $code = 0;
         } catch (GuzzleException $e) {
             $message = $e->getMessage();
@@ -102,7 +109,7 @@ class ClientHTTP
         }
         $client  = new GuzzleHttp\Client();
         $options = [
-            'timeout'       => 5,
+            'timeout'       => 8,
             'http_errors'   => false,
             'headers'       => $headers,
         ];
@@ -113,7 +120,10 @@ class ClientHTTP
             $code       = $resultHttp->getStatusCode();
         }catch (GuzzleHttp\Exception\ConnectException $e ){
             $message = $e->getMessage();
-            Util::sysLogMsg('ModuleAmoCrm', "ConnectException");
+            $errorMessage = "Error: " . $e->getMessage() . ',';
+            $errorMessage .= "Request URL: " . $e->getRequest()->getUri() . ',';
+            $errorMessage .= "Request Method: " . $e->getRequest()->getMethod() . ',';
+            Util::sysLogMsg('ModuleAmoCrm', "ConnectException: ".$errorMessage);
             $code = 0;
         } catch (GuzzleException $e) {
             $message = $e->getMessage();

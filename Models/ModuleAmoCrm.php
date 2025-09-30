@@ -116,6 +116,11 @@ class ModuleAmoCrm extends ModulesModelsBase
      */
     public $disableDetailedCdr = 0;
 
+    /**
+     * Restricts the loading of calls to configured employees only.
+     * @Column(type="integer", default="0", nullable=true)
+     */
+    public $restrictCdrToKnownEmployees = 0;
 
     /**
      * first last fromContact fromRule

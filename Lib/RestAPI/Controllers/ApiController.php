@@ -67,8 +67,8 @@ class ApiController extends ModulesControllerBase
             return;
         }
         $allSettings   = ConnectorDb::invoke('getModuleSettings', [true]);
-        $panelIsEnable = $allSettings['ModuleAmoCrm']['panelIsEnable']??'0';
-        if($panelIsEnable === '1'){
+        $panelIsEnable = intval($allSettings['ModuleAmoCrm']['panelIsEnable']??0);
+        if($panelIsEnable === 1){
             $code = 200;
         }else{
             $code = 201;
@@ -84,7 +84,7 @@ class ApiController extends ModulesControllerBase
 
     public function amoEntityUpdateAction():void
     {
-        ConnectorDb::invoke('entityUpdate', [$_REQUEST]);
+        ConnectorDb::invoke('entityUpdate', [$_REQUEST], false);
     }
 
     /**
