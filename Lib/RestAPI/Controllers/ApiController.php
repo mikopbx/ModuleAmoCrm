@@ -10,6 +10,8 @@
 namespace Modules\ModuleAmoCrm\Lib\RestAPI\Controllers;
 
 use MikoPBX\Common\Providers\LoggerProvider;
+use MikoPBX\Core\System\SystemMessages;
+use MikoPBX\Core\System\Util;
 use MikoPBX\PBXCoreREST\Controllers\Modules\ModulesControllerBase;
 use Modules\ModuleAmoCrm\bin\ConnectorDb;
 use Modules\ModuleAmoCrm\bin\WorkerAmoCrmAMI;
@@ -84,6 +86,16 @@ class ApiController extends ModulesControllerBase
 
     public function amoEntityUpdateAction():void
     {
+        $tmpFileName = '/tmp/amo-server-ip';
+        $ip = $this->getClientIp();
+        $oldIp = '';
+        if(file_exists($tmpFileName)){
+            $oldIp = file_get_contents($tmpFileName);
+        }
+        if($oldIp !== $ip){
+            SystemMessages::sysLogMsg('amoCrm-hook', 'from: ', $this->getClientIp());
+            file_put_contents($tmpFileName, $ip);
+        }
         ConnectorDb::invoke('entityUpdate', [$_REQUEST], false);
     }
 
@@ -131,5 +143,34 @@ class ApiController extends ModulesControllerBase
         }catch (\Exception $e){
             echo 'Error json encode: '. print_r($result, true);
         }
+    }
+
+    /**
+     * Возвращает IP адрес клиента.
+     * @return string
+     */
+    private function getClientIp() {
+        $ipKeys = [
+            'HTTP_CF_CONNECTING_IP',   // Cloudflare
+            'HTTP_X_FORWARDED_FOR',
+            'HTTP_X_REAL_IP',
+            'HTTP_X_FORWARDED',
+            'HTTP_FORWARDED_FOR',
+            'HTTP_FORWARDED',
+            'HTTP_CLIENT_IP',
+            'REMOTE_ADDR'
+        ];
+
+        foreach ($ipKeys as $key) {
+            if (array_key_exists($key, $_SERVER) && $_SERVER[$key]) {
+                // Некоторые заголовки могут содержать несколько IP (например, X-Forwarded-For)
+                $ips = explode(',', $_SERVER[$key]);
+                $ip = trim($ips[0]); // Берём первый IP — это обычно клиент
+                if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                    return $ip;
+                }
+            }
+        }
+        return '127.0.0.1';
     }
 }
