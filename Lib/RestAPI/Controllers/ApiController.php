@@ -93,7 +93,7 @@ class ApiController extends ModulesControllerBase
             $oldIp = file_get_contents($tmpFileName);
         }
         if($oldIp !== $ip){
-            SystemMessages::sysLogMsg('amoCrm-hook', 'from: ', $this->getClientIp());
+            SystemMessages::sysLogMsg('amoCrm-hook', 'from: '. $this->getClientIp());
             file_put_contents($tmpFileName, $ip);
         }
         ConnectorDb::invoke('entityUpdate', [$_REQUEST], false);
