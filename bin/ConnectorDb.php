@@ -498,7 +498,7 @@ class ConnectorDb extends WorkerBase
                 $this->saveCache(self::class.':'.$phone, [], 10);
             }
         }
-        ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['action' => 'findContact', 'data' => $result]);
+        ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['action' => 'findContact', 'data' => $result]);
         return $result;
     }
 

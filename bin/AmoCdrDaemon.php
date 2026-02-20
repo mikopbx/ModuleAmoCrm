@@ -194,7 +194,7 @@ class AmoCdrDaemon extends WorkerBase
             ];
         }
         unset($extensions);
-        $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $data, 'action' => 'USERS']);
+        $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['data' => $data, 'action' => 'USERS']);
         if(!$result->success){
             $this->logger->writeError("Update user list. Count: ".count($data));
             try {
@@ -265,7 +265,7 @@ class AmoCdrDaemon extends WorkerBase
         $md5Cdr = md5(print_r($params, true));
         if($this->panelIsEnable && $md5Cdr !== $this->lastCacheCdr){
             // Оповещаме только если изменилось состояние.
-            ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $params, 'action' => 'CDRs']);
+            ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['data' => $params, 'action' => 'CDRs']);
             $this->lastCacheCdr = $md5Cdr;
         }
     }
@@ -469,7 +469,7 @@ class AmoCdrDaemon extends WorkerBase
             }
             if(!empty($call['lead']) || !empty($call['client']) || !empty($call['company'])){
                 $this->logger->writeInfo($call, "alertIncompleteAnswered");
-                ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $call, 'action' => 'open-card']);
+                ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['data' => $call, 'action' => 'open-card']);
             }
             $this->incompleteAnswered[$id]['finished'] = true;
         }

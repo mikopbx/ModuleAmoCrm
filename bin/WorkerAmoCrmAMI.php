@@ -20,6 +20,7 @@
 namespace Modules\ModuleAmoCrm\bin;
 require_once 'Globals.php';
 
+use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
@@ -28,7 +29,14 @@ use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 
 class WorkerAmoCrmAMI extends WorkerBase
 {
-    public const CHANNEL_CALL_NAME = 'http://127.0.0.1/pbxcore/api/nchan/pub/pbx-events';
+    /**
+     * @return string
+     */
+    public static function getChannelUrl(): string
+    {
+        $port = PbxSettings::getValueByKey('WEBPort');
+        return "http://127.0.0.1:{$port}/pbxcore/api/nchan/pub/pbx-events";
+    }
 
     private int     $extensionLength = 3;
     private array   $users = [];
@@ -251,7 +259,7 @@ class WorkerAmoCrmAMI extends WorkerBase
                 $this->calls[$call['id']][] = $call;
             }
             $this->activeChannels[$data['src_chan']] = $data['src_num'];
-            ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
+            ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $call);
         }
     }
 
@@ -419,7 +427,7 @@ class WorkerAmoCrmAMI extends WorkerBase
                 'user'    => $userId,
                 'action'  => 'hangup'
             ];
-            ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
+            ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $params);
         }
     }
 
@@ -466,7 +474,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'dst'     => $transferCall['dst'],
             'action'  => 'call'
         ];
-        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
+        ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $params);
 
         $data = [
             'action'   => 'answer',
@@ -474,7 +482,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'id'       => $data['linkedid'],
             'uid'      => $transferCall['uid'],
         ];
-        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $data);
+        ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $data);
     }
 
     /**
@@ -514,7 +522,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'user'    => $this->users[$number],
             'action'  => 'create-chan'
         ];
-        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
+        ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $params);
     }
 
     /**
@@ -538,7 +546,7 @@ class WorkerAmoCrmAMI extends WorkerBase
                 'id'       => $params['linkedid'],
                 'uid'      => $call['uid'],
             ];
-            ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $data);
+            ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $data);
             break;
         }
         unset($call);
@@ -567,7 +575,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'dst'              => '', // Канал назначения не был создан.
             'action'           => 'end-dial',
         ];
-        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
+        ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $call);
     }
 
     /**
@@ -611,7 +619,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'filename'         => $data['recordingfile'],
             'action'           => 'end-call',
         ];
-        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
+        ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $call);
 
         // Чистим мусор.
         unset(
