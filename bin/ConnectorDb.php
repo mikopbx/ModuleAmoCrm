@@ -35,6 +35,7 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoLeads;
 use Modules\ModuleAmoCrm\Models\ModuleAmoPhones;
 use Modules\ModuleAmoCrm\Models\ModuleAmoPipeLines;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
+use Modules\ModuleAmoCrm\Models\ModuleAmoFailedCdr;
 use Throwable;
 use Phalcon\Mvc\Model\Manager;
 
@@ -1109,6 +1110,25 @@ class ConnectorDb extends WorkerBase
     }
 
 
+    /**
+     * Сохранение провального CDR в БД.
+     * @param array $linkedIds
+     * @param string $reason
+     * @return bool
+     */
+    public function saveFailedCdr(array $linkedIds, string $reason = ''):bool
+    {
+        $result = true;
+        $now = time();
+        foreach ($linkedIds as $linkedId) {
+            $record = new ModuleAmoFailedCdr();
+            $record->linkedid = $linkedId;
+            $record->failedAt = $now;
+            $record->reason   = $reason;
+            $result = min($record->save(), $result);
+        }
+        return $result;
+    }
 }
 
 if(isset($argv) && count($argv) !== 1

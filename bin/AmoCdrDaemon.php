@@ -65,6 +65,8 @@ class AmoCdrDaemon extends WorkerBase
     private array $newTasks = [];
     private array $incompleteAnswered = [];
     private array $createdLeads = []; // Кэш создана ли сделка для звонка. 1 звонок = 1 сделка
+    private int $addCallsFailCount = 0; // Счётчик последовательных неудач addCalls
+    private const MAX_ADD_CALLS_FAILURES = 5; // Максимум попыток перед пропуском батча
 
     // ВИДЫ ЗВОНКОВ.
     // Входящие
@@ -450,7 +452,24 @@ class AmoCdrDaemon extends WorkerBase
         ////
         // Прикрепление звонков к сущностям.
         ////
-        $this->addCalls($calls, $callCounter);
+        $callsOk = $this->addCalls($calls, $callCounter);
+        if(!$callsOk){
+            $this->addCallsFailCount++;
+            if($this->addCallsFailCount >= self::MAX_ADD_CALLS_FAILURES){
+                // Превышен лимит попыток — пропускаем батч, фиксируем в БД и в лог.
+                $failedIds = array_unique(array_keys($this->cdrRows));
+                $this->logger->writeError("addCalls failed $this->addCallsFailCount times in a row, skipping batch. Lost linkedids: " . implode(', ', $failedIds));
+                ConnectorDb::invoke('saveFailedCdr', [$failedIds, 'addCalls timeout after ' . self::MAX_ADD_CALLS_FAILURES . ' attempts'], false);
+                $this->addCallsFailCount = 0;
+                // offset НЕ откатываем — пропускаем батч
+            }else{
+                $this->offset = $oldOffset;
+                $this->logger->writeError("addCalls failed (attempt $this->addCallsFailCount/" . self::MAX_ADD_CALLS_FAILURES . "), offset rolled back to $oldOffset");
+                return;
+            }
+        }else{
+            $this->addCallsFailCount = 0;
+        }
 
         if($oldOffset !== $this->offset){
             ConnectorDb::invoke('saveNewSettings', [['offsetCdr' => $this->offset]]);
@@ -549,7 +568,7 @@ class AmoCdrDaemon extends WorkerBase
      * @param $callCounter
      * @return void
      */
-    private function addCalls($calls, $callCounter):void
+    private function addCalls($calls, $callCounter):bool
     {
         $calls  = array_merge(... array_values($calls));
         if(!empty($calls)){
@@ -557,7 +576,7 @@ class AmoCdrDaemon extends WorkerBase
             $calls = $this->cleanCalls($calls, $callCounter);
         }
         if(empty($calls)){
-            return;
+            return true;
         }
         $this->logger->writeInfo($calls, "CDR synchronization. Step 2. Count: ".count($calls));
         $ids = '';
@@ -573,6 +592,7 @@ class AmoCdrDaemon extends WorkerBase
             $callsArray[$entity_type][] = $call;
         }
         unset($call, $calls);
+        $allSuccess = true;
         foreach ($callsArray as $entity_type => $callsData){
             if(empty($callsData)){
                 continue;
@@ -581,7 +601,12 @@ class AmoCdrDaemon extends WorkerBase
             $result = WorkerAmoHTTP::invokeAmoApi('addCalls', [$callsData, $entity_type]);
             $this->logger->writeInfo($callsData, "Create calls (REQ): $ids");
             $this->logger->writeInfo($result, "Create calls (RES): $ids");
+            if(!$result->success){
+                $this->logger->writeError("Failed to add calls for $entity_type, offset will be rolled back");
+                $allSuccess = false;
+            }
         }
+        return $allSuccess;
     }
 
     /**

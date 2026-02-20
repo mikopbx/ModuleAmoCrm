@@ -35,30 +35,13 @@ class ClientHTTP
     public static function sendHttpPostRequest(string $url, array $params, array $headers=[]):PBXAmoResult{
         $client  = new GuzzleHttp\Client();
         $options = [
-            'timeout'       => 5,
-            'http_errors'   => false,
-            'headers'       => $headers,
-            'json'          => $params,
+            'timeout'         => 15,
+            'connect_timeout' => 5,
+            'http_errors'     => false,
+            'headers'         => $headers,
+            'json'            => $params,
         ];
-        $message = '';
-        $resultHttp = null;
-        try {
-            $resultHttp = $client->request('POST', $url, $options);
-            $code       = $resultHttp->getStatusCode();
-        }catch (GuzzleHttp\Exception\ConnectException $e ){
-            $message = $e->getMessage();
-
-            $errorMessage = "Error: " . $e->getMessage() . ',';
-            $errorMessage .= "Request URL: " . $e->getRequest()->getUri() . ',';
-            $errorMessage .= "Request Method: " . $e->getRequest()->getMethod() . ',';
-            Util::sysLogMsg('ModuleAmoCrm', "ConnectException: ".$errorMessage);
-            $code = 0;
-        } catch (GuzzleException $e) {
-            $message = $e->getMessage();
-            Util::sysLogMsg('ModuleAmoCrm', "GuzzleException");
-            $code = 0;
-        }
-        return self::parseResponse($resultHttp, $message, $code);
+        return self::executeWithRetry($client, 'POST', $url, $options);
     }
 
     /**
@@ -71,29 +54,13 @@ class ClientHTTP
     public static function sendHttpPatchRequest(string $url, array $params, array $headers=[]):PBXAmoResult{
         $client  = new GuzzleHttp\Client();
         $options = [
-            'timeout'       => 5,
-            'http_errors'   => false,
-            'headers'       => $headers,
-            'json'          => $params,
+            'timeout'         => 15,
+            'connect_timeout' => 5,
+            'http_errors'     => false,
+            'headers'         => $headers,
+            'json'            => $params,
         ];
-        $message = '';
-        $resultHttp = null;
-        try {
-            $resultHttp = $client->request('PATCH', $url, $options);
-            $code       = $resultHttp->getStatusCode();
-        }catch (GuzzleHttp\Exception\ConnectException $e ){
-            $message = $e->getMessage();
-            $errorMessage = "Error: " . $e->getMessage() . ',';
-            $errorMessage .= "Request URL: " . $e->getRequest()->getUri() . ',';
-            $errorMessage .= "Request Method: " . $e->getRequest()->getMethod() . ',';
-            Util::sysLogMsg('ModuleAmoCrm', "ConnectException: ".$errorMessage);
-            $code = 0;
-        } catch (GuzzleException $e) {
-            $message = $e->getMessage();
-            Util::sysLogMsg('ModuleAmoCrm', "GuzzleException");
-            $code = 0;
-        }
-        return self::parseResponse($resultHttp, $message, $code);
+        return self::executeWithRetry($client, 'PATCH', $url, $options);
     }
 
     /**
@@ -109,26 +76,52 @@ class ClientHTTP
         }
         $client  = new GuzzleHttp\Client();
         $options = [
-            'timeout'       => 8,
-            'http_errors'   => false,
-            'headers'       => $headers,
+            'timeout'         => 15,
+            'connect_timeout' => 5,
+            'http_errors'     => false,
+            'headers'         => $headers,
         ];
-        $message = '';
+        return self::executeWithRetry($client, 'GET', $url, $options);
+    }
+
+    /**
+     * Выполнение HTTP-запроса с retry при ConnectException (таймауты, сетевые ошибки).
+     * До 3 попыток с линейным backoff (2, 4, 6 сек).
+     * @param GuzzleHttp\Client $client
+     * @param string $method
+     * @param string $url
+     * @param array  $options
+     * @return PBXAmoResult
+     */
+    private static function executeWithRetry(GuzzleHttp\Client $client, string $method, string $url, array $options):PBXAmoResult
+    {
+        $maxRetries = 3;
+        $retryDelay = 2;
+        $message    = '';
         $resultHttp = null;
-        try {
-            $resultHttp = $client->request('GET', $url, $options);
-            $code       = $resultHttp->getStatusCode();
-        }catch (GuzzleHttp\Exception\ConnectException $e ){
-            $message = $e->getMessage();
-            $errorMessage = "Error: " . $e->getMessage() . ',';
-            $errorMessage .= "Request URL: " . $e->getRequest()->getUri() . ',';
-            $errorMessage .= "Request Method: " . $e->getRequest()->getMethod() . ',';
-            Util::sysLogMsg('ModuleAmoCrm', "ConnectException: ".$errorMessage);
-            $code = 0;
-        } catch (GuzzleException $e) {
-            $message = $e->getMessage();
-            Util::sysLogMsg('ModuleAmoCrm', "GuzzleException");
-            $code = 0;
+        $code       = 0;
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $resultHttp = $client->request($method, $url, $options);
+                $code       = $resultHttp->getStatusCode();
+                break;
+            } catch (GuzzleHttp\Exception\ConnectException $e) {
+                $message = $e->getMessage();
+                $errorMessage = "Error: " . $e->getMessage() . ',';
+                $errorMessage .= "Request URL: " . $e->getRequest()->getUri() . ',';
+                $errorMessage .= "Request Method: " . $e->getRequest()->getMethod() . ',';
+                $errorMessage .= "Attempt: $attempt/$maxRetries";
+                Util::sysLogMsg('ModuleAmoCrm', "ConnectException: " . $errorMessage);
+                if ($attempt < $maxRetries) {
+                    sleep($retryDelay * $attempt);
+                }
+                $code = 0;
+            } catch (GuzzleException $e) {
+                $message = $e->getMessage();
+                Util::sysLogMsg('ModuleAmoCrm', "GuzzleException: " . $message);
+                $code = 0;
+                break;
+            }
         }
         return self::parseResponse($resultHttp, $message, $code);
     }
