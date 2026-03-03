@@ -739,23 +739,20 @@ class AmoCdrDaemon extends WorkerBase
             }else{
                 $monitor_dir = Storage::getMonitorDir();
                 $sub_dir = date('Y/m/d/H', $created_at);
-                $fileName = "$monitor_dir/amo/$sub_dir/$id.mp3";
+                $ext = pathinfo($this->cdrRows[$id]['records'][0], PATHINFO_EXTENSION);
+                if(empty($ext)){
+                    $ext = 'mp3';
+                }
+                $fileName = "$monitor_dir/amo/$sub_dir/$id.$ext";
                 Util::mwMkdir(dirname($fileName));
 
-                $pathSox = Util::which('sox');
                 $records = array_reverse($this->cdrRows[$id]['records']);
-                $cmd = '';
-                foreach ($records as $key => $value){
-                    if($key === array_key_first($records)){
-                        $cmd.= "$pathSox $value -p pad 3 0 | ";
-                    }elseif ($key === array_key_last($records)){
-                        $cmd.= "$pathSox - -m $value $fileName";
-                    }else{
-                        $cmd.= "$pathSox - -m $value -p pad 3 0 | ";
-                    }
-                }
                 if(!empty($records)){
-                    shell_exec($cmd);
+                    if($ext === 'webm'){
+                        $this->mergeWithFfmpeg($records, $fileName);
+                    }else{
+                        $this->mergeWithSox($records, $fileName);
+                    }
                 }
             }
             $link = "https://$this->extHostname/pbxcore/api/amo-crm/playback?view=$fileName";
@@ -763,6 +760,54 @@ class AmoCdrDaemon extends WorkerBase
         return $link;
     }
 
+
+    /**
+     * Склейка файлов через sox (mp3 и другие форматы, поддерживаемые sox).
+     * @param array  $records
+     * @param string $fileName
+     * @return void
+     */
+    private function mergeWithSox(array $records, string $fileName):void
+    {
+        $pathSox = Util::which('sox');
+        $cmd = '';
+        foreach ($records as $key => $value){
+            if($key === array_key_first($records)){
+                $cmd.= "$pathSox $value -p pad 3 0 | ";
+            }elseif ($key === array_key_last($records)){
+                $cmd.= "$pathSox - -m $value $fileName";
+            }else{
+                $cmd.= "$pathSox - -m $value -p pad 3 0 | ";
+            }
+        }
+        shell_exec($cmd);
+    }
+
+    /**
+     * Склейка файлов через ffmpeg (webm и другие форматы, не поддерживаемые sox).
+     * @param array  $records
+     * @param string $fileName
+     * @return void
+     */
+    private function mergeWithFfmpeg(array $records, string $fileName):void
+    {
+        $pathFfmpeg = Util::which('ffmpeg');
+        $inputs = '';
+        $count = count($records);
+        foreach ($records as $value){
+            $inputs .= "-i $value ";
+        }
+        if($count === 2){
+            $cmd = "$pathFfmpeg $inputs-filter_complex '[0:a][1:a]concat=n=2:v=0:a=1[out]' -map '[out]' -y $fileName 2>/dev/null";
+        }else{
+            $filterParts = '';
+            for($i = 0; $i < $count; $i++){
+                $filterParts .= "[$i:a]";
+            }
+            $cmd = "$pathFfmpeg $inputs-filter_complex '{$filterParts}concat=n=$count:v=0:a=1[out]' -map '[out]' -y $fileName 2>/dev/null";
+        }
+        shell_exec($cmd);
+    }
 
     /**
      * Подготавливает данные для создания сделок / контактов / задач.

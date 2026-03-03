@@ -82,5 +82,5 @@
             {{ form.render('deadline_task') }}
         </div>
     </div>
-    {{ partial("partials/submitbutton",['indexurl':'module-amo-crm/index/']) }}
+    {{ partial("partials/submitbutton",['indexurl':'module-amo-crm/module-amo-crm/index/']) }}
 </form>

@@ -5,7 +5,7 @@
  * Written by Nikolay Beketov, 11 2018
  */
 
-const idUrl     	 = 'module-amo-crm';
+const idUrl     	 = 'module-amo-crm/module-amo-crm';
 const idForm    	 = 'module-amo-crm-entity-settings-form';
 const className 	 = 'ModuleAmoCrmEntityEdit';
 

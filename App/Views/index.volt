@@ -20,7 +20,7 @@
 <form class="ui large grey form" id="module-amo-crm-form">
 
 <div class="ui bottom active tab segment disability" data-tab="rules">
-    {{ link_to("module-amo-crm/modify/", '<i class="add circle icon"></i> '~t._('mod_amo_AddRules'), "class": "ui blue button", "id":"add-new-button") }}
+    {{ link_to("module-amo-crm/module-amo-crm/modify/", '<i class="add circle icon"></i> '~t._('mod_amo_AddRules'), "class": "ui blue button", "id":"add-new-button") }}
     {% for rule in entitySettings %}
         {% if loop.first %}
             <table class="ui selectable compact unstackable table" id="entitySettingsTable">
@@ -80,8 +80,8 @@
             {{ partial("partials/tablesbuttons",
                 [
                     'id': rule['id'],
-                    'edit' : 'module-amo-crm/modify/',
-                    'delete': 'module-amo-crm/delete/'
+                    'edit' : 'module-amo-crm/module-amo-crm/modify/',
+                    'delete': 'module-amo-crm/module-amo-crm/delete/'
                 ])
             }}
         </tr>

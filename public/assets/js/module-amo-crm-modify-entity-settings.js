@@ -6,11 +6,12 @@
  * Proprietary and confidential
  * Written by Nikolay Beketov, 11 2018
  */
-var idUrl = 'module-amo-crm';
+
+var idUrl = 'module-amo-crm/module-amo-crm';
 var idForm = 'module-amo-crm-entity-settings-form';
 var className = 'ModuleAmoCrmEntityEdit';
-/* global $, globalRootUrl, globalTranslate, Form, Config */
 
+/* global $, globalRootUrl, globalTranslate, Form, Config */
 var ModuleAmoCrmEntityEdit = {
   $formObj: $('#' + idForm),
   $checkBoxes: $('#' + idForm + ' .ui.checkbox'),
@@ -19,14 +20,12 @@ var ModuleAmoCrmEntityEdit = {
   $entityActionDropdown: $('#entityAction'),
   $typeDropdown: $('#type'),
   $task_responsible_type: $('#task_responsible_type'),
-
   /**
   /**
    * Field validation rules
    * https://semantic-ui.com/behaviors/form.html
    */
   validateRules: {},
-
   /**
    * On page load we init some Semantic UI library
    */
@@ -46,10 +45,8 @@ var ModuleAmoCrmEntityEdit = {
     if (value === undefined) {
       value = window[className].$entityActionDropdown.parent().dropdown('get value');
     }
-
     $("#responsible").parents('div.field').first().show();
     $("#def_responsible").parents('div.field').first().show();
-
     if ('none' === value) {
       $('#create_contact').parents('div.checkbox').first().checkbox('set unchecked');
       $('#create_lead').parents('div.checkbox').first().checkbox('set unchecked');
@@ -84,23 +81,18 @@ var ModuleAmoCrmEntityEdit = {
       $("#lead_pipeline_status_id").parents('div.field').first().show();
       $("#lead_pipeline_id").parents('div.field').first().show();
     }
-
     var type = window[className].$typeDropdown.parent().dropdown('get value');
-
     if (type === 'MISSING_UNKNOWN' || type === 'MISSING_KNOWN') {
       $("#responsible").parents('div.field').first().hide();
     }
-
     window[className].setVisibilityElements();
   },
   onChangePipelineStatusId: function onChangePipelineStatusId(value, text, $selectedItem) {},
   onChangeDropdown: function onChangeDropdown(value, text, $selectedItem) {
     var id = '';
-
     if ($selectedItem !== undefined) {
       id = $selectedItem.parent().parent().find('select').attr('id');
     }
-
     if ('' === id || id === window[className].$pipelineDropdown.attr('id')) {
       var pipeLineId = window[className].$pipelineDropdown.parent().dropdown('get value');
       var statuses = JSON.parse($('#pipeLineStatuses').val())[pipeLineId];
@@ -110,11 +102,9 @@ var ModuleAmoCrmEntityEdit = {
           value: item.value,
           text: item.name
         };
-
         if (item.selected) {
           options.selected = 'selected';
         }
-
         $('#lead_pipeline_status_id').append($('<option>', options));
       });
       $('#lead_pipeline_status_id').parent().dropdown({
@@ -122,14 +112,12 @@ var ModuleAmoCrmEntityEdit = {
         onChange: window[className].onChangePipelineStatusId
       });
     }
-
     if ('' === id || id === window[className].$typeDropdown.attr('id')) {
       var create_contact = $('#create_contact').parents('div.checkbox').first().checkbox('is checked');
       var create_lead = $('#create_lead').parents('div.checkbox').first().checkbox('is checked');
       var create_unsorted = $('#create_unsorted').parents('div.checkbox').first().checkbox('is checked');
       var type = window[className].$typeDropdown.parent().dropdown('get value');
       var entityActionVariants = [];
-
       if (type === 'INCOMING_UNKNOWN' || type === 'MISSING_UNKNOWN') {
         entityActionVariants = [{
           name: globalTranslate['mod_amo_action_none'],
@@ -173,18 +161,15 @@ var ModuleAmoCrmEntityEdit = {
           selected: create_contact === true && create_lead === true && create_unsorted === false
         }];
       }
-
       window[className].$entityActionDropdown.find('option').remove();
       $.each(entityActionVariants, function (i, item) {
         var options = {
           value: item.value,
           text: item.name
         };
-
         if (item.selected) {
           options.selected = 'selected';
         }
-
         window[className].$entityActionDropdown.append($('<option>', options));
       });
       window[className].$entityActionDropdown.parent().dropdown({
@@ -193,7 +178,6 @@ var ModuleAmoCrmEntityEdit = {
       });
       var task_responsible_type = window[className].$task_responsible_type.parent().dropdown('get value');
       var taskRespVariants = [];
-
       if (type === 'OUTGOING_KNOWN_FAIL' || type === 'OUTGOING_KNOWN') {
         taskRespVariants = [{
           name: globalTranslate['mod_amo_task_responsible_type_'],
@@ -315,18 +299,15 @@ var ModuleAmoCrmEntityEdit = {
           selected: task_responsible_type === 'def_responsible'
         }];
       }
-
       window[className].$task_responsible_type.find('option').remove();
       $.each(taskRespVariants, function (i, item) {
         var options = {
           value: item.value,
           text: item.name
         };
-
         if (item.selected) {
           options.selected = 'selected';
         }
-
         window[className].$task_responsible_type.append($('<option>', options));
       });
       window[className].$task_responsible_type.parent().dropdown({
@@ -334,17 +315,14 @@ var ModuleAmoCrmEntityEdit = {
         onChange: window[className].onChangeEntityAction
       });
     }
-
     window[className].setVisibilityElements();
   },
-
   /**
    *
    */
   onChangeSettings: function onChangeSettings() {
     window[className].setVisibilityElements();
   },
-
   /**
    * We can modify some data before form send
    * @param settings
@@ -356,13 +334,11 @@ var ModuleAmoCrmEntityEdit = {
     delete result.data.pipeLineStatuses;
     return result;
   },
-
   /**
    * Some actions after forms send
    */
   cbAfterSendForm: function cbAfterSendForm(response) {
     console.log(response);
-
     if (response.success === true && $('#id').val() === '') {
       $('#id').val(response.id);
       var title = $('head title').html();
@@ -371,7 +347,6 @@ var ModuleAmoCrmEntityEdit = {
       }, title, "".concat(window.location.href).concat(response.id));
     }
   },
-
   /**
    * Initialize form parameters
    */
@@ -386,23 +361,18 @@ var ModuleAmoCrmEntityEdit = {
   setVisibilityElements: function setVisibilityElements() {
     var create_contact = $('#create_contact').parents('div.checkbox').checkbox('is checked');
     var create_unsorted = $('#create_unsorted').parents('div.checkbox').first().checkbox('is checked');
-
     if (create_contact || create_unsorted) {
       $('#template_contact_name').parents('div.field').first().show();
     } else {
       $('#template_contact_name').parents('div.field').first().hide();
     }
-
     var create_lead = $('#create_lead').parents('div.checkbox').checkbox('is checked');
-
     if (create_lead || create_unsorted) {
       $('#template_lead_name').parents('div.field').first().show();
     } else {
       $('#template_lead_name').parents('div.field').first().hide();
     }
-
     var create_task = $('#create_task').parents('div.checkbox').checkbox('is checked');
-
     if (create_task) {
       $('#template_task_text').parents('div.field').first().show();
       $('#deadline_task').parents('div.field').first().show();
@@ -412,9 +382,7 @@ var ModuleAmoCrmEntityEdit = {
       $('#deadline_task').parents('div.field').first().hide();
       window[className].$task_responsible_type.parents('div.field').first().hide();
     }
-
     var type = window[className].$typeDropdown.parent().dropdown('get value');
-
     if (type === 'OUTGOING_KNOWN_FAIL' || type === 'OUTGOING_KNOWN' || type === 'OUTGOING_UNKNOWN') {
       $('#did').parents('div.field').first().hide();
     } else {

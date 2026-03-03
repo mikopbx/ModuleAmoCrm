@@ -140,7 +140,9 @@ class SyncDaemon extends WorkerBase
         $nextPage = $url."?".http_build_query($params);
         $count = 0;
         while(!empty($nextPage)){
-            $this->logger->writeInfo("SYNC: $count, GET '$entityType' ".$nextPage);
+            $logUrl = parse_url($nextPage, PHP_URL_PATH);
+            $logQuery = parse_url($nextPage, PHP_URL_QUERY);
+            $this->logger->writeInfo("SYNC: $count, GET '$entityType' ".$logUrl.($logQuery ? "?$logQuery" : ''));
             $tryGetCount = 20;
             do{
                 $result   = WorkerAmoHTTP::invokeAmoApi('getChangedEntity', [$nextPage, $entityType]);

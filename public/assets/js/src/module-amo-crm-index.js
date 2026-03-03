@@ -5,7 +5,7 @@
  * Written by Nikolay Beketov, 11 2018
  */
 
-const idUrl     	 = 'module-amo-crm';
+const idUrl     	 = 'module-amo-crm/module-amo-crm';
 const idForm    	 = 'module-amo-crm-form';
 const className 	 = 'ModuleAmoCrm';
 const inputClassName = 'mikopbx-module-input';
@@ -145,7 +145,7 @@ const ModuleAmoCrm = {
 	deleteRule(id) {
 		$('.message.ajax').remove();
 		$.api({
-			url: `${globalRootUrl}module-amo-crm/delete/${id}`,
+			url: `${globalRootUrl}${idUrl}/delete/${id}`,
 			on: 'now',
 			successTest(response) {
 				// test whether a JSON response is valid
