@@ -123,6 +123,7 @@ window.onload = function() {
                 document.querySelector('html').style = "";
             } else {
                 console.log('FALSE');
+                window.parent.postMessage(JSON.stringify({action: 'hide-panel', pbxHost: iframe.getAttribute('title')}), '*');
             }
         });
 };

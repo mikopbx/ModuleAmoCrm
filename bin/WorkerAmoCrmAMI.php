@@ -220,7 +220,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             $data['src_num'],
             $data['dst_num'],
         ];
-        $general_src_num = null;
+        $general_src_num = '';
         if ($data['transfer'] === '1') {
             $history = $this->calls[$data['linkedid']]??[];
             if (!empty($history)) {
@@ -395,6 +395,9 @@ class WorkerAmoCrmAMI extends WorkerBase
         }
         $transferCall = [];
         $data['end'] = date(\DateTimeInterface::ATOM, strtotime($data['end']));
+        if(empty($this->calls[$data['linkedid']])){
+            return;
+        }
         foreach ($this->calls[$data['linkedid']] as &$call) {
             if(isset($call['end'])){
                 continue;
