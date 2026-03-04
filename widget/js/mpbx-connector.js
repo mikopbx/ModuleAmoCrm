@@ -24,13 +24,81 @@ define(function (require) {
     let connector = {
         settings: {},
         iFrame: null,
+        toggleTab: null,
+        /**
+         * Creates a fixed toggle tab on the right edge of the screen
+         */
+        createToggleTab: function () {
+            if (connector.toggleTab) {
+                return;
+            }
+            let tab = document.createElement('div');
+            tab.id = 'miko-pbx-toggle-tab';
+            tab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#555">'
+                + '<path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2a1.004 1.004 0 011.01-.24c1.12.37 2.33.57 3.57.57'
+                + '.55 0 1 .45 1 1v3.49c0 .55-.45 1-1 1C10.07 22 2 13.93 2 4c0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1'
+                + ' 0 1.25.2 2.45.57 3.57.11.35.03.74-.24 1.01l-2.21 2.21z"/>'
+                + '</svg>';
+            let savedY = localStorage.getItem('tabPositionY');
+            let topVal = savedY ? savedY + 'px' : '50%';
+            tab.style.cssText = 'position:fixed;right:0;top:' + topVal + ';z-index:998;width:32px;height:32px;'
+                + 'background:#e0e0e0;border-radius:6px 0 0 6px;cursor:pointer;'
+                + 'box-shadow:-1px 0 4px rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:center;'
+                + 'transition:background 0.15s;user-select:none;';
+            tab.onmouseenter = function () { tab.style.background = '#ccc'; };
+            tab.onmouseleave = function () { tab.style.background = '#e0e0e0'; };
+
+            // Drag logic
+            let isDragging = false;
+            let dragStartY = 0;
+            let dragStartTop = 0;
+            let totalDragDistance = 0;
+
+            tab.addEventListener('mousedown', function (e) {
+                isDragging = true;
+                dragStartY = e.clientY;
+                dragStartTop = parseInt(tab.style.top, 10) || ($(window).height() / 2);
+                totalDragDistance = 0;
+                e.preventDefault();
+            });
+            $(document).on('mousemove.mikoTab', function (e) {
+                if (!isDragging) return;
+                let delta = e.clientY - dragStartY;
+                totalDragDistance = Math.max(totalDragDistance, Math.abs(delta));
+                let newTop = dragStartTop + delta;
+                let maxTop = $(window).height() - 32;
+                if (newTop < 0) newTop = 0;
+                if (newTop > maxTop) newTop = maxTop;
+                tab.style.top = newTop + 'px';
+            });
+            $(document).on('mouseup.mikoTab', function () {
+                if (!isDragging) return;
+                isDragging = false;
+                localStorage.setItem('tabPositionY', parseInt(tab.style.top, 10));
+                if (totalDragDistance < 5) {
+                    // Click without drag — show panel
+                    $(connector.iFrame).show({
+                        duration: 400,
+                        done: function () {
+                            connector.postToFrame({action: 'resize', height: $(window).height()});
+                            connector.setHeightFrame();
+                        }
+                    });
+                    localStorage.setItem('frameVisibility', '1');
+                    $(tab).hide();
+                }
+            });
+
+            document.body.appendChild(tab);
+            connector.toggleTab = tab;
+        },
         /**
          * Sending a command to a frame
          * @param message
          */
         postToFrame: function (message){
             if(connector.iFrame !== null && typeof connector.iFrame.contentWindow === 'object'){
-                connector.iFrame.contentWindow.postMessage(message, '*');
+                connector.iFrame.contentWindow.postMessage(message, window.location.origin);
             }
         },
         /**
@@ -62,6 +130,7 @@ define(function (require) {
                     htmlContent = htmlContent.replace(new RegExp('href="', 'g'), `href="//${connector.settings.pbxHost}/webrtc-phone/`);
                     htmlContent = htmlContent.replace(new RegExp('src="', 'g'),  `src="//${connector.settings.pbxHost}/webrtc-phone/`);
                     htmlContent = htmlContent.replace(new RegExp('data-main="', 'g'),  `data-main="//${connector.settings.pbxHost}/webrtc-phone/`);
+                    htmlContent = htmlContent.replace('<head>', `<head><script>window.mikoPbxHost="${connector.settings.pbxHost}";</script>`);
                     if ($('#miko-pbx-phone').length < 1) {
                         // Add iframe
                         let css = 'position: fixed; z-index: 999; right: 0;bottom: 0; border: 0;';
@@ -83,29 +152,25 @@ define(function (require) {
                         }else{
                             $(connector.iFrame).hide();
                         }
+                        let resizeTimer;
                         $(window).resize(() => {
-                            // Set the size of the frame content. Passing a command to a frame
-                            connector.postToFrame({action: 'resize', height: $(window).height()});
-                            connector.setHeightFrame();
+                            clearTimeout(resizeTimer);
+                            resizeTimer = setTimeout(() => {
+                                // Set the size of the frame content. Passing a command to a frame
+                                connector.postToFrame({action: 'resize', height: $(window).height()});
+                                connector.setHeightFrame();
+                            }, 150);
                         });
-                        // Show a hidden frame when the mouse hovers over the border of the area
-                        $(window).mousemove(event => {
-                            if($(window).width() - event.pageX < 5){
-                                if(localStorage.getItem('frameVisibility') === '1'){
-                                    return;
-                                }
-                                localStorage.setItem('frameVisibility', '1');
-                                $(connector.iFrame).show({
-                                    duration: 400,
-                                    done: () => {
-                                        connector.postToFrame({action: 'resize', height: $(window).height()});
-                                        connector.setHeightFrame();
-                                    }
-                                });
-                            }
-                        });
+                        // Create toggle tab for showing the hidden panel
+                        connector.createToggleTab();
+                        if (frameVisibility !== '1') {
+                            $(connector.toggleTab).show();
+                        } else {
+                            $(connector.toggleTab).hide();
+                        }
                     };
                     // Subscribing to event processing from a frame
+                    window.removeEventListener("message", connector.onMessage);
                     window.addEventListener("message", connector.onMessage);
                 })
                 .error(function(){
@@ -130,7 +195,10 @@ define(function (require) {
             }
             if(params.action === 'saveSettings'){
                 // Обновляем значение в настройках.
-                connector.settings.pbxHost = params.pbxHost;
+                if (params.pbxHost) {
+                    connector.settings.pbxHost = params.pbxHost;
+                }
+                params.pbxHost = connector.settings.pbxHost;
             }
             if(connector.settings.pbxHost !== params.pbxHost){
                 return;
@@ -146,7 +214,7 @@ define(function (require) {
                     number:  params.number,
                     contact: params.element.name,
                     company: params.element.company,
-                    id:      params.element.company
+                    id:      params.element.id
                 };
                 connector.postToFrame({action: 'updateContact', data:  result});
             }else if(params.action === 'openCardEntities'){
@@ -157,7 +225,9 @@ define(function (require) {
                 PubSub.publish(connector.settings.ns + ':main', params);
             }else if(params.action === 'hide-panel'){
                 $(connector.iFrame).hide();
-                localStorage.setItem('frameVisibility', '0')
+                localStorage.setItem('frameVisibility', '0');
+                connector.createToggleTab();
+                $(connector.toggleTab).show();
             }else if(params.action === 'show-panel'){
                 connector.postToFrame({action: 'resize'});
                 $(connector.iFrame).show({
@@ -166,7 +236,10 @@ define(function (require) {
                         connector.postToFrame({action: 'resize'});
                     }
                 });
-                localStorage.setItem('frameVisibility', '1')
+                localStorage.setItem('frameVisibility', '1');
+                if (connector.toggleTab) {
+                    $(connector.toggleTab).hide();
+                }
             }else if(params.action === 'error'){
                 PubSub.publish(connector.settings.ns + ':main', params);
             }else if(params.action === 'resize'){

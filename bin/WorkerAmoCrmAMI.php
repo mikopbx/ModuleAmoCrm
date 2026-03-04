@@ -501,6 +501,9 @@ class WorkerAmoCrmAMI extends WorkerBase
      */
     private function actionDialCreateChan($data):void{
         $uid = $data['transfer_UNIQUEID']??$data['UNIQUEID'];
+        if(empty($this->calls[$data['linkedid']])){
+            return;
+        }
         foreach ($this->calls[$data['linkedid']] as &$call){
             if($uid !== $call['uid']){
                 continue;
@@ -541,6 +544,9 @@ class WorkerAmoCrmAMI extends WorkerBase
     private function actionDialAnswer($params):void
     {
         $channel = $params['agi_channel'];
+        if(empty($this->calls[$params['linkedid']])){
+            return;
+        }
         foreach ($this->calls[$params['linkedid']] as &$call){
             if(isset($call['answer'])){
                 continue;
@@ -568,7 +574,7 @@ class WorkerAmoCrmAMI extends WorkerBase
      */
     private function actionDialEnd($data):void
     {
-        $src_num = $this->activeChannels[$data['src_chan']];
+        $src_num = $this->activeChannels[$data['src_chan']]??'';
         if (isset($this->users[$src_num])) {
             // Это исходящий вызов.
             $USER_ID = $this->users[$src_num];
@@ -607,9 +613,10 @@ class WorkerAmoCrmAMI extends WorkerBase
         $uid     = $data['UNIQUEID'];
         $endTime = date(\DateTimeInterface::ATOM, strtotime($data['endtime']));
         $start   = date(\DateTimeInterface::ATOM, strtotime($data['start']));
-        foreach ( $this->calls[$data['linkedid']] as $index => $callData){
+        $callsById = $this->calls[$data['linkedid']]??[];
+        foreach ($callsById as $index => $callData){
             if($callData['src'] === $data['src_num'] && $callData['dst'] === $data['dst_num']
-               && $callData['date'] === $start && $callData['end'] === $endTime){
+               && $callData['date'] === $start && ($callData['end']??'') === $endTime){
                 $uid = $callData['uid'];
                 unset($this->calls[$data['linkedid']][$index]);
                 break;
@@ -631,11 +638,13 @@ class WorkerAmoCrmAMI extends WorkerBase
         ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $call);
 
         // Чистим мусор.
-        unset(
-            $this->activeChannels[$data['src_chan']],
-            $this->activeChannels[$data['dst_chan']],
-            $this->channelCounter[$data['UNIQUEID']]
-        );
+        if(isset($data['src_chan'])){
+            unset($this->activeChannels[$data['src_chan']]);
+        }
+        if(isset($data['dst_chan'])){
+            unset($this->activeChannels[$data['dst_chan']]);
+        }
+        unset($this->channelCounter[$data['UNIQUEID']]);
         if(empty($this->calls[$data['linkedid']])){
             unset($this->calls[$data['linkedid']]);
         }

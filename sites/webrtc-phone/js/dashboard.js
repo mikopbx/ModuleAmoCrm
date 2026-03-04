@@ -184,7 +184,14 @@ define(function (require) {
         },
         sendMessage: function (msgData){
             if(window.self !== window.top) {
-                msgData.pbxHost = window.frameElement.title;
+                let pbxHost = window.mikoPbxHost || '';
+                if (!pbxHost) {
+                    try { pbxHost = window.frameElement.title; } catch(e) {}
+                }
+                if (!pbxHost) {
+                    pbxHost = window.location.host;
+                }
+                msgData.pbxHost = pbxHost;
             }
             window.parent.postMessage(JSON.stringify(msgData), '*')
         },
