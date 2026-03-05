@@ -632,7 +632,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'dst'              => $data['dst_num'],
             'g-missed'         => $data['GLOBAL_STATUS'] !== 'ANSWERED',
             'missed'           => $data['disposition'] !== 'ANSWERED',
-            'filename'         => $data['recordingfile'],
+            'filename'         => $data['recordingfile']??'',
             'action'           => 'end-call',
         ];
         ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $call);
