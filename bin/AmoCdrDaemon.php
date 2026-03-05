@@ -733,7 +733,7 @@ class AmoCdrDaemon extends WorkerBase
     private function getCreateFileAndLink(string $id, int $created_at):string
     {
         $link = '';
-        if(isset($this->cdrRows[$id]['records'])){
+        if(!empty($this->cdrRows[$id]['records'])){
             if(count($this->cdrRows[$id]['records']) === 1){
                 $fileName = $this->cdrRows[$id]['records'][0];
             }else{
