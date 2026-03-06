@@ -510,14 +510,21 @@ class WorkerAmoCrmAMI extends WorkerBase
     private function actionDialCreateChan($data):void{
         $uid = $data['transfer_UNIQUEID']??$data['UNIQUEID'];
         if(empty($this->calls[$data['linkedid']])){
+            $this->logger->writeInfo("No calls for linkedid", "actionDialCreateChan {$data['linkedid']}");
             return;
         }
+        $matched = false;
         foreach ($this->calls[$data['linkedid']] as &$call){
             if($uid !== $call['uid']){
                 continue;
             }
             $call['dst-chan'] = $data['dst_chan'];
+            $matched = true;
+            $this->logger->writeInfo("Set dst-chan={$data['dst_chan']} for uid=$uid", "actionDialCreateChan {$data['linkedid']}");
             break;
+        }
+        if(!$matched){
+            $this->logger->writeInfo("No matching uid=$uid, dst_chan={$data['dst_chan']}", "actionDialCreateChan {$data['linkedid']}");
         }
         unset($call);
 
@@ -553,13 +560,17 @@ class WorkerAmoCrmAMI extends WorkerBase
     {
         $channel = $params['agi_channel'];
         if(empty($this->calls[$params['linkedid']])){
+            $this->logger->writeInfo("No calls for linkedid, channel=$channel", "actionDialAnswer {$params['linkedid']}");
             return;
         }
+        $matched = false;
         foreach ($this->calls[$params['linkedid']] as &$call){
             if(isset($call['answer'])){
+                $this->logger->writeInfo("Skip already answered uid={$call['uid']}", "actionDialAnswer {$params['linkedid']}");
                 continue;
             }
             if($channel !== $call['src-chan'] && $channel !== $call['dst-chan']){
+                $this->logger->writeInfo("Channel mismatch: agi=$channel src-chan={$call['src-chan']} dst-chan={$call['dst-chan']} uid={$call['uid']}", "actionDialAnswer {$params['linkedid']}");
                 continue;
             }
             $call['answer'] = date(\DateTimeInterface::ATOM, strtotime($params['answer']));
@@ -569,8 +580,13 @@ class WorkerAmoCrmAMI extends WorkerBase
                 'id'       => $params['linkedid'],
                 'uid'      => $call['uid'],
             ];
+            $this->logger->writeInfo($data, "Publish answer {$params['linkedid']}");
             ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $data);
+            $matched = true;
             break;
+        }
+        if(!$matched){
+            $this->logger->writeInfo("No matching call for channel=$channel", "actionDialAnswer {$params['linkedid']}");
         }
         unset($call);
     }
