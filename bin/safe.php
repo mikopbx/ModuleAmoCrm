@@ -17,6 +17,7 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 
+use MikoPBX\Core\System\System;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\System\Processes;
 use MikoPBX\Core\System\SystemMessages;
@@ -43,6 +44,26 @@ foreach ($workers as $workerData) {
             // Завершаем дубликаты процессов.
             $bbPath = Util::which('busybox');
             shell_exec("$bbPath kill -SIGUSR2 ". implode(" ", $allButLast));
+        }
+    }
+}
+
+// Проверка размеров лог-файлов. Если ротация не сработала и файл превысил 2x лимит — обрезаем.
+$logDir = System::getLogDir() . '/ModuleAmoCrm';
+$maxSize = 20 * 1024 * 1024; // 2x от лимита ротации (10MB)
+if (is_dir($logDir)) {
+    $files = glob($logDir . '/*.log');
+    if (is_array($files)) {
+        foreach ($files as $file) {
+            $size = filesize($file);
+            if ($size !== false && $size > $maxSize) {
+                $logName = basename($file);
+                SystemMessages::sysLogMsg('AMO_SAFE', "Log $logName exceeds limit ({$size} bytes), truncating.", LOG_WARNING);
+                $fh = fopen($file, 'w');
+                if ($fh !== false) {
+                    fclose($fh);
+                }
+            }
         }
     }
 }
