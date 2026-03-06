@@ -26,6 +26,7 @@ use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
+use Modules\ModuleAmoCrm\Lib\Logger;
 
 class WorkerAmoCrmAMI extends WorkerBase
 {
@@ -45,6 +46,7 @@ class WorkerAmoCrmAMI extends WorkerBase
     private int     $lastUpdateSettings = 0;
 
     private $beanstalk;
+    private Logger $logger;
 
     /**
      * Соответстввие Linked ID и сведиений о каналах.
@@ -86,6 +88,7 @@ class WorkerAmoCrmAMI extends WorkerBase
     public function start($argv):void
     {
         $this->beanstalk = new BeanstalkClient(ConnectorDb::class);
+        $this->logger = new Logger('WorkerAmoCrmAMI', 'ModuleAmoCrm');
 
         $this->am     = Util::getAstManager();
         $this->setFilter();
@@ -180,6 +183,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             $stringData = base64_decode($agiData);
         }
         $data = json_decode($stringData, true, 512, JSON_THROW_ON_ERROR);
+        $this->logger->writeInfo($data['action'], "AMI event: {$data['linkedid']}");
         switch ($data['action']) {
             case 'hangup_chan':
                 $this->actionHangupChan($data);
@@ -247,11 +251,13 @@ class WorkerAmoCrmAMI extends WorkerBase
     {
         $tmpCalls = [];
         if(in_array($data['action_extra']??'', ['originate_start', 'originate_end'], true)){
+            $this->logger->writeInfo("Skip originate: {$data['action_extra']}", "actionCreateCdr {$data['linkedid']}");
             return;
         }
         $this->createCdrCheckInner($tmpCalls, $data, $generalNumber);
         $this->createCdrCheckOutgoing($tmpCalls, $data, $generalNumber);
         $this->createCdrCheckIncoming($tmpCalls, $data, $generalNumber);
+        $this->logger->writeInfo("tmpCalls count: ".count($tmpCalls)." src={$data['src_num']} dst={$data['dst_num']}", "actionCreateCdr {$data['linkedid']}");
         foreach ($tmpCalls as $call){
             $callFound = false;
             $callsById = $this->calls[$data['linkedid']]??[];
@@ -265,6 +271,7 @@ class WorkerAmoCrmAMI extends WorkerBase
                 $this->calls[$call['id']][] = $call;
             }
             $this->activeChannels[$data['src_chan']] = $data['src_num'];
+            $this->logger->writeInfo($call, "Publish call event {$data['linkedid']}");
             ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $call);
         }
     }
@@ -316,8 +323,9 @@ class WorkerAmoCrmAMI extends WorkerBase
     private function createCdrCheckIncoming(&$calls, $data, $generalNumber):void
     {
         if(in_array($data['src_num'], $this->innerNums, true)
-           || in_array($generalNumber, $this->innerNums, true)){
+           || (!empty($generalNumber) && in_array($generalNumber, $this->innerNums, true))){
             // Это точно не входящий. Как вариант - внутренний.
+            $this->logger->writeInfo("Skip: src={$data['src_num']} in innerNums or gen=$generalNumber in innerNums", "checkIncoming {$data['linkedid']}");
             return;
         }
 
@@ -635,6 +643,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'filename'         => $data['recordingfile']??'',
             'action'           => 'end-call',
         ];
+        $this->logger->writeInfo($call, "Publish end-call {$data['linkedid']}");
         ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $call);
 
         // Чистим мусор.

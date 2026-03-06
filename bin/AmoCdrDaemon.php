@@ -687,7 +687,14 @@ class AmoCdrDaemon extends WorkerBase
 
         foreach ($calls as $call) {
             if(isset($resCalls[$call['id']])){
-                $this->logger->writeError($call, "A call with this ID has been processed {$call['id']}, drop it");
+                // Подхватываем ссылку на запись из другого leg, если у текущего результата её нет.
+                if(empty($resCalls[$call['id']]['params']['link']) && !empty($call['params']['link'])){
+                    $resCalls[$call['id']]['params']['link'] = $call['params']['link'];
+                    if($call['params']['duration'] > 0){
+                        $resCalls[$call['id']]['params']['duration'] = $call['params']['duration'];
+                    }
+                    $this->logger->writeInfo($call, "Updated link/duration from another leg {$call['id']}");
+                }
                 continue;
             }
             $typeCall = $this->cdrRows[$call['id']]['type']??'';
@@ -707,8 +714,14 @@ class AmoCdrDaemon extends WorkerBase
                     $call['responsible_user_id'] = 1*$responsible;
                 }
             }
-            $call['params']['link']       = $this->getCreateFileAndLink($call['id'], $call['created_at']);
-            $call['params']['duration']   = $this->cdrRows[$call['id']]['duration']??$this->cdrRows[$call['id']]['params']['duration']??0;
+            $newLink = $this->getCreateFileAndLink($call['id'], $call['created_at']);
+            if(!empty($newLink)){
+                $call['params']['link'] = $newLink;
+            }
+            $newDuration = $this->cdrRows[$call['id']]['duration']??0;
+            if($newDuration > 0){
+                $call['params']['duration'] = $newDuration;
+            }
 
             $answered = $this->cdrRows[$call['id']]['answered']??0;
             if($answered === 1){
