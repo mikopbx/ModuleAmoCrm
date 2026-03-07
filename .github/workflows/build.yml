@@ -14,8 +14,8 @@ jobs:
       initial_version: "1.84"
       custom_build_steps: |
         cd module
-        sed -i "s|%CLIENT_ID%|${{ secrets.AMO_CLIENT_ID }}|g" Lib/AmoCrmMainBase.php
-        sed -i "s|%CLIENT_SECRET%|${{ secrets.AMO_CLIENT_SECRET }}|g" Lib/AmoCrmMainBase.php
-        sed -i "s|%REDIRECT_URL%|${{ secrets.AMO_REDIRECT_URL }}|g" Lib/AmoCrmMainBase.php
+        sed -i "s|%CLIENT_ID%|${{ vars.AMO_CLIENT_ID }}|g" Lib/AmoCrmMainBase.php
+        sed -i "s|%CLIENT_SECRET%|${{ vars.AMO_CLIENT_SECRET }}|g" Lib/AmoCrmMainBase.php
+        sed -i "s|%REDIRECT_URL%|${{ vars.AMO_REDIRECT_URL }}|g" Lib/AmoCrmMainBase.php
         echo "AmoCrmMainBase.php placeholders replaced."
     secrets: inherit
