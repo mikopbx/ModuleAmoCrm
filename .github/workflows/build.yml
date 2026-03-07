@@ -126,9 +126,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ steps.version.outputs.new_version_tag }}"
-          if [ -n "$TAG" ] && gh release view "$TAG" &>/dev/null; then
-            gh release upload "$TAG" "$RUNNER_TEMP/widget.zip" --clobber
-            echo "widget.zip uploaded to release $TAG"
-          else
-            echo "Release $TAG not found, skipping widget upload."
-          fi
+          echo "Uploading widget.zip to release $TAG..."
+          sleep 5
+          gh release upload "$TAG" "$RUNNER_TEMP/widget.zip" --clobber
+          echo "widget.zip uploaded to release $TAG"
