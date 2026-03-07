@@ -54,6 +54,8 @@ define(function (require) {
         return true;
       },
       destroy: function () {
+        PubSub.unsubscribe(self.ns + ':main');
+        $(document).off('mousedown.mikoWidget');
       },
     };
     self.api = {
@@ -68,7 +70,7 @@ define(function (require) {
         let user   = APP.constant('user').id;
         let phones = globalSettings.pbx_users || false;
         if (typeof phones == 'string') {
-          phones = phones ? $.parseJSON(phones) : false;
+          phones = phones ? JSON.parse(phones) : false;
         }
         if (phones && typeof phones[user] !== 'undefined') {
           currentPhone = phones[user].trim();
@@ -92,7 +94,7 @@ define(function (require) {
         self.add_action("phone", self.api.onClickPhone);
         PubSub.subscribe(self.ns + ':main', self.api.onMessage);
 
-        $(document).on('mousedown',"div.feed-note__call-content a",function() {
+        $(document).on('mousedown.mikoWidget',"div.feed-note__call-content a",function() {
           if($(this).parent().find('a[data-prepare="miko-pbx"]').length === 0){
             return;
           }
@@ -194,6 +196,18 @@ define(function (require) {
               self.api.gotoContact(result._embedded.contacts[0].id);
               self.api.addNotesContact(result._embedded.contacts[0].id, notifications_data.comment);
             }
+            if (typeof notifications_data.onComplete === 'function') {
+              notifications_data.onComplete(true);
+            }
+          },
+          error: function() {
+            APP.notifications.show_message_error({
+              header: self.langs.errors['alert'],
+              text: self.langs.errors['createContactError'] || 'Error creating contact'
+            });
+            if (typeof notifications_data.onComplete === 'function') {
+              notifications_data.onComplete(false);
+            }
           }
         });
       },
@@ -224,10 +238,10 @@ define(function (require) {
       findContact: function (contactData, callback){
         let query = '';
         if(contactData.email !== undefined && contactData.email.trim() !== '' ){
-          query += '&SEARCH='+contactData.email;
+          query += '&SEARCH='+encodeURIComponent(contactData.email);
         }
         if(contactData.number !== undefined && contactData.number.trim() !== '' ){
-          query += '&SEARCH='+contactData.number;
+          query += '&SEARCH='+encodeURIComponent(contactData.number);
         }
         if(query === ''){
           contactData.element = {};
@@ -255,7 +269,9 @@ define(function (require) {
               callback(contactData)
             });
           }
-
+        }).fail(function() {
+          contactData.element = {id: '', name: '', company: ''};
+          callback(contactData);
         });
       },
       onClickPhone: function (params) {
@@ -272,7 +288,11 @@ define(function (require) {
       },
     };
     self.call_result = function (phone) {
-      let intPhone    = phone.match(/\d+/g).join('');
+      let digits = phone.match(/\d+/g);
+      if (!digits) {
+        return;
+      }
+      let intPhone = digits.join('');
       if(intPhone.length < 5){
         return;
       }
@@ -315,14 +335,20 @@ define(function (require) {
                   if(result.element.id !== ''){
                     // Такой контакт уже существует.
                     form.find('#contactId').val(result.element.id);
-                    form.find('div.ui.message.red p').html(`<a href="/contacts/detail/${result.element.id}" class="js-navigate-link">${result.element.name}</a>`);
+                    let $link = $('<a></a>')
+                        .attr('href', '/contacts/detail/' + result.element.id)
+                        .addClass('js-navigate-link')
+                        .text(result.element.name);
+                    form.find('div.ui.message.red p').empty().append($link);
                     form.find('div.ui.message.red').removeClass('hidden');
                     form.find('button.miko-save-btn').addClass('hidden');
                     form.find('button.miko-update-btn').removeClass('hidden');
                   }else{
+                    data.onComplete = function() {
+                      funcClose();
+                      delete self.stickers[intPhone];
+                    };
                     self.api.createContact(data);
-                    setTimeout(funcClose, 1000);
-                    delete self.stickers[intPhone];
                   }
               });
             }

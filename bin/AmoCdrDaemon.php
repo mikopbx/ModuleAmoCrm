@@ -65,6 +65,8 @@ class AmoCdrDaemon extends WorkerBase
     private array $newTasks = [];
     private array $incompleteAnswered = [];
     private array $createdLeads = []; // Кэш создана ли сделка для звонка. 1 звонок = 1 сделка
+    private int $addCallsFailCount = 0; // Счётчик последовательных неудач addCalls
+    private const MAX_ADD_CALLS_FAILURES = 5; // Максимум попыток перед пропуском батча
 
     // ВИДЫ ЗВОНКОВ.
     // Входящие
@@ -194,7 +196,7 @@ class AmoCdrDaemon extends WorkerBase
             ];
         }
         unset($extensions);
-        $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $data, 'action' => 'USERS']);
+        $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['data' => $data, 'action' => 'USERS']);
         if(!$result->success){
             $this->logger->writeError("Update user list. Count: ".count($data));
             try {
@@ -265,7 +267,7 @@ class AmoCdrDaemon extends WorkerBase
         $md5Cdr = md5(print_r($params, true));
         if($this->panelIsEnable && $md5Cdr !== $this->lastCacheCdr){
             // Оповещаме только если изменилось состояние.
-            ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $params, 'action' => 'CDRs']);
+            ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['data' => $params, 'action' => 'CDRs']);
             $this->lastCacheCdr = $md5Cdr;
         }
     }
@@ -450,7 +452,24 @@ class AmoCdrDaemon extends WorkerBase
         ////
         // Прикрепление звонков к сущностям.
         ////
-        $this->addCalls($calls, $callCounter);
+        $callsOk = $this->addCalls($calls, $callCounter);
+        if(!$callsOk){
+            $this->addCallsFailCount++;
+            if($this->addCallsFailCount >= self::MAX_ADD_CALLS_FAILURES){
+                // Превышен лимит попыток — пропускаем батч, фиксируем в БД и в лог.
+                $failedIds = array_unique(array_keys($this->cdrRows));
+                $this->logger->writeError("addCalls failed $this->addCallsFailCount times in a row, skipping batch. Lost linkedids: " . implode(', ', $failedIds));
+                ConnectorDb::invoke('saveFailedCdr', [$failedIds, 'addCalls timeout after ' . self::MAX_ADD_CALLS_FAILURES . ' attempts'], false);
+                $this->addCallsFailCount = 0;
+                // offset НЕ откатываем — пропускаем батч
+            }else{
+                $this->offset = $oldOffset;
+                $this->logger->writeError("addCalls failed (attempt $this->addCallsFailCount/" . self::MAX_ADD_CALLS_FAILURES . "), offset rolled back to $oldOffset");
+                return;
+            }
+        }else{
+            $this->addCallsFailCount = 0;
+        }
 
         if($oldOffset !== $this->offset){
             ConnectorDb::invoke('saveNewSettings', [['offsetCdr' => $this->offset]]);
@@ -469,7 +488,7 @@ class AmoCdrDaemon extends WorkerBase
             }
             if(!empty($call['lead']) || !empty($call['client']) || !empty($call['company'])){
                 $this->logger->writeInfo($call, "alertIncompleteAnswered");
-                ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::CHANNEL_CALL_NAME, ['data' => $call, 'action' => 'open-card']);
+                ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['data' => $call, 'action' => 'open-card']);
             }
             $this->incompleteAnswered[$id]['finished'] = true;
         }
@@ -549,7 +568,7 @@ class AmoCdrDaemon extends WorkerBase
      * @param $callCounter
      * @return void
      */
-    private function addCalls($calls, $callCounter):void
+    private function addCalls($calls, $callCounter):bool
     {
         $calls  = array_merge(... array_values($calls));
         if(!empty($calls)){
@@ -557,7 +576,7 @@ class AmoCdrDaemon extends WorkerBase
             $calls = $this->cleanCalls($calls, $callCounter);
         }
         if(empty($calls)){
-            return;
+            return true;
         }
         $this->logger->writeInfo($calls, "CDR synchronization. Step 2. Count: ".count($calls));
         $ids = '';
@@ -573,6 +592,7 @@ class AmoCdrDaemon extends WorkerBase
             $callsArray[$entity_type][] = $call;
         }
         unset($call, $calls);
+        $allSuccess = true;
         foreach ($callsArray as $entity_type => $callsData){
             if(empty($callsData)){
                 continue;
@@ -581,7 +601,12 @@ class AmoCdrDaemon extends WorkerBase
             $result = WorkerAmoHTTP::invokeAmoApi('addCalls', [$callsData, $entity_type]);
             $this->logger->writeInfo($callsData, "Create calls (REQ): $ids");
             $this->logger->writeInfo($result, "Create calls (RES): $ids");
+            if(!$result->success){
+                $this->logger->writeError("Failed to add calls for $entity_type, offset will be rolled back");
+                $allSuccess = false;
+            }
         }
+        return $allSuccess;
     }
 
     /**
@@ -662,7 +687,14 @@ class AmoCdrDaemon extends WorkerBase
 
         foreach ($calls as $call) {
             if(isset($resCalls[$call['id']])){
-                $this->logger->writeError($call, "A call with this ID has been processed {$call['id']}, drop it");
+                // Подхватываем ссылку на запись из другого leg, если у текущего результата её нет.
+                if(empty($resCalls[$call['id']]['params']['link']) && !empty($call['params']['link'])){
+                    $resCalls[$call['id']]['params']['link'] = $call['params']['link'];
+                    if($call['params']['duration'] > 0){
+                        $resCalls[$call['id']]['params']['duration'] = $call['params']['duration'];
+                    }
+                    $this->logger->writeInfo($call, "Updated link/duration from another leg {$call['id']}");
+                }
                 continue;
             }
             $typeCall = $this->cdrRows[$call['id']]['type']??'';
@@ -682,8 +714,14 @@ class AmoCdrDaemon extends WorkerBase
                     $call['responsible_user_id'] = 1*$responsible;
                 }
             }
-            $call['params']['link']       = $this->getCreateFileAndLink($call['id'], $call['created_at']);
-            $call['params']['duration']   = $this->cdrRows[$call['id']]['duration']??$this->cdrRows[$call['id']]['params']['duration']??0;
+            $newLink = $this->getCreateFileAndLink($call['id'], $call['created_at']);
+            if(!empty($newLink)){
+                $call['params']['link'] = $newLink;
+            }
+            $newDuration = $this->cdrRows[$call['id']]['duration']??0;
+            if($newDuration > 0){
+                $call['params']['duration'] = $newDuration;
+            }
 
             $answered = $this->cdrRows[$call['id']]['answered']??0;
             if($answered === 1){
@@ -708,29 +746,26 @@ class AmoCdrDaemon extends WorkerBase
     private function getCreateFileAndLink(string $id, int $created_at):string
     {
         $link = '';
-        if(isset($this->cdrRows[$id]['records'])){
+        if(!empty($this->cdrRows[$id]['records'])){
             if(count($this->cdrRows[$id]['records']) === 1){
                 $fileName = $this->cdrRows[$id]['records'][0];
             }else{
                 $monitor_dir = Storage::getMonitorDir();
                 $sub_dir = date('Y/m/d/H', $created_at);
-                $fileName = "$monitor_dir/amo/$sub_dir/$id.mp3";
+                $ext = pathinfo($this->cdrRows[$id]['records'][0], PATHINFO_EXTENSION);
+                if(empty($ext)){
+                    $ext = 'mp3';
+                }
+                $fileName = "$monitor_dir/amo/$sub_dir/$id.$ext";
                 Util::mwMkdir(dirname($fileName));
 
-                $pathSox = Util::which('sox');
                 $records = array_reverse($this->cdrRows[$id]['records']);
-                $cmd = '';
-                foreach ($records as $key => $value){
-                    if($key === array_key_first($records)){
-                        $cmd.= "$pathSox $value -p pad 3 0 | ";
-                    }elseif ($key === array_key_last($records)){
-                        $cmd.= "$pathSox - -m $value $fileName";
-                    }else{
-                        $cmd.= "$pathSox - -m $value -p pad 3 0 | ";
-                    }
-                }
                 if(!empty($records)){
-                    shell_exec($cmd);
+                    if($ext === 'webm'){
+                        $this->mergeWithFfmpeg($records, $fileName);
+                    }else{
+                        $this->mergeWithSox($records, $fileName);
+                    }
                 }
             }
             $link = "https://$this->extHostname/pbxcore/api/amo-crm/playback?view=$fileName";
@@ -738,6 +773,54 @@ class AmoCdrDaemon extends WorkerBase
         return $link;
     }
 
+
+    /**
+     * Склейка файлов через sox (mp3 и другие форматы, поддерживаемые sox).
+     * @param array  $records
+     * @param string $fileName
+     * @return void
+     */
+    private function mergeWithSox(array $records, string $fileName):void
+    {
+        $pathSox = Util::which('sox');
+        $cmd = '';
+        foreach ($records as $key => $value){
+            if($key === array_key_first($records)){
+                $cmd.= "$pathSox $value -p pad 3 0 | ";
+            }elseif ($key === array_key_last($records)){
+                $cmd.= "$pathSox - -m $value $fileName";
+            }else{
+                $cmd.= "$pathSox - -m $value -p pad 3 0 | ";
+            }
+        }
+        shell_exec($cmd);
+    }
+
+    /**
+     * Склейка файлов через ffmpeg (webm и другие форматы, не поддерживаемые sox).
+     * @param array  $records
+     * @param string $fileName
+     * @return void
+     */
+    private function mergeWithFfmpeg(array $records, string $fileName):void
+    {
+        $pathFfmpeg = Util::which('ffmpeg');
+        $inputs = '';
+        $count = count($records);
+        foreach ($records as $value){
+            $inputs .= "-i $value ";
+        }
+        if($count === 2){
+            $cmd = "$pathFfmpeg $inputs-filter_complex '[0:a][1:a]concat=n=2:v=0:a=1[out]' -map '[out]' -y $fileName 2>/dev/null";
+        }else{
+            $filterParts = '';
+            for($i = 0; $i < $count; $i++){
+                $filterParts .= "[$i:a]";
+            }
+            $cmd = "$pathFfmpeg $inputs-filter_complex '{$filterParts}concat=n=$count:v=0:a=1[out]' -map '[out]' -y $fileName 2>/dev/null";
+        }
+        shell_exec($cmd);
+    }
 
     /**
      * Подготавливает данные для создания сделок / контактов / задач.

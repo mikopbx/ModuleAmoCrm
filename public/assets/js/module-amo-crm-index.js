@@ -6,12 +6,13 @@
  * Proprietary and confidential
  * Written by Nikolay Beketov, 11 2018
  */
-var idUrl = 'module-amo-crm';
+
+var idUrl = 'module-amo-crm/module-amo-crm';
 var idForm = 'module-amo-crm-form';
 var className = 'ModuleAmoCrm';
 var inputClassName = 'mikopbx-module-input';
-/* global $, globalRootUrl, globalTranslate, Form, Config */
 
+/* global $, globalRootUrl, globalTranslate, Form, Config */
 var ModuleAmoCrm = {
   $formObj: $('#' + idForm),
   $checkBoxes: $('#' + idForm + ' .ui.checkbox'),
@@ -22,7 +23,6 @@ var ModuleAmoCrm = {
   $statusToggle: $('#module-status-toggle'),
   $moduleStatus: $('#status'),
   authWindow: undefined,
-
   /**
   /**
    * Field validation rules
@@ -53,16 +53,13 @@ var ModuleAmoCrm = {
   },
   generatePassword: function generatePassword() {
     var length = 50,
-        charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
-        retVal = "";
-
+      charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+      retVal = "";
     for (var i = 0, n = charset.length; i < length; ++i) {
       retVal += charset.charAt(Math.floor(Math.random() * n));
     }
-
     return retVal;
   },
-
   /**
    * On page load we init some Semantic UI library
    */
@@ -86,11 +83,9 @@ var ModuleAmoCrm = {
     });
     $("#login-button").on('click', function (e) {
       var client_id = $('#clientId').val();
-
       if ($('#isPrivateWidget').parent().checkbox('is checked')) {
         client_id = $('#privateClientId').val();
       }
-
       var state = encodeURIComponent(client_id);
       var redirect_uri = encodeURIComponent($('#redirectUri').val());
       var url = "https://www.amocrm.ru/oauth?client_id=".concat(client_id, "&state=").concat(state, "&redirect_uri=").concat(redirect_uri, "&mode=post_message&scope=&approval_prompt=auto");
@@ -139,14 +134,12 @@ var ModuleAmoCrm = {
     } else {
       $('#private-fields').hide();
     }
-
     if ($('#disableDetailedCdr').parent().checkbox('is checked')) {
       $('.limited-cdr-settings').show();
     } else {
       $('.limited-cdr-settings').hide();
     }
   },
-
   /**
    * Deletes an extension with the given ID.
    * @param {string} id - The ID of the rule to delete.
@@ -154,7 +147,7 @@ var ModuleAmoCrm = {
   deleteRule: function deleteRule(id) {
     $('.message.ajax').remove();
     $.api({
-      url: "".concat(globalRootUrl, "module-amo-crm/delete/").concat(id),
+      url: "".concat(globalRootUrl).concat(idUrl, "/delete/").concat(id),
       on: 'now',
       successTest: function successTest(response) {
         // test whether a JSON response is valid
@@ -173,7 +166,6 @@ var ModuleAmoCrm = {
     $.get("".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/check"), function (result) {
       var elStatusAuth = $('#login-button');
       elStatusAuth.removeClass('red green');
-
       if (result.success === true) {
         elStatusAuth.addClass('green');
         elStatusAuth.text(globalTranslate.module_amo_crm_connect_ok);
@@ -181,7 +173,6 @@ var ModuleAmoCrm = {
         elStatusAuth.addClass('red');
         elStatusAuth.text(globalTranslate.module_amo_crm_connect_fail);
       }
-
       if (result.data.lastContactsSyncTime === 0) {
         $('#WaitSyncMsg').show();
       } else {
@@ -209,7 +200,6 @@ var ModuleAmoCrm = {
     });
     window[className].popup.close();
   },
-
   /**
    * Подготавливает список выбора
    * @param selected
@@ -230,7 +220,6 @@ var ModuleAmoCrm = {
     });
     return values;
   },
-
   /**
    * Обработка изменения группы в списке
    */
@@ -240,26 +229,22 @@ var ModuleAmoCrm = {
     tdInput.attr('value', value);
     var currentRowId = $(choice).closest('tr').attr('id');
     var tableName = $(choice).closest('table').attr('id').replace('-table', '');
-
     if (currentRowId !== undefined && tableName !== undefined) {
       window[className].sendChangesToServer(tableName, currentRowId);
     }
   },
-
   /**
    * Add new Table.
    */
   initTable: function initTable(tableName, options) {
     var columns = [];
     var columnsArray4Sort = [];
-
     for (var colName in options['cols']) {
       columns.push({
         data: colName
       });
       columnsArray4Sort.push(colName);
     }
-
     $('#' + tableName).DataTable({
       ajax: {
         url: idUrl + options.ajaxUrl + '?table=' + tableName.replace('-table', ''),
@@ -275,7 +260,6 @@ var ModuleAmoCrm = {
       },
       language: SemanticLocalization.dataTableLocalisation,
       ordering: false,
-
       /**
        * Builder row presentation
        * @param row
@@ -284,10 +268,8 @@ var ModuleAmoCrm = {
       createdRow: function createdRow(row, data) {
         var cols = $('td', row);
         var headers = $('#' + tableName + ' thead tr th');
-
         for (var key in data) {
           var index = columnsArray4Sort.indexOf(key);
-
           if (key === 'rowIcon') {
             cols.eq(index).html('<i class="ui ' + data[key] + ' circle icon"></i>');
           } else if (key === 'delButton') {
@@ -295,42 +277,32 @@ var ModuleAmoCrm = {
             cols.eq(index).html(templateDeleteButton);
           } else if (key === 'priority') {
             cols.eq(index).addClass('dragHandle');
-            cols.eq(index).html('<i class="ui sort circle icon"></i>'); // Приоритет устанавливаем для строки.
-
+            cols.eq(index).html('<i class="ui sort circle icon"></i>');
+            // Приоритет устанавливаем для строки.
             $(row).attr('m-priority', data[key]);
           } else {
             var template = '<div class="ui transparent fluid input inline-edit">' + '<input colName="' + key + '" class="' + inputClassName + '" type="text" data-value="' + data[key] + '" value="' + data[key] + '"></div>';
             $('td', row).eq(index).html(template);
           }
-
           if (options['cols'][key] === undefined) {
             continue;
           }
-
           var additionalClass = options['cols'][key]['class'];
-
           if (additionalClass !== undefined && additionalClass !== '') {
             headers.eq(index).addClass(additionalClass);
           }
-
           var header = options['cols'][key]['header'];
-
           if (header !== undefined && header !== '') {
             headers.eq(index).html(header);
           }
-
           var selectMetaData = options['cols'][key]['select'];
-
           if (selectMetaData !== undefined) {
             var newTemplate = $('#template-select').html().replace('PARAM', data[key]);
-
             var _template = '<input class="' + inputClassName + '" colName="' + key + '" selectType="' + selectMetaData + '" style="display: none;" type="text" data-value="' + data[key] + '" value="' + data[key] + '"></div>';
-
             cols.eq(index).html(newTemplate + _template);
           }
         }
       },
-
       /**
        * Draw event - fired once the table has completed a draw.
        */
@@ -338,21 +310,19 @@ var ModuleAmoCrm = {
         window[className].drowSelectGroup(settings.sTableId);
       }
     });
-    var body = $('body'); // Клик по полю. Вход для редактирования значения.
-
+    var body = $('body');
+    // Клик по полю. Вход для редактирования значения.
     body.on('focusin', '.' + inputClassName, function (e) {
       if ($(e.target).parents('table').attr('id') === 'ModuleAmoPipeLines-table' && $(e.target).attr('colname') === 'name') {
         return;
       }
-
       $(e.target).transition('glow');
       $(e.target).closest('div').removeClass('transparent').addClass('changed-field');
       $(e.target).attr('readonly', false);
-    }); // Отправка формы на сервер по Enter или Tab
-
+    });
+    // Отправка формы на сервер по Enter или Tab
     $(document).on('keydown', function (e) {
       var keyCode = e.keyCode || e.which;
-
       if (keyCode === 13 || keyCode === 9 && $(':focus').hasClass('mikopbx-module-input')) {
         window[className].endEditInput();
       }
@@ -363,13 +333,13 @@ var ModuleAmoCrm = {
       var tableName = $(e.target).closest('table').attr('id').replace('-table', '');
       window[className].deleteRow(tableName, currentRowId);
     }); // Добавление новой строки
+
     // Отправка формы на сервер по уходу с поля ввода
+    body.on('focusout', '.' + inputClassName, window[className].endEditInput);
 
-    body.on('focusout', '.' + inputClassName, window[className].endEditInput); // Кнопка "Добавить новую запись"
-
+    // Кнопка "Добавить новую запись"
     $('[id-table = "' + tableName + '"]').on('click', window[className].addNewRow);
   },
-
   /**
    * Перемещение строки, изменение приоритета.
    */
@@ -380,13 +350,11 @@ var ModuleAmoCrm = {
       var ruleId = $(obj).attr('id');
       var oldPriority = parseInt($(obj).attr('m-priority'), 10);
       var newPriority = obj.rowIndex;
-
       if (!isNaN(ruleId) && oldPriority !== newPriority) {
         priorityWasChanged = true;
         priorityData[ruleId] = newPriority;
       }
     });
-
     if (priorityWasChanged) {
       $.api({
         on: 'now',
@@ -396,7 +364,6 @@ var ModuleAmoCrm = {
       });
     }
   },
-
   /**
    * Окончание редактирования поля ввода.
    * Не относится к select.
@@ -407,13 +374,11 @@ var ModuleAmoCrm = {
     $el.each(function (index, obj) {
       var currentRowId = $(obj).attr('id');
       var tableName = $(obj).closest('table').attr('id').replace('-table', '');
-
       if (currentRowId !== undefined && tableName !== undefined) {
         window[className].sendChangesToServer(tableName, currentRowId);
       }
     });
   },
-
   /**
    * Добавление новой строки в таблицу.
    * @param e
@@ -422,12 +387,11 @@ var ModuleAmoCrm = {
     var idTable = $(e.target).attr('id-table');
     var table = $('#' + idTable);
     e.preventDefault();
-    table.find('.dataTables_empty').remove(); // Отправим на запись все что не записано еще
-
+    table.find('.dataTables_empty').remove();
+    // Отправим на запись все что не записано еще
     var $el = table.find('.changed-field').closest('tr');
     $el.each(function (index, obj) {
       var currentRowId = $(obj).attr('id');
-
       if (currentRowId !== undefined) {
         window[className].sendChangesToServer(currentRowId);
       }
@@ -437,7 +401,6 @@ var ModuleAmoCrm = {
     table.find('tbody > tr:first').before(rowTemplate);
     window[className].drowSelectGroup(idTable);
   },
-
   /**
    * Обновление select элементов.
    * @param tableId
@@ -460,7 +423,6 @@ var ModuleAmoCrm = {
       dragHandle: '.dragHandle'
     });
   },
-
   /**
    * Удаление строки
    * @param tableName
@@ -468,19 +430,16 @@ var ModuleAmoCrm = {
    */
   deleteRow: function deleteRow(tableName, id) {
     var table = $('#' + tableName + '-table');
-
     if (id.substr(0, 3) === 'new') {
       table.find('tr#' + id).remove();
       return;
     }
-
     $.api({
       url: window[className].deleteRecordAJAXUrl + '?id=' + id + '&table=' + tableName,
       on: 'now',
       onSuccess: function onSuccess(response) {
         if (response.success) {
           table.find('tr#' + id).remove();
-
           if (table.find('tbody > tr').length === 0) {
             table.find('tbody').append('<tr class="odd"></tr>');
           }
@@ -488,7 +447,6 @@ var ModuleAmoCrm = {
       }
     });
   },
-
   /**
    * Отправка данных на сервер при измении
    */
@@ -500,20 +458,16 @@ var ModuleAmoCrm = {
     var notEmpty = false;
     $("tr#" + recordId + ' .' + inputClassName).each(function (index, obj) {
       var colName = $(obj).attr('colName');
-
       if (colName !== undefined) {
         data[$(obj).attr('colName')] = $(obj).val();
-
         if ($(obj).val() !== '') {
           notEmpty = true;
         }
       }
     });
-
     if (notEmpty === false) {
       return;
     }
-
     $("tr#" + recordId + " .user.circle").removeClass('user circle').addClass('spinner loading');
     $.api({
       url: window[className].saveTableAJAXUrl,
@@ -530,7 +484,6 @@ var ModuleAmoCrm = {
           table.find("tr#" + rowId + " input").attr('readonly', true);
           table.find("tr#" + rowId + " div").removeClass('changed-field loading').addClass('transparent');
           table.find("tr#" + rowId + " .spinner.loading").addClass('user circle').removeClass('spinner loading');
-
           if (rowId !== response.data['newId']) {
             $("tr#".concat(rowId)).attr('id', response.data['newId']);
           }
@@ -540,7 +493,6 @@ var ModuleAmoCrm = {
         if (response.message !== undefined) {
           UserMessage.showMultiString(response.message);
         }
-
         $("tr#" + recordId + " .spinner.loading").addClass('user circle').removeClass('spinner loading');
       },
       onError: function onError(errorMessage, element, xhr) {
@@ -550,7 +502,6 @@ var ModuleAmoCrm = {
       }
     });
   },
-
   /**
    * Change some form elements classes depends of module status
    */
@@ -563,7 +514,6 @@ var ModuleAmoCrm = {
       window[className].$moduleStatus.hide();
     }
   },
-
   /**
    * Send command to restart module workers after data changes,
    * Also we can do it on TemplateConf->modelsEventChangeData method
@@ -585,7 +535,6 @@ var ModuleAmoCrm = {
       }
     });
   },
-
   /**
    * We can modify some data before form send
    * @param settings
@@ -596,14 +545,12 @@ var ModuleAmoCrm = {
     result.data = window[className].$formObj.form('get values');
     return result;
   },
-
   /**
    * Some actions after forms send
    */
   cbAfterSendForm: function cbAfterSendForm() {
     window[className].applyConfigurationChanges();
   },
-
   /**
    * Initialize form parameters
    */
@@ -615,7 +562,6 @@ var ModuleAmoCrm = {
     Form.cbAfterSendForm = window[className].cbAfterSendForm;
     Form.initialize();
   },
-
   /**
    * Update the module state on form label
    * @param status
@@ -626,17 +572,14 @@ var ModuleAmoCrm = {
         window[className].$moduleStatus.removeClass('grey').removeClass('red').addClass('green');
         window[className].$moduleStatus.html(globalTranslate.module_amo_crmConnected);
         break;
-
       case 'Disconnected':
         window[className].$moduleStatus.removeClass('green').removeClass('red').addClass('grey');
         window[className].$moduleStatus.html(globalTranslate.module_amo_crmDisconnected);
         break;
-
       case 'Updating':
         window[className].$moduleStatus.removeClass('green').removeClass('red').addClass('grey');
         window[className].$moduleStatus.html("<i class=\"spinner loading icon\"></i>".concat(globalTranslate.module_amo_crmUpdateStatus));
         break;
-
       default:
         window[className].$moduleStatus.removeClass('green').removeClass('red').addClass('grey');
         window[className].$moduleStatus.html(globalTranslate.module_amo_crmDisconnected);

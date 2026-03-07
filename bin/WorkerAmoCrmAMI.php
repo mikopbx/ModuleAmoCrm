@@ -20,15 +20,24 @@
 namespace Modules\ModuleAmoCrm\bin;
 require_once 'Globals.php';
 
+use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
+use Modules\ModuleAmoCrm\Lib\Logger;
 
 class WorkerAmoCrmAMI extends WorkerBase
 {
-    public const CHANNEL_CALL_NAME = 'http://127.0.0.1/pbxcore/api/nchan/pub/pbx-events';
+    /**
+     * @return string
+     */
+    public static function getChannelUrl(): string
+    {
+        $port = PbxSettings::getValueByKey('WEBPort');
+        return "http://127.0.0.1:{$port}/pbxcore/api/nchan/pub/pbx-events";
+    }
 
     private int     $extensionLength = 3;
     private array   $users = [];
@@ -37,6 +46,7 @@ class WorkerAmoCrmAMI extends WorkerBase
     private int     $lastUpdateSettings = 0;
 
     private $beanstalk;
+    private Logger $logger;
 
     /**
      * Соответстввие Linked ID и сведиений о каналах.
@@ -78,6 +88,7 @@ class WorkerAmoCrmAMI extends WorkerBase
     public function start($argv):void
     {
         $this->beanstalk = new BeanstalkClient(ConnectorDb::class);
+        $this->logger = new Logger('WorkerAmoCrmAMI', 'ModuleAmoCrm');
 
         $this->am     = Util::getAstManager();
         $this->setFilter();
@@ -165,7 +176,14 @@ class WorkerAmoCrmAMI extends WorkerBase
         }
         $this->checkUpdateSettings();
 
-        $data = json_decode(base64_decode($parameters['AgiData']), true, 512, JSON_THROW_ON_ERROR);
+        $agiData = $parameters['AgiData'];
+        if (strpos($agiData, 'GZ:') === 0) {
+            $stringData = gzdecode(base64_decode(substr($agiData, 3)));
+        } else {
+            $stringData = base64_decode($agiData);
+        }
+        $data = json_decode($stringData, true, 512, JSON_THROW_ON_ERROR);
+        $this->logger->writeInfo($data['action'], "AMI event: {$data['linkedid']}");
         switch ($data['action']) {
             case 'hangup_chan':
                 $this->actionHangupChan($data);
@@ -206,7 +224,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             $data['src_num'],
             $data['dst_num'],
         ];
-        $general_src_num = null;
+        $general_src_num = '';
         if ($data['transfer'] === '1') {
             $history = $this->calls[$data['linkedid']]??[];
             if (!empty($history)) {
@@ -233,11 +251,13 @@ class WorkerAmoCrmAMI extends WorkerBase
     {
         $tmpCalls = [];
         if(in_array($data['action_extra']??'', ['originate_start', 'originate_end'], true)){
+            $this->logger->writeInfo("Skip originate: {$data['action_extra']}", "actionCreateCdr {$data['linkedid']}");
             return;
         }
         $this->createCdrCheckInner($tmpCalls, $data, $generalNumber);
         $this->createCdrCheckOutgoing($tmpCalls, $data, $generalNumber);
         $this->createCdrCheckIncoming($tmpCalls, $data, $generalNumber);
+        $this->logger->writeInfo("tmpCalls count: ".count($tmpCalls)." src={$data['src_num']} dst={$data['dst_num']}", "actionCreateCdr {$data['linkedid']}");
         foreach ($tmpCalls as $call){
             $callFound = false;
             $callsById = $this->calls[$data['linkedid']]??[];
@@ -251,7 +271,8 @@ class WorkerAmoCrmAMI extends WorkerBase
                 $this->calls[$call['id']][] = $call;
             }
             $this->activeChannels[$data['src_chan']] = $data['src_num'];
-            ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
+            $this->logger->writeInfo($call, "Publish call event {$data['linkedid']}");
+            ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $call);
         }
     }
 
@@ -302,8 +323,9 @@ class WorkerAmoCrmAMI extends WorkerBase
     private function createCdrCheckIncoming(&$calls, $data, $generalNumber):void
     {
         if(in_array($data['src_num'], $this->innerNums, true)
-           || in_array($generalNumber, $this->innerNums, true)){
+           || (!empty($generalNumber) && in_array($generalNumber, $this->innerNums, true))){
             // Это точно не входящий. Как вариант - внутренний.
+            $this->logger->writeInfo("Skip: src={$data['src_num']} in innerNums or gen=$generalNumber in innerNums", "checkIncoming {$data['linkedid']}");
             return;
         }
 
@@ -381,6 +403,9 @@ class WorkerAmoCrmAMI extends WorkerBase
         }
         $transferCall = [];
         $data['end'] = date(\DateTimeInterface::ATOM, strtotime($data['end']));
+        if(empty($this->calls[$data['linkedid']])){
+            return;
+        }
         foreach ($this->calls[$data['linkedid']] as &$call) {
             if(isset($call['end'])){
                 continue;
@@ -419,7 +444,7 @@ class WorkerAmoCrmAMI extends WorkerBase
                 'user'    => $userId,
                 'action'  => 'hangup'
             ];
-            ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
+            ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $params);
         }
     }
 
@@ -466,7 +491,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'dst'     => $transferCall['dst'],
             'action'  => 'call'
         ];
-        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
+        ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $params);
 
         $data = [
             'action'   => 'answer',
@@ -474,7 +499,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'id'       => $data['linkedid'],
             'uid'      => $transferCall['uid'],
         ];
-        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $data);
+        ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $data);
     }
 
     /**
@@ -484,12 +509,22 @@ class WorkerAmoCrmAMI extends WorkerBase
      */
     private function actionDialCreateChan($data):void{
         $uid = $data['transfer_UNIQUEID']??$data['UNIQUEID'];
+        if(empty($this->calls[$data['linkedid']])){
+            $this->logger->writeInfo("No calls for linkedid", "actionDialCreateChan {$data['linkedid']}");
+            return;
+        }
+        $matched = false;
         foreach ($this->calls[$data['linkedid']] as &$call){
             if($uid !== $call['uid']){
                 continue;
             }
             $call['dst-chan'] = $data['dst_chan'];
+            $matched = true;
+            $this->logger->writeInfo("Set dst-chan={$data['dst_chan']} for uid=$uid", "actionDialCreateChan {$data['linkedid']}");
             break;
+        }
+        if(!$matched){
+            $this->logger->writeInfo("No matching uid=$uid, dst_chan={$data['dst_chan']}", "actionDialCreateChan {$data['linkedid']}");
         }
         unset($call);
 
@@ -514,7 +549,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'user'    => $this->users[$number],
             'action'  => 'create-chan'
         ];
-        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $params);
+        ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $params);
     }
 
     /**
@@ -524,11 +559,18 @@ class WorkerAmoCrmAMI extends WorkerBase
     private function actionDialAnswer($params):void
     {
         $channel = $params['agi_channel'];
+        if(empty($this->calls[$params['linkedid']])){
+            $this->logger->writeInfo("No calls for linkedid, channel=$channel", "actionDialAnswer {$params['linkedid']}");
+            return;
+        }
+        $matched = false;
         foreach ($this->calls[$params['linkedid']] as &$call){
             if(isset($call['answer'])){
+                $this->logger->writeInfo("Skip already answered uid={$call['uid']}", "actionDialAnswer {$params['linkedid']}");
                 continue;
             }
             if($channel !== $call['src-chan'] && $channel !== $call['dst-chan']){
+                $this->logger->writeInfo("Channel mismatch: agi=$channel src-chan={$call['src-chan']} dst-chan={$call['dst-chan']} uid={$call['uid']}", "actionDialAnswer {$params['linkedid']}");
                 continue;
             }
             $call['answer'] = date(\DateTimeInterface::ATOM, strtotime($params['answer']));
@@ -538,8 +580,13 @@ class WorkerAmoCrmAMI extends WorkerBase
                 'id'       => $params['linkedid'],
                 'uid'      => $call['uid'],
             ];
-            ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $data);
+            $this->logger->writeInfo($data, "Publish answer {$params['linkedid']}");
+            ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $data);
+            $matched = true;
             break;
+        }
+        if(!$matched){
+            $this->logger->writeInfo("No matching call for channel=$channel", "actionDialAnswer {$params['linkedid']}");
         }
         unset($call);
     }
@@ -551,7 +598,7 @@ class WorkerAmoCrmAMI extends WorkerBase
      */
     private function actionDialEnd($data):void
     {
-        $src_num = $this->activeChannels[$data['src_chan']];
+        $src_num = $this->activeChannels[$data['src_chan']]??'';
         if (isset($this->users[$src_num])) {
             // Это исходящий вызов.
             $USER_ID = $this->users[$src_num];
@@ -567,7 +614,7 @@ class WorkerAmoCrmAMI extends WorkerBase
             'dst'              => '', // Канал назначения не был создан.
             'action'           => 'end-dial',
         ];
-        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
+        ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $call);
     }
 
     /**
@@ -590,9 +637,10 @@ class WorkerAmoCrmAMI extends WorkerBase
         $uid     = $data['UNIQUEID'];
         $endTime = date(\DateTimeInterface::ATOM, strtotime($data['endtime']));
         $start   = date(\DateTimeInterface::ATOM, strtotime($data['start']));
-        foreach ( $this->calls[$data['linkedid']] as $index => $callData){
+        $callsById = $this->calls[$data['linkedid']]??[];
+        foreach ($callsById as $index => $callData){
             if($callData['src'] === $data['src_num'] && $callData['dst'] === $data['dst_num']
-               && $callData['date'] === $start && $callData['end'] === $endTime){
+               && $callData['date'] === $start && ($callData['end']??'') === $endTime){
                 $uid = $callData['uid'];
                 unset($this->calls[$data['linkedid']][$index]);
                 break;
@@ -608,17 +656,20 @@ class WorkerAmoCrmAMI extends WorkerBase
             'dst'              => $data['dst_num'],
             'g-missed'         => $data['GLOBAL_STATUS'] !== 'ANSWERED',
             'missed'           => $data['disposition'] !== 'ANSWERED',
-            'filename'         => $data['recordingfile'],
+            'filename'         => $data['recordingfile']??'',
             'action'           => 'end-call',
         ];
-        ClientHTTP::sendHttpPostRequest(self::CHANNEL_CALL_NAME, $call);
+        $this->logger->writeInfo($call, "Publish end-call {$data['linkedid']}");
+        ClientHTTP::sendHttpPostRequest(self::getChannelUrl(), $call);
 
         // Чистим мусор.
-        unset(
-            $this->activeChannels[$data['src_chan']],
-            $this->activeChannels[$data['dst_chan']],
-            $this->channelCounter[$data['UNIQUEID']]
-        );
+        if(isset($data['src_chan'])){
+            unset($this->activeChannels[$data['src_chan']]);
+        }
+        if(isset($data['dst_chan'])){
+            unset($this->activeChannels[$data['dst_chan']]);
+        }
+        unset($this->channelCounter[$data['UNIQUEID']]);
         if(empty($this->calls[$data['linkedid']])){
             unset($this->calls[$data['linkedid']]);
         }

@@ -111,9 +111,18 @@
 <audio id="sipRemoteAudio"></audio>
 <script>
 window.onload = function() {
-    let iframe = window.parent.document.getElementById('miko-pbx-phone');
-    console.log(iframe.getAttribute('title'));
-    let apiUrl = window.location.protocol + '//' + iframe.getAttribute('title') + '/pbxcore/api/amo-crm/v1/panel-enable';
+    let pbxHost = window.mikoPbxHost || '';
+    if (!pbxHost) {
+        try {
+            let iframe = window.parent.document.getElementById('miko-pbx-phone');
+            pbxHost = iframe.getAttribute('title');
+        } catch(e) {}
+    }
+    if (!pbxHost) {
+        pbxHost = window.location.host;
+    }
+    console.log(pbxHost);
+    let apiUrl = window.location.protocol + '//' + pbxHost + '/pbxcore/api/amo-crm/v1/panel-enable';
     // Выполняем запрос
     fetch(apiUrl)
         .then(function(response) {
@@ -123,6 +132,7 @@ window.onload = function() {
                 document.querySelector('html').style = "";
             } else {
                 console.log('FALSE');
+                window.parent.postMessage(JSON.stringify({action: 'hide-panel', pbxHost: pbxHost}), '*');
             }
         });
 };

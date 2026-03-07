@@ -19,7 +19,13 @@
 let baseUrl = 'js';
 if(window.self !== window.top){
     // This is iframe.
-    baseUrl = `${window.location.protocol}//${window.frameElement.title}/webrtc-phone/js`;
+    let pbxHost = window.mikoPbxHost || '';
+    if (!pbxHost) {
+        try { pbxHost = window.frameElement.title; } catch(e) {}
+    }
+    if (pbxHost) {
+        baseUrl = `${window.location.protocol}//${pbxHost}/webrtc-phone/js`;
+    }
 }
 requirejs.config({
     baseUrl: baseUrl,

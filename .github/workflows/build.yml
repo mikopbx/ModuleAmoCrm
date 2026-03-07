@@ -12,4 +12,46 @@ jobs:
     uses: mikopbx/.github-workflows/.github/workflows/extension-publish.yml@master
     with:
       initial_version: "1.84"
+      custom_build_steps: |
+        cd module
+        sed -i "s|%CLIENT_ID%|${{ vars.AMO_CLIENT_ID }}|g" Lib/AmoCrmMainBase.php
+        sed -i "s|%CLIENT_SECRET%|${{ vars.AMO_CLIENT_SECRET }}|g" Lib/AmoCrmMainBase.php
+        sed -i "s|%REDIRECT_URL%|${{ vars.AMO_REDIRECT_URL }}|g" Lib/AmoCrmMainBase.php
+        echo "AmoCrmMainBase.php placeholders replaced."
+        WIDGET_VERSION="1.0.$(git rev-list --count HEAD)"
+        sed -i "s|%WidgetVersion%|$WIDGET_VERSION|g" widget/manifest.json
+        sed -i "s|%WidgetVersion%|$WIDGET_VERSION|g" widget/script.js
+        cd widget && zip -r "$RUNNER_TEMP/widget.zip" . -x "*.DS_Store*" && cd ..
+        echo "Widget built: widget.zip (version $WIDGET_VERSION)"
+        rm -rf widget
+        echo "widget/ removed from module archive."
     secrets: inherit
+
+  upload-widget:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build widget
+        run: |
+          WIDGET_VERSION="1.0.$(git rev-list --count HEAD)"
+          sed -i "s|%WidgetVersion%|$WIDGET_VERSION|g" widget/manifest.json
+          sed -i "s|%WidgetVersion%|$WIDGET_VERSION|g" widget/script.js
+          cd widget && zip -r ../widget.zip . -x "*.DS_Store*"
+
+      - name: Upload widget to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
+          if [ -n "$TAG" ]; then
+            gh release upload "$TAG" widget.zip --clobber
+            echo "widget.zip uploaded to release $TAG"
+          else
+            echo "No release found, skipping upload."
+          fi
