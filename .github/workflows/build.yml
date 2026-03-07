@@ -18,4 +18,9 @@ jobs:
         sed -i "s|%CLIENT_SECRET%|${{ vars.AMO_CLIENT_SECRET }}|g" Lib/AmoCrmMainBase.php
         sed -i "s|%REDIRECT_URL%|${{ vars.AMO_REDIRECT_URL }}|g" Lib/AmoCrmMainBase.php
         echo "AmoCrmMainBase.php placeholders replaced."
+        WIDGET_VERSION="1.0.$(git rev-list --count HEAD)"
+        sed -i "s|%WidgetVersion%|$WIDGET_VERSION|g" widget/manifest.json
+        sed -i "s|%WidgetVersion%|$WIDGET_VERSION|g" widget/script.js
+        cd widget && zip -r ../widget.zip . -x "*.DS_Store*" && cd ..
+        echo "Widget built: widget.zip (version $WIDGET_VERSION)"
     secrets: inherit
