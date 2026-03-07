@@ -125,6 +125,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          cd module
           TAG="${{ steps.version.outputs.new_version_tag }}"
           echo "Uploading widget.zip to release $TAG..."
           sleep 5
