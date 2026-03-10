@@ -29,6 +29,18 @@ $moduleEnable = PbxExtensionUtils::isEnabled('ModuleAmoCrm');
 if(!$moduleEnable){
     exit(1);
 }
+
+// Защита от параллельного запуска нескольких экземпляров safe.php (cron race condition)
+$lockFile = '/tmp/amo_safe.lock';
+$lockFp = fopen($lockFile, 'w');
+if ($lockFp === false || !flock($lockFp, LOCK_EX | LOCK_NB)) {
+    // Другой экземпляр safe.php уже работает
+    if ($lockFp !== false) {
+        fclose($lockFp);
+    }
+    exit(0);
+}
+
 $conf = new AmoCrmConf();
 $workers = $conf->getModuleWorkers();
 foreach ($workers as $workerData) {
@@ -67,3 +79,6 @@ if (is_dir($logDir)) {
         }
     }
 }
+
+flock($lockFp, LOCK_UN);
+fclose($lockFp);

@@ -278,6 +278,32 @@ class AmoCdrDaemon extends WorkerBase
      */
     private function cdrSync():void
     {
+        // Защита от параллельной обработки CDR двумя экземплярами AmoCdrDaemon
+        $lockFile = '/tmp/amo_cdr_sync.lock';
+        $lockFp = fopen($lockFile, 'w');
+        if ($lockFp === false) {
+            $this->logger->writeError('cdrSync: failed to open lock file');
+            return;
+        }
+        if (!flock($lockFp, LOCK_EX | LOCK_NB)) {
+            $this->logger->writeInfo('cdrSync is locked by another process, skip this iteration');
+            fclose($lockFp);
+            return;
+        }
+        try {
+            $this->cdrSyncInternal();
+        } finally {
+            flock($lockFp, LOCK_UN);
+            fclose($lockFp);
+        }
+    }
+
+    /**
+     * Внутренняя логика синхронизации CDR (защищена file lock в cdrSync).
+     * @return void
+     */
+    private function cdrSyncInternal():void
+    {
         $oldOffset = $this->offset;
         $this->cdrRows = [];
         $add_query                     = [
@@ -1188,6 +1214,50 @@ class AmoCdrDaemon extends WorkerBase
         if(empty($this->newContacts)){
             return;
         }
+
+        // Повторная проверка БД: контакт мог быть создан другим процессом между
+        // prepareDataCreatingEntities() и этим моментом
+        $phonesToCheck = array_keys($this->newContacts);
+        $freshData = ConnectorDb::invoke('getContactsData', [$phonesToCheck]);
+        if (is_array($freshData)) {
+            foreach ($freshData as $phoneId => $data) {
+                if (!empty($data['contactId'])) {
+                    $this->logger->writeInfo("Contact already exists for $phoneId (id:{$data['contactId']}), skip create");
+                    $contactId = intval($data['contactId']);
+                    // Привязываем существующий контакт к связанным сущностям
+                    if (isset($this->newLeads[$phoneId])) {
+                        $this->newLeads[$phoneId]['_embedded']['contacts'][] = [
+                            'id' => $contactId,
+                            'is_main' => true
+                        ];
+                    }
+                    if (isset($this->newUnsorted[$phoneId])) {
+                        $this->newUnsorted[$phoneId]['_embedded']['contacts'][] = [
+                            'id' => $contactId,
+                        ];
+                    }
+                    if (isset($this->newTasks[$phoneId])) {
+                        $this->newTasks[$phoneId]['entity_id'] = $contactId;
+                        $this->newTasks[$phoneId]['entity_type'] = 'contact';
+                    }
+                    if (isset($this->incompleteAnswered[$phoneId])) {
+                        $this->incompleteAnswered[$phoneId]['client'] = $contactId;
+                    }
+                    if (isset($calls[$phoneId])) {
+                        foreach ($calls[$phoneId] as &$call) {
+                            $call['entity_id'] = $contactId;
+                        }
+                        unset($call);
+                    }
+                    unset($this->newContacts[$phoneId]);
+                }
+            }
+        }
+
+        if(empty($this->newContacts)){
+            return;
+        }
+
         $contactsData = [
             'add' => []
         ];
