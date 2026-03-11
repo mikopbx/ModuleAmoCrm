@@ -100,7 +100,7 @@ define(function (require) {
           }
           $(this).each(() => {
             let oldUrl  = $(this).attr('href');
-            let oldHost = (new URL(oldUrl)).hostname;
+            let oldHost = (new URL(oldUrl)).host;
             if(oldHost === self.settings.pbxHost){
               return;
             }
