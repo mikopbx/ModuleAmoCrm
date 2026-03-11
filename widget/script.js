@@ -40,8 +40,8 @@ define(function (require) {
           "color": "#61a0e1"
         };
         $(`.${wCode} div.widget_settings_block__title_field:not(.widget_settings_block_users__title_field)`).css(boldStyle);
-        $(`.${wCode} strong`).css(boldStyle);
-        $(`.${wCode} a`).css({"color": "#61a0e1"});
+        $(`.${wCode} .widget_settings_block strong`).css(boldStyle);
+        $(`.${wCode} .widget_settings_block a`).css({"color": "#61a0e1"});
         return true;
       },
       onSave: function (data) {
