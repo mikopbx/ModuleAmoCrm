@@ -625,12 +625,14 @@ class WorkerAmoCrmAMI extends WorkerBase
     private function actionCompleteCdr($data):void
     {
         // Это событие приходит только когда все cdr обработаны.
-        if (isset($this->users[$data['src_num']])) {
+        $srcNum = $data['src_num'] ?? '';
+        $dstNum = $data['dst_num'] ?? '';
+        if (isset($this->users[$srcNum])) {
             // Это исходящий вызов.
-            $USER_ID = $this->users[$data['src_num']];
-        } elseif (isset($this->users[$data['dst_num']])) {
+            $USER_ID = $this->users[$srcNum];
+        } elseif (isset($this->users[$dstNum])) {
             // Это входящие вызов.
-            $USER_ID = $this->users[$data['dst_num']];
+            $USER_ID = $this->users[$dstNum];
         } else {
             return;
         }
@@ -639,7 +641,7 @@ class WorkerAmoCrmAMI extends WorkerBase
         $start   = date(\DateTimeInterface::ATOM, strtotime($data['start']));
         $callsById = $this->calls[$data['linkedid']]??[];
         foreach ($callsById as $index => $callData){
-            if($callData['src'] === $data['src_num'] && $callData['dst'] === $data['dst_num']
+            if($callData['src'] === $srcNum && $callData['dst'] === $dstNum
                && $callData['date'] === $start && ($callData['end']??'') === $endTime){
                 $uid = $callData['uid'];
                 unset($this->calls[$data['linkedid']][$index]);
@@ -652,10 +654,10 @@ class WorkerAmoCrmAMI extends WorkerBase
             'id'               => $data['linkedid'],
             'date'             => date(\DateTimeInterface::ATOM, strtotime($data['start'])),
             'user'             => $USER_ID,
-            'src'              => $data['src_num'],
-            'dst'              => $data['dst_num'],
-            'g-missed'         => $data['GLOBAL_STATUS'] !== 'ANSWERED',
-            'missed'           => $data['disposition'] !== 'ANSWERED',
+            'src'              => $srcNum,
+            'dst'              => $dstNum,
+            'g-missed'         => ($data['GLOBAL_STATUS'] ?? '') !== 'ANSWERED',
+            'missed'           => ($data['disposition'] ?? '') !== 'ANSWERED',
             'filename'         => $data['recordingfile']??'',
             'action'           => 'end-call',
         ];

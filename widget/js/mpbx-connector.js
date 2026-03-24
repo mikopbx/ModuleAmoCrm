@@ -25,6 +25,7 @@ define(function (require) {
         settings: {},
         iFrame: null,
         toggleTab: null,
+        panelDisabled: true,
         /**
          * Creates a fixed toggle tab on the right edge of the screen
          */
@@ -146,28 +147,19 @@ define(function (require) {
                     previewIframe.close();
 
                     connector.iFrame.onload = function (){
-                        let frameVisibility= localStorage.getItem('frameVisibility');
-                        if(frameVisibility === '1'){
-                            $(connector.iFrame).show({duration: 400});
-                        }else{
-                            $(connector.iFrame).hide();
-                        }
+                        // Не показываем ни iframe, ни toggleTab до подтверждения от iframe
+                        // что панель включена (panel-enable API вернул 200).
+                        // iframe отправит 'hide-panel' если отключена, или отобразит контент если включена.
+                        $(connector.iFrame).hide();
                         let resizeTimer;
                         $(window).resize(() => {
                             clearTimeout(resizeTimer);
                             resizeTimer = setTimeout(() => {
-                                // Set the size of the frame content. Passing a command to a frame
+                                if (connector.panelDisabled) return;
                                 connector.postToFrame({action: 'resize', height: $(window).height()});
                                 connector.setHeightFrame();
                             }, 150);
                         });
-                        // Create toggle tab for showing the hidden panel
-                        connector.createToggleTab();
-                        if (frameVisibility !== '1') {
-                            $(connector.toggleTab).show();
-                        } else {
-                            $(connector.toggleTab).hide();
-                        }
                     };
                     // Subscribing to event processing from a frame
                     window.removeEventListener("message", connector.onMessage);
@@ -204,9 +196,20 @@ define(function (require) {
                 return;
             }
             if(params.action === 'init-done'){
-                // Message from MikoPBX frame
+                // Message from MikoPBX frame — панель подтвердила что включена
+                connector.panelDisabled = false;
                 connector.setHeightFrame();
-                connector.postToFrame({action: 'connect', data: connector.settings})
+                connector.postToFrame({action: 'connect', data: connector.settings});
+                // Теперь можно показать toggleTab или iframe
+                connector.createToggleTab();
+                let frameVisibility = localStorage.getItem('frameVisibility');
+                if(frameVisibility === '1'){
+                    $(connector.iFrame).show({duration: 400});
+                    $(connector.toggleTab).hide();
+                }else{
+                    $(connector.iFrame).hide();
+                    $(connector.toggleTab).show();
+                }
             }else if(params.action === 'findContact'){
                 PubSub.publish(connector.settings.ns + ':main', params);
             }else if(params.action === 'resultFindContact'){
@@ -226,8 +229,16 @@ define(function (require) {
             }else if(params.action === 'hide-panel'){
                 $(connector.iFrame).hide();
                 localStorage.setItem('frameVisibility', '0');
-                connector.createToggleTab();
-                $(connector.toggleTab).show();
+                if (connector.panelDisabled) {
+                    // Панель отключена на сервере — не показываем ничего
+                    if (connector.toggleTab) {
+                        $(connector.toggleTab).hide();
+                    }
+                } else {
+                    // Панель свёрнута пользователем — показываем кнопку
+                    connector.createToggleTab();
+                    $(connector.toggleTab).show();
+                }
             }else if(params.action === 'show-panel'){
                 connector.postToFrame({action: 'resize'});
                 $(connector.iFrame).show({

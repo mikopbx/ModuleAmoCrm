@@ -270,7 +270,18 @@ class AmoCrmConf extends ConfigClass
             '        return "ok";'.PHP_EOL.
             "    ';".PHP_EOL.
             "    set_by_lua \$result_url '".PHP_EOL.
-            '        local url = "/pbxcore/api/amo-crm/v2/playback"..ngx.var.arg_view;'.PHP_EOL.
+            '        local view = ngx.var.arg_view or ""'.PHP_EOL.
+            '        if view:find("%.%.") or view:find("//") then'.PHP_EOL.
+            '            return "/404"'.PHP_EOL.
+            '        end'.PHP_EOL.
+            '        local allowed = {".mp3", ".wav", ".webm", ".ogg"}'.PHP_EOL.
+            '        local ext = view:lower():match("(%.[a-z0-9]+)$") or ""'.PHP_EOL.
+            '        local ok = false'.PHP_EOL.
+            '        for _, v in ipairs(allowed) do'.PHP_EOL.
+            '            if ext == v then ok = true; break end'.PHP_EOL.
+            '        end'.PHP_EOL.
+            '        if not ok then return "/404" end'.PHP_EOL.
+            '        local url = "/pbxcore/api/amo-crm/v2/playback"..view;'.PHP_EOL.
             '        return string.gsub(url,ngx.var.document_root,"");'.PHP_EOL.
             "    ';".PHP_EOL.
             '    try_files "${result_url}" "${result_url}";'.PHP_EOL.
@@ -278,7 +289,11 @@ class AmoCrmConf extends ConfigClass
             "location /pbxcore/api/amo-crm/v2/media {".PHP_EOL.
             "    root /storage/usbdisk1/mikopbx/astspool/monitor;".PHP_EOL.
             '    set_by_lua $token_exists \''.PHP_EOL.
-            '        local file = "/var/etc/auth/"..tostring(ngx.var.arg_token);'.PHP_EOL.
+            '        local token = tostring(ngx.var.arg_token or "")'.PHP_EOL.
+            '        if token == "" or token:find("%.%.") or token:find("/") then'.PHP_EOL.
+            '            return "fail"'.PHP_EOL.
+            '        end'.PHP_EOL.
+            '        local file = "/var/etc/auth/"..token;'.PHP_EOL.
             '        local f = io.open(file, "rb")'.PHP_EOL.
             '        local result = "fail";'.PHP_EOL.
             '        if f then'.PHP_EOL.
@@ -291,7 +306,11 @@ class AmoCrmConf extends ConfigClass
             '        rewrite ^ /pbxcore/api/nchan/auth last;'.PHP_EOL.
             '    }'.PHP_EOL.
             "    set_by_lua \$result_url '".PHP_EOL.
-            '        local url = "/pbxcore/api/amo-crm/v2/playback"..ngx.var.arg_view;'.PHP_EOL.
+            '        local view = ngx.var.arg_view or ""'.PHP_EOL.
+            '        if view:find("%.%.") or view:find("//") then'.PHP_EOL.
+            '            return "/404"'.PHP_EOL.
+            '        end'.PHP_EOL.
+            '        local url = "/pbxcore/api/amo-crm/v2/playback"..view;'.PHP_EOL.
             '        return string.gsub(url,ngx.var.document_root,"");'.PHP_EOL.
             "    ';".PHP_EOL.
             '    try_files "${result_url}" "${result_url}";'.PHP_EOL.

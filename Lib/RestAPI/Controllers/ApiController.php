@@ -87,16 +87,17 @@ class ApiController extends ModulesControllerBase
     public function amoEntityUpdateAction():void
     {
         $tmpFileName = '/tmp/amo-server-ip';
-        $ip = $this->getClientIp();
+        $ip = $this->request->getClientAddress(true);
         $oldIp = '';
         if(file_exists($tmpFileName)){
             $oldIp = file_get_contents($tmpFileName);
         }
         if($oldIp !== $ip){
-            SystemMessages::sysLogMsg('amoCrm-hook', 'from: '. $this->getClientIp());
+            SystemMessages::sysLogMsg('amoCrm-hook', 'from: '. $ip);
             file_put_contents($tmpFileName, $ip);
         }
-        ConnectorDb::invoke('entityUpdate', [$_REQUEST], false);
+        $data = $this->request->getPost();
+        ConnectorDb::invoke('entityUpdate', [$data], false);
     }
 
     /**
@@ -105,7 +106,12 @@ class ApiController extends ModulesControllerBase
      */
     private function checkAuth():bool
     {
-        if(!file_exists("/var/etc/auth/".$_REQUEST['token'])){
+        $token = $this->request->getPost('token', 'string', '');
+        if (empty($token)) {
+            $token = $this->request->getQuery('token', 'string', '');
+        }
+        // Защита от path traversal: токен должен быть только алфавитно-цифровым
+        if(empty($token) || preg_match('/[^a-zA-Z0-9]/', $token) || !file_exists("/var/etc/auth/".$token)){
             $remoteAddress = $this->request->getClientAddress(true);
             $userAgent     = $this->request->getUserAgent();
             $loggerAuth    = $this->di->getShared(LoggerProvider::SERVICE_NAME);

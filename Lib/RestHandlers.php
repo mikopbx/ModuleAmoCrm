@@ -75,9 +75,14 @@ class RestHandlers extends AmoCrmMainBase
         if(!is_array($params)){
             return $res;
         }
-        $action = "{$params['action']}Action";
-        if(method_exists($this, $action)){
-            return $this->$action($params);
+        $allowedActions = ['callback', 'hangup', 'transfer'];
+        $actionName = $params['action']??'';
+        if(!in_array($actionName, $allowedActions, true)){
+            return $res;
+        }
+        $method = "{$actionName}Action";
+        if(method_exists($this, $method)){
+            return $this->$method($params);
         }
         return $res;
     }
