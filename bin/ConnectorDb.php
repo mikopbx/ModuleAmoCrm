@@ -1121,11 +1121,16 @@ class ConnectorDb extends WorkerBase
         $result = true;
         $now = time();
         foreach ($linkedIds as $linkedId) {
-            $record = new ModuleAmoFailedCdr();
-            $record->linkedid = $linkedId;
-            $record->failedAt = $now;
-            $record->reason   = $reason;
-            $result = min($record->save(), $result);
+            try {
+                $record = new ModuleAmoFailedCdr();
+                $record->linkedid = $linkedId;
+                $record->failedAt = $now;
+                $record->reason   = $reason;
+                $result = min($record->save(), $result);
+            } catch (\Throwable $e) {
+                $this->logger->writeError("saveFailedCdr error for $linkedId: " . $e->getMessage());
+                $result = false;
+            }
         }
         return $result;
     }
