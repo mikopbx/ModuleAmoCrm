@@ -611,11 +611,20 @@ class AmoCdrDaemon extends WorkerBase
             'contacts' => [],
             'companies' => []
         ];
+        $skippedIds = '';
         foreach ($calls as &$call) {
+            if ($call['entity_id'] === null) {
+                $skippedIds .= $call['id'] . '|';
+                unset($call);
+                continue;
+            }
             $ids.= $call['id'].'|';
             $entity_type = $this->cdrRows[$call['id']]['entity_type']??'contacts';
             unset($call['id'],$call['is_app'],$call['did']);
             $callsArray[$entity_type][] = $call;
+        }
+        if (!empty($skippedIds)) {
+            $this->logger->writeError("Skipped calls with null entity_id: $skippedIds");
         }
         unset($call, $calls);
         $allSuccess = true;
