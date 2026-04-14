@@ -181,8 +181,12 @@ var ModuleAmoCrm = {
     });
   },
   updateAuthInfo: function updateAuthInfo(e) {
+    var payload = e && e.originalEvent && e.originalEvent.data || {};
+    if (!payload.code) {
+      return;
+    }
     var params = {
-      'code': e.originalEvent.data.code,
+      'code': payload.code,
       'referer': $('#baseDomain').val(),
       'save-only': true
     };
@@ -191,14 +195,20 @@ var ModuleAmoCrm = {
     elStatusAuth.removeClass('red green');
     elStatusAuth.text(globalTranslate.module_amo_crm_connect_refresh);
     $.post("".concat(window.location.origin, "/pbxcore/api/modules/").concat(className, "/listener"), params, function (data) {
-      if (data.result === false) {
-        var errorText = data.messages['error-data'].hint || '' + " (" + data.messages['error-data'].detail || '' + ").";
+      if (data && data.result === false) {
+        var messages = data && data.messages || {};
+        var errorData = messages['error-data'] || {};
+        var hint = errorData.hint || '';
+        var detail = errorData.detail || '';
+        var errorText = hint + (detail ? " (" + detail + ")." : "");
         $("#warning-message div.header").text(globalTranslate.mod_amo_Error);
         $("#warning-message div.body").text(errorText);
         $("#warning-message").show();
       }
     });
-    window[className].popup.close();
+    if (window[className] && window[className].popup && typeof window[className].popup.close === 'function') {
+      window[className].popup.close();
+    }
   },
   /**
    * Подготавливает список выбора

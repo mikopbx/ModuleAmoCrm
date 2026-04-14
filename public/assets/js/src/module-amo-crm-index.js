@@ -181,8 +181,12 @@ const ModuleAmoCrm = {
 	},
 
 	updateAuthInfo(e) {
+		let payload = (e && e.originalEvent && e.originalEvent.data) || {};
+		if (!payload.code) {
+			return;
+		}
 		let params = {
-			'code': e.originalEvent.data.code,
+			'code': payload.code,
 			'referer': $('#baseDomain').val(),
 			'save-only': true
 		};
@@ -192,14 +196,20 @@ const ModuleAmoCrm = {
 		elStatusAuth.text(globalTranslate.module_amo_crm_connect_refresh);
 
 		$.post(`${window.location.origin}/pbxcore/api/modules/${className}/listener`, params, function( data ) {
-			if(data.result === false){
-				let errorText = data.messages['error-data'].hint || '' + " ("+ data.messages['error-data'].detail || '' + ").";
-				$("#warning-message div.header").text(globalTranslate.mod_amo_Error)
-				$("#warning-message div.body").text(errorText)
+			if (data && data.result === false) {
+				let messages = (data && data.messages) || {};
+				let errorData = messages['error-data'] || {};
+				let hint = errorData.hint || '';
+				let detail = errorData.detail || '';
+				let errorText = hint + (detail ? " (" + detail + ")." : "");
+				$("#warning-message div.header").text(globalTranslate.mod_amo_Error);
+				$("#warning-message div.body").text(errorText);
 				$("#warning-message").show();
 			}
 		});
-		window[className].popup.close();
+		if (window[className] && window[className].popup && typeof window[className].popup.close === 'function') {
+			window[className].popup.close();
+		}
 	},
 
 	/**

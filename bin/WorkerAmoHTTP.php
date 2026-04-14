@@ -59,7 +59,14 @@ class WorkerAmoHTTP extends WorkerBase
         $beanstalk->subscribe(self::class, [$this, 'onEvents']);
         $beanstalk->subscribe($this->makePingTubeName(self::class), [$this, 'pingCallBack']);
         while ($this->needRestart === false) {
-            $beanstalk->wait();
+            try {
+                $beanstalk->wait();
+            } catch (\Pheanstalk\Exception\JobNotFoundException $e) {
+                // Job уже снят с резерва (TTR истёк) — продолжаем цикл.
+                Util::sysLogMsg(self::class, 'JobNotFound: ' . $e->getMessage(), LOG_WARNING);
+            } catch (\Throwable $e) {
+                Util::sysLogMsg(self::class, 'beanstalk wait error: ' . $e->getMessage(), LOG_WARNING);
+            }
         }
     }
 
@@ -147,19 +154,27 @@ class WorkerAmoHTTP extends WorkerBase
             'args' => $args
         ];
         $client = new BeanstalkClient(self::class);
+        $object = null;
         try {
             $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), 20);
-            if(file_exists($result)){
+            if(is_string($result) && $result !== '' && file_exists($result)){
                 $filename = $result;
                 $result = json_decode(file_get_contents($result), true, 512, JSON_THROW_ON_ERROR);
                 unlink($filename);
                 unset($filename);
             }
-            $object = unserialize($result, ['allowed_classes' => [PBXAmoResult::class, PBXApiResult::class]]);
+            if(is_string($result) && $result !== ''){
+                $object = @unserialize($result, ['allowed_classes' => [PBXAmoResult::class, PBXApiResult::class]]);
+            }
         } catch (\Throwable $e) {
             $object = new PBXAmoResult();
             $object->success = false;
             $object->messages[] = $e->getMessage();
+        }
+        if(!($object instanceof PBXAmoResult) && !($object instanceof PBXApiResult)){
+            $object = new PBXAmoResult();
+            $object->success = false;
+            $object->messages[] = 'Empty or invalid response from WorkerAmoHTTP';
         }
         return $object;
     }

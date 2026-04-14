@@ -53,7 +53,13 @@ class RestHandlers extends AmoCrmMainBase
         if(isset($params['error'])) {
             ConnectorDb::invoke('saveNewSettings', ['authData' => '']);
         }elseif (isset($params['code']) && !empty($params['code'])){
-            $result = WorkerAmoHTTP::invokeAmoApi('getAccessTokenByCode', [$params['code']]);
+            $apiResult = WorkerAmoHTTP::invokeAmoApi('getAccessTokenByCode', [$params['code']]);
+            if ($apiResult instanceof PBXAmoResult) {
+                $result = $apiResult;
+            } else {
+                $result->success = false;
+                $result->messages[] = 'Invalid response from WorkerAmoHTTP';
+            }
             WorkerAmoHTTP::invokeAmoApi('checkConnection', [true]);
         }
         $result->processor = __METHOD__;

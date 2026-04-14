@@ -443,7 +443,17 @@ class ConnectorDb extends WorkerBase
     public function findContacts($numbers):array
     {
         $result = [];
+        if (!is_array($numbers)) {
+            return $result;
+        }
         foreach ($numbers as $phone){
+            if (!is_string($phone) && !is_numeric($phone)) {
+                continue;
+            }
+            $phone = (string)$phone;
+            if ($phone === '') {
+                continue;
+            }
             // 1. Проверка кэш.
             $cacheData = $this->getCache(self::class.':'.$phone);
             if(!empty($cacheData)){
