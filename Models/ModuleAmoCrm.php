@@ -158,7 +158,7 @@ class ModuleAmoCrm extends ModulesModelsBase
      * Если пуст — webhook доступен через основной HTTPS-порт.
      * @Column(type="string", nullable=true)
      */
-    public $webhookPort = '';
+    public $webhookPort = '61445';
 
     /**
      * Returns dynamic relations between module models and common models

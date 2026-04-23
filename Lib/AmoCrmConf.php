@@ -379,7 +379,8 @@ class AmoCrmConf extends ConfigClass
 
         $proxyHeaders =
             "    proxy_set_header Host \$host;\n" .
-            "    proxy_set_header X-Real-IP \$remote_addr;\n";
+            "    proxy_set_header X-Real-IP \$remote_addr;\n" .
+            "    proxy_set_header X-Amo-Webhook-Auth 1;\n";
 
         $locations =
             // Webhook от AmoCRM
@@ -393,16 +394,20 @@ class AmoCrmConf extends ConfigClass
             "    client_max_body_size 1m;\n" .
             "}\n\n" .
 
-            // REST API виджета (все /pbxcore/api/amo-crm/v1/ эндпоинты)
+            // REST API виджета (все /pbxcore/api/amo-crm/ эндпоинты)
             "location /{$token}/pbxcore/api/amo-crm/ {\n" .
             "    proxy_pass {$proxyTarget}/pbxcore/api/amo-crm/;\n" .
             $proxyHeaders .
+            "    proxy_hide_header Access-Control-Allow-Origin;\n" .
+            "    add_header Access-Control-Allow-Origin * always;\n" .
             "}\n\n" .
 
             // Nchan подписки (EventSource/WebSocket)
             "location /{$token}/pbxcore/api/nchan/sub/ {\n" .
             "    proxy_pass {$proxyTarget}/pbxcore/api/nchan/sub/;\n" .
             $proxyHeaders .
+            "    proxy_hide_header Access-Control-Allow-Origin;\n" .
+            "    add_header Access-Control-Allow-Origin * always;\n" .
             "    proxy_set_header Upgrade \$http_upgrade;\n" .
             "    proxy_set_header Connection \"upgrade\";\n" .
             "    proxy_read_timeout 86400;\n" .
@@ -412,6 +417,8 @@ class AmoCrmConf extends ConfigClass
             "location /{$token}/webrtc-phone/ {\n" .
             "    proxy_pass {$proxyTarget}/webrtc-phone/;\n" .
             $proxyHeaders .
+            "    proxy_hide_header Access-Control-Allow-Origin;\n" .
+            "    add_header Access-Control-Allow-Origin * always;\n" .
             "}\n\n" .
 
             // Catch-all — всё остальное отклоняем

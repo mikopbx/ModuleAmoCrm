@@ -84,6 +84,18 @@ const ModuleAmoCrm = {
 			input.select();
 			document.execCommand('copy');
 		});
+		$('#copy-pbx-address').on('click', function () {
+			const host = $('#externalHostname').val() || $('#externalHostname').attr('placeholder') || '';
+			const port = $('#webhookPort').val();
+			const token = $('#tokenForAmo').val();
+			let address = host;
+			if (port && token) {
+				address = host + ':' + port + '/' + token;
+			}
+			const tmp = $('<input>').val(address).appendTo('body').select();
+			document.execCommand('copy');
+			tmp.remove();
+		});
 		window[className].updateWebhookUrlPreview();
 		window[className].checkStatusToggle();
 		window.addEventListener('ModuleStatusChanged', window[className].checkStatusToggle);

@@ -21,7 +21,6 @@
 namespace Modules\ModuleAmoCrm\App\Forms;
 
 use MikoPBX\Common\Models\LanInterfaces;
-use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Core\System\Util;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMainBase;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
@@ -115,9 +114,8 @@ class ModuleAmoCrmForm extends ModuleBaseForm
         }
         $this->add(new Text('externalHostname', ['placeholder' => $placeholder]));
 
-        $webHttpsPort = PbxSettings::getValueByKey(PbxSettings::WEB_HTTPS_PORT);
         $this->add(new Text('webhookPort', [
-            'placeholder' => $webHttpsPort,
+            'placeholder' => '61445',
             'maxlength' => 5,
         ]));
     }

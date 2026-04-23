@@ -129,8 +129,9 @@
             <div class="fields disability">
                 <div class="ten wide field">
                     <label>{{ t._('mod_amo_externalHostname') }} <i class="ui icon blue info circle" data-content="{{ t._('mod_amo_externalHostnameHint') }}"></i></label>
-                    <div class="disability ui fluid input">
+                    <div class="disability ui fluid action input">
                         {{ form.render('externalHostname') }}
+                        <button class="ui icon button" id="copy-pbx-address" type="button"><i class="copy icon"></i></button>
                     </div>
                 </div>
                 <div class="four wide field">
