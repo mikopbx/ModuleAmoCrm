@@ -71,7 +71,7 @@ var ModuleAmoCrm = {
     window[className].onChangeSettings();
     window[className].$dropDowns.dropdown();
     $('.info.circle').popup();
-    $('#webhookPort, #tokenForAmo').on('input', function () {
+    $('#webhookPort, #tokenForAmo, #externalHostname').on('input', function () {
       return window[className].updateWebhookUrlPreview();
     });
     $('#copy-webhook-url').on('click', function () {
@@ -154,7 +154,7 @@ var ModuleAmoCrm = {
   updateWebhookUrlPreview: function updateWebhookUrlPreview() {
     var port = $('#webhookPort').val();
     var token = $('#tokenForAmo').val();
-    var host = window.location.hostname || 'your-pbx-host';
+    var host = $('#externalHostname').val() || $('#externalHostname').attr('placeholder') || window.location.hostname || 'your-pbx-host';
     if (token) {
       var url;
       if (port) {
