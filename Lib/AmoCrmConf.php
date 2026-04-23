@@ -377,17 +377,44 @@ class AmoCrmConf extends ConfigClass
         $webPort = PbxSettings::getValueByKey(PbxSettings::WEB_PORT);
         $proxyTarget = "http://127.0.0.1:{$webPort}";
 
+        $proxyHeaders =
+            "    proxy_set_header Host \$host;\n" .
+            "    proxy_set_header X-Real-IP \$remote_addr;\n";
+
         $locations =
+            // Webhook от AmoCRM
             "location = /{$token}/entity-update {\n" .
             "    limit_except POST { deny all; }\n" .
             "    proxy_pass {$proxyTarget}/pbxcore/api/amo-crm/v1/entity-update;\n" .
-            "    proxy_set_header Host \$host;\n" .
-            "    proxy_set_header X-Real-IP \$remote_addr;\n" .
+            $proxyHeaders .
             "    proxy_set_header Content-Type \$content_type;\n" .
             "    proxy_set_header Content-Length \$content_length;\n" .
             "    proxy_pass_request_body on;\n" .
             "    client_max_body_size 1m;\n" .
             "}\n\n" .
+
+            // REST API виджета (все /pbxcore/api/amo-crm/v1/ эндпоинты)
+            "location /{$token}/pbxcore/api/amo-crm/ {\n" .
+            "    proxy_pass {$proxyTarget}/pbxcore/api/amo-crm/;\n" .
+            $proxyHeaders .
+            "}\n\n" .
+
+            // Nchan подписки (EventSource/WebSocket)
+            "location /{$token}/pbxcore/api/nchan/sub/ {\n" .
+            "    proxy_pass {$proxyTarget}/pbxcore/api/nchan/sub/;\n" .
+            $proxyHeaders .
+            "    proxy_set_header Upgrade \$http_upgrade;\n" .
+            "    proxy_set_header Connection \"upgrade\";\n" .
+            "    proxy_read_timeout 86400;\n" .
+            "}\n\n" .
+
+            // WebRTC-телефон (статика iframe)
+            "location /{$token}/webrtc-phone/ {\n" .
+            "    proxy_pass {$proxyTarget}/webrtc-phone/;\n" .
+            $proxyHeaders .
+            "}\n\n" .
+
+            // Catch-all — всё остальное отклоняем
             "location / {\n" .
             "    return 444;\n" .
             "}\n";
