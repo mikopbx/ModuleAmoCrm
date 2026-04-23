@@ -126,6 +126,27 @@
                     <button class="ui basic compact icon button green" id="createPassword"><i class="sync icon"></i></button>
                 </div>
             </div>
+            <div class="fields disability">
+                <div class="ten wide field">
+                    <label>{{ t._('mod_amo_externalHostname') }} <i class="ui icon blue info circle" data-content="{{ t._('mod_amo_externalHostnameHint') }}"></i></label>
+                    <div class="disability ui fluid input">
+                        {{ form.render('externalHostname') }}
+                    </div>
+                </div>
+                <div class="four wide field">
+                    <label>{{ t._('mod_amo_webhookPort') }} <i class="ui icon blue info circle" data-content="{{ t._('mod_amo_webhookPortHint') }}"></i></label>
+                    <div class="disability ui fluid input">
+                        {{ form.render('webhookPort') }}
+                    </div>
+                </div>
+            </div>
+            <div id="webhook-url-preview" class="ui info message" style="display: none;">
+                <label>Webhook URL:</label>
+                <div class="ui fluid action input">
+                    <input type="text" id="webhook-url-text" readonly="readonly" />
+                    <button class="ui icon button" id="copy-webhook-url" type="button"><i class="copy icon"></i></button>
+                </div>
+            </div>
             <div class="field disability">
                 <div class="ui segment">
                     <div class="ui toggle checkbox ">

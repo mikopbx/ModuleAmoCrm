@@ -21,6 +21,9 @@ namespace Modules\ModuleAmoCrm\bin;
 require_once 'Globals.php';
 
 use MikoPBX\Common\Models\Extensions;
+use MikoPBX\Common\Providers\BeanstalkConnectionModelsProvider;
+use MikoPBX\Core\Workers\Libs\WorkerModelsEvents\Actions\ReloadFirewallAction;
+use MikoPBX\Core\Workers\Libs\WorkerModelsEvents\Actions\ReloadNginxConfAction;
 use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\Processes;
 use MikoPBX\Core\System\Util;
@@ -611,7 +614,15 @@ class ConnectorDb extends WorkerBase
             $isSync = false;
             $logMessage = "Received other task";
         }
-        $this->logger->writeInfo($updates, $logMessage);
+        $actionSummary = [];
+        foreach (['update', 'add', 'delete'] as $a) {
+            $items = $updates[$a] ?? [];
+            if (!empty($items)) {
+                $ids = array_column($items, 'id');
+                $actionSummary[] = "$a=" . count($items) . ' ids=[' . implode(',', $ids) . ']';
+            }
+        }
+        $this->logger->writeInfo(implode('; ', $actionSummary), $logMessage);
 
         $actions = ['update', 'add', 'delete'];
         foreach ($actions as $action){
@@ -957,10 +968,44 @@ class ConnectorDb extends WorkerBase
         }
         foreach ($settings->toArray() as $key => $value){
             if(isset($data[$key])){
-                $settings->writeAttribute($key, $data[$key]);
+                $settings->$key = $data[$key];
             }
         }
-        return $settings->save();
+        // getChangedFields() работает для public-свойств, getUpdatedFields() — нет (Phalcon 5).
+        // ModelsBase::processSettingsChanges() использует getUpdatedFields(), поэтому событие
+        // не отправляется автоматически. Отправляем вручную.
+        $changedFields = $settings->getChangedFields();
+        $result = $settings->save();
+        if ($result && !empty($changedFields)) {
+            $queue = $this->di->getShared(BeanstalkConnectionModelsProvider::SERVICE_NAME);
+            if ($queue !== null) {
+                // Уведомляем модули об изменении модели
+                $queue->publish(json_encode([
+                    'source' => BeanstalkConnectionModelsProvider::SOURCE_MODELS_CHANGED,
+                    'model'  => get_class($settings),
+                    'recordId' => $settings->id,
+                    'action' => 'afterSave',
+                    'changedFields' => $changedFields,
+                ]));
+                // Перегенерация nginx и firewall при изменении webhook-порта или токена
+                $nginxFields = ['webhookPort', 'tokenForAmo'];
+                if (!empty(array_intersect($nginxFields, $changedFields))) {
+                    $queue->publish(json_encode([
+                        'source' => BeanstalkConnectionModelsProvider::SOURCE_INVOKE_ACTION,
+                        'action' => ReloadNginxConfAction::class,
+                        'parameters' => [],
+                    ]));
+                }
+                if (in_array('webhookPort', $changedFields, true)) {
+                    $queue->publish(json_encode([
+                        'source' => BeanstalkConnectionModelsProvider::SOURCE_INVOKE_ACTION,
+                        'action' => ReloadFirewallAction::class,
+                        'parameters' => [],
+                    ]));
+                }
+            }
+        }
+        return $result;
     }
 
     /**

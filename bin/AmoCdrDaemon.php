@@ -93,6 +93,27 @@ class AmoCdrDaemon extends WorkerBase
     }
 
     /**
+     * Компактное представление звонка для логирования.
+     * @param array $call
+     * @return string
+     */
+    private function callSummary(array $call): string
+    {
+        $parts = [];
+        foreach (['id', 'entity_id', 'responsible_user_id', 'created_by'] as $k) {
+            if (isset($call[$k])) {
+                $parts[] = "$k={$call[$k]}";
+            }
+        }
+        foreach (['uniq', 'phone', 'call_status', 'duration'] as $k) {
+            if (isset($call['params'][$k])) {
+                $parts[] = "$k={$call['params'][$k]}";
+            }
+        }
+        return implode(', ', $parts);
+    }
+
+    /**
      * Начало загрузки истории звонков в Amo.
      */
     public function start($argv):void
@@ -140,6 +161,12 @@ class AmoCdrDaemon extends WorkerBase
             $this->respCallAnsweredNoClient   = ($allSettings['ModuleAmoCrm']['respCallAnsweredNoClient']??'');
             $this->respCallMissedNoClient     = ($allSettings['ModuleAmoCrm']['respCallMissedNoClient']??'');
             $this->respCallMissedHaveClient   = ($allSettings['ModuleAmoCrm']['respCallMissedHaveClient']??'');
+
+            // Внешний адрес АТС из настроек модуля — приоритет над LanInterfaces
+            $moduleHostname = trim($allSettings['ModuleAmoCrm']['externalHostname']??'');
+            if (!empty($moduleHostname)) {
+                $this->extHostname = $moduleHostname;
+            }
 
             if($oldOffset !== $this->offset){
                 $this->logger->writeInfo("Update settings, Reference date: $this->referenceDate, offset: $this->offset");
@@ -447,14 +474,14 @@ class AmoCdrDaemon extends WorkerBase
                 $call['responsible_user_id']        = $amoUserId;
                 $call['params']['call_responsible'] = $amoUserId;
             }elseif ($this->restrictCdrToKnownEmployees){
-                $this->logger->writeInfo($call, "The amoCRM user is not identified, the call will not be uploaded (restrictCdrToKnownEmployees = true)");
+                $this->logger->writeInfo($this->callSummary($call), "The amoCRM user is not identified, the call will not be uploaded (restrictCdrToKnownEmployees = true)");
                 continue;
             }
             $phoneId = AmoCrmMain::getPhoneIndex($call['params']['phone']);
 
             $calls[$phoneId][] = $call;
             $this->cdrRows[$row['UNIQUEID']] = $call;
-            $this->logger->writeInfo($call, "Result call data");
+            $this->logger->writeInfo($this->callSummary($call), "Result call data");
         }
 
         ////
@@ -513,7 +540,7 @@ class AmoCdrDaemon extends WorkerBase
                 continue;
             }
             if(!empty($call['lead']) || !empty($call['client']) || !empty($call['company'])){
-                $this->logger->writeInfo($call, "alertIncompleteAnswered");
+                $this->logger->writeInfo($this->callSummary($call), "alertIncompleteAnswered");
                 ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['data' => $call, 'action' => 'open-card']);
             }
             $this->incompleteAnswered[$id]['finished'] = true;
@@ -598,13 +625,13 @@ class AmoCdrDaemon extends WorkerBase
     {
         $calls  = array_merge(... array_values($calls));
         if(!empty($calls)){
-            $this->logger->writeInfo($calls, "CDR synchronization. Step 1 Count: ".count($calls));
+            $this->logger->writeSummary($calls, "CDR synchronization. Step 1 Count: ".count($calls), false, ['id']);
             $calls = $this->cleanCalls($calls, $callCounter);
         }
         if(empty($calls)){
             return true;
         }
-        $this->logger->writeInfo($calls, "CDR synchronization. Step 2. Count: ".count($calls));
+        $this->logger->writeSummary($calls, "CDR synchronization. Step 2. Count: ".count($calls), false, ['id']);
         $ids = '';
 
         $callsArray = [
@@ -634,7 +661,7 @@ class AmoCdrDaemon extends WorkerBase
             }
             // Пытаемся добавить вызовы. Это получится, если контакты существуют.
             $result = WorkerAmoHTTP::invokeAmoApi('addCalls', [$callsData, $entity_type]);
-            $this->logger->writeInfo($callsData, "Create calls (REQ): $ids");
+            $this->logger->writeSummary($callsData, "Create calls (REQ): $ids", true, ['request_id']);
             $this->logger->writeInfo($result, "Create calls (RES): $ids");
             if(!$result->success){
                 $this->logger->writeError("Failed to add calls for $entity_type, offset will be rolled back");
@@ -668,16 +695,16 @@ class AmoCdrDaemon extends WorkerBase
                 if($call['is_app'] === '1' && $haveUser) {
                     // Этот вызов был направлен на сотрудника.
                     // Все вызовы на приложения чистим.
-                    $this->logger->writeInfo($call, "Is app {$call['id']}, drop it");
+                    $this->logger->writeInfo($this->callSummary($call), "Is app {$call['id']}, drop it");
                     unset($calls[$index], $call);
                 }elseif($this->cdrRows[$call['id']]['first'] !== $call['params']['uniq'] && $haveUser === false){
                     // Этот вызов не попал на сотрудников, только приложения
                     // Оставляем только вызов на первое приложение
-                    $this->logger->writeInfo($call, "Is app only {$call['id']}, drop it");
+                    $this->logger->writeInfo($this->callSummary($call), "Is app only {$call['id']}, drop it");
                     unset($calls[$index], $call);
                 }elseif( $this->cdrRows[$call['id']]['answered'] === 1 && $call['params']['call_status'] === 6 && $haveUser){
                     // Если вызов отвечен, то не следует загружать информацию о пропущенных.
-                    $this->logger->writeInfo($call, "The Cdr was missed, the call was answered {$call['id']}, drop it");
+                    $this->logger->writeInfo($this->callSummary($call), "The Cdr was missed, the call was answered {$call['id']}, drop it");
                     unset($calls[$index],$call);
                 }
             }
@@ -728,7 +755,7 @@ class AmoCdrDaemon extends WorkerBase
                     if($call['params']['duration'] > 0){
                         $resCalls[$call['id']]['params']['duration'] = $call['params']['duration'];
                     }
-                    $this->logger->writeInfo($call, "Updated link/duration from another leg {$call['id']}");
+                    $this->logger->writeInfo($this->callSummary($call), "Updated link/duration from another leg {$call['id']}");
                 }
                 continue;
             }
@@ -737,7 +764,7 @@ class AmoCdrDaemon extends WorkerBase
                 $this->logger->writeError($call, "the type of call is not defined {$call['id']}, drop it");
                 continue;
             }
-            $this->logger->writeInfo($call, "Successful cdr verification {$call['id']}");
+            $this->logger->writeInfo($this->callSummary($call), "Successful cdr verification {$call['id']}");
             $settingName = $responsibleMap[$typeCall]['settingName']??'';
             $this->logger->writeInfo($settingName, "Responsible map {$call['id']}");
             if(!empty($settingName)){
@@ -766,7 +793,7 @@ class AmoCdrDaemon extends WorkerBase
             }
 
             $resCalls[$call['id']] = $call;
-            $this->logger->writeInfo($call, "Result cdr {$call['id']}");
+            $this->logger->writeInfo($this->callSummary($call), "Result cdr {$call['id']}");
 
         }
         return array_values($resCalls);
@@ -886,7 +913,7 @@ class AmoCdrDaemon extends WorkerBase
                 $this->incompleteAnswered[$id]['skip'] = true;
                 continue;
             }
-            $this->logger->writeInfo($call, "Check incomplete answered call");
+            $this->logger->writeInfo($this->callSummary($call), "Check incomplete answered call");
 
             $indexAction   = AmoCrmMain::getPhoneIndex($call['phone']);
             $contData      = $contactsData[$indexAction];
@@ -934,7 +961,7 @@ class AmoCdrDaemon extends WorkerBase
         // Завершенные вызовы.
         foreach ($calls as $phoneId => $subCalls){
             foreach ($subCalls as $index => $call) {
-                $this->logger->writeInfo($call, "Complete call: {$call['id']}");
+                $this->logger->writeInfo($this->callSummary($call), "Complete call: {$call['id']}");
                 $answered = $this->cdrRows[$call['id']]['answered']??0;
                 if($answered === 1 && $call['params']['duration'] === 0){
                     $this->logger->writeInfo("Сdr not answered the call was generally answered: {$call['id']}. skip it");

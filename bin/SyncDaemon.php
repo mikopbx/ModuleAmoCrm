@@ -61,21 +61,42 @@ class SyncDaemon extends WorkerBase
     {
         $this->logger =  new Logger('SyncDaemon', 'ModuleAmoCrm');
         $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
-        while ($this->needRestart === false) {
-            $this->checkInitMode();
-            $this->syncContacts(AmoCrmMain::ENTITY_CONTACTS);
-            $this->syncContacts(AmoCrmMain::ENTITY_LEADS);
-            $this->syncContacts(AmoCrmMain::ENTITY_COMPANIES);
-            if($this->initTime > 0){
-                // Очищаем все записи, что не были обновлены при init.
-                ConnectorDb::invoke('deleteWithFailTime', [$this->initTime]);
-                // Запустим синхронизацию контактов по полю "COLUMN_UPDATE_NAME"
-                ConnectorDb::invoke('saveNewSettings', [['lastContactsSyncTime'=>1, 'lastCompaniesSyncTime' => 1, 'lastLeadsSyncTime' => 1]]);
-                $this->logger->writeInfo('End init mode...');
-                sleep(1);
-            }else{
-                sleep(10);
+
+        // Защита от параллельных экземпляров SyncDaemon
+        $lockFile = '/tmp/amo_sync_daemon.lock';
+        $lockFp = fopen($lockFile, 'w');
+        if ($lockFp === false) {
+            $this->logger->writeError('Failed to open SyncDaemon lock file');
+            return;
+        }
+        if (!flock($lockFp, LOCK_EX | LOCK_NB)) {
+            $this->logger->writeInfo('Another SyncDaemon instance is running, exiting');
+            fclose($lockFp);
+            return;
+        }
+
+        try {
+            while ($this->needRestart === false) {
+                $this->checkInitMode();
+                $this->syncContacts(AmoCrmMain::ENTITY_CONTACTS);
+                $this->syncContacts(AmoCrmMain::ENTITY_LEADS);
+                $this->syncContacts(AmoCrmMain::ENTITY_COMPANIES);
+                if($this->initTime > 0){
+                    // Очищаем все записи, что не были обновлены при init.
+                    ConnectorDb::invoke('deleteWithFailTime', [$this->initTime]);
+                    // Init завершён — ставим текущее время, чтобы инкрементальная синхронизация
+                    // начала с этого момента, а не качала всё заново (from=1).
+                    $now = time();
+                    ConnectorDb::invoke('saveNewSettings', [['lastContactsSyncTime' => $now, 'lastCompaniesSyncTime' => $now, 'lastLeadsSyncTime' => $now]]);
+                    $this->logger->writeInfo('End init mode...');
+                    sleep(1);
+                }else{
+                    sleep(10);
+                }
             }
+        } finally {
+            flock($lockFp, LOCK_UN);
+            fclose($lockFp);
         }
     }
 

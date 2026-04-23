@@ -70,6 +70,16 @@ var ModuleAmoCrm = {
     });
     window[className].onChangeSettings();
     window[className].$dropDowns.dropdown();
+    $('.info.circle').popup();
+    $('#webhookPort, #tokenForAmo').on('input', function () {
+      return window[className].updateWebhookUrlPreview();
+    });
+    $('#copy-webhook-url').on('click', function () {
+      var input = document.getElementById('webhook-url-text');
+      input.select();
+      document.execCommand('copy');
+    });
+    window[className].updateWebhookUrlPreview();
     window[className].checkStatusToggle();
     window.addEventListener('ModuleStatusChanged', window[className].checkStatusToggle);
     window[className].initializeForm();
@@ -80,6 +90,7 @@ var ModuleAmoCrm = {
     $("#createPassword").on('click', function (e) {
       $("#tokenForAmo").val(window[className].generatePassword());
       $('#submitbutton').removeClass('disabled');
+      window[className].updateWebhookUrlPreview();
     });
     $("#login-button").on('click', function (e) {
       var client_id = $('#clientId').val();
@@ -127,6 +138,23 @@ var ModuleAmoCrm = {
       language: SemanticLocalization.dataTableLocalisation,
       order: [1, 'asc']
     });
+  },
+  updateWebhookUrlPreview: function updateWebhookUrlPreview() {
+    var port = $('#webhookPort').val();
+    var token = $('#tokenForAmo').val();
+    var host = window.location.hostname || 'your-pbx-host';
+    if (token) {
+      var url;
+      if (port) {
+        url = 'https://' + host + ':' + port + '/' + token + '/entity-update';
+      } else {
+        url = 'https://' + host + '/pbxcore/api/amo-crm/v1/entity-update';
+      }
+      $('#webhook-url-text').val(url);
+      $('#webhook-url-preview').show();
+    } else {
+      $('#webhook-url-preview').hide();
+    }
   },
   onChangeSettings: function onChangeSettings() {
     if ($('#isPrivateWidget').parent().checkbox('is checked')) {
