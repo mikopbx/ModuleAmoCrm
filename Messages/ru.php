@@ -61,6 +61,8 @@ return [
     'mod_amo_externalHostnameHint'              => 'IP-адрес или доменное имя АТС, доступное из интернета. Используется для формирования URL прослушивания записей разговоров из интерфейса amoCRM.',
     'mod_amo_webhookPort'                       => 'Порт для webhook',
     'mod_amo_webhookPortHint'                   => 'Отдельный HTTPS-порт для приёма webhook от amoCRM. Если не указан — используется стандартный HTTPS-порт системы. При указании нестандартного порта создаётся отдельный nginx-сервер с уникальным URL.',
+    'fw_moduleamocrmDescription'               => 'AmoCRM Webhook',
+    'fw_moduleamocrmDescriptionHint'            => 'Порт для приёма webhook и работы виджета amoCRM',
     'mod_amo_settingsCalls'                     => 'Загрузка звонков',
     'mod_amo_disableDetailedCdr'                => 'Отключить загрузку подробных CDR',
     'mod_amo_respCallAnsweredHaveClient'        => 'Вызов отвечен, есть клиент, ответственный',

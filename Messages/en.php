@@ -91,6 +91,8 @@ return [
     'mod_amo_externalHostnameHint' => 'IP address or domain name of the PBX accessible from the internet. Used to generate URLs for listening to call recordings from the amoCRM interface.',
     'mod_amo_webhookPort' => 'Webhook port',
     'mod_amo_webhookPortHint' => 'Dedicated HTTPS port for receiving webhooks from amoCRM. If empty, the standard system HTTPS port is used. When a custom port is specified, a separate nginx server is created with a unique URL.',
+    'fw_moduleamocrmDescription' => 'AmoCRM Webhook',
+    'fw_moduleamocrmDescriptionHint' => 'Port for receiving webhooks and amoCRM widget operation',
     'mod_amo_settingsCalls' => 'Loading calls',
     'mod_amo_disableDetailedCdr' => 'Disable loading of detailed CDRs',
     'mod_amo_type_responsible_answered_last' => 'Last person to answer the call',
