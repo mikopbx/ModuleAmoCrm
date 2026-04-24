@@ -107,9 +107,9 @@ class ApiController extends ModulesControllerBase
     private function checkAuth():bool
     {
         // Запрос через webhook-порт с токен-URI — авторизация подтверждена nginx.
-        // Проверяем заголовок + что запрос пришёл с localhost (nginx proxy).
+        // Проверяем заголовок + что реальный remote addr = localhost (nginx proxy).
         if ($this->request->getHeader('X-Amo-Webhook-Auth') === '1'
-            && $this->request->getClientAddress(true) === '127.0.0.1') {
+            && $this->request->getClientAddress(false) === '127.0.0.1') {
             return true;
         }
         $token = $this->request->getPost('token', 'string', '');

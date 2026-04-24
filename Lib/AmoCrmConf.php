@@ -380,6 +380,7 @@ class AmoCrmConf extends ConfigClass
         $proxyHeaders =
             "    proxy_set_header Host \$host;\n" .
             "    proxy_set_header X-Real-IP \$remote_addr;\n" .
+            "    proxy_set_header X-Forwarded-For \$remote_addr;\n" .
             "    proxy_set_header X-Amo-Webhook-Auth 1;\n";
 
         $locations =
