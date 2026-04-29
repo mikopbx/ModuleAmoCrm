@@ -123,7 +123,7 @@ class ClientHTTP
                 break;
             }
         }
-        return self::parseResponse($resultHttp, $message, $code);
+        return self::parseResponse($resultHttp, $message, $code, $method, $url);
     }
 
     /**
@@ -131,9 +131,11 @@ class ClientHTTP
      * @param $resultHttp
      * @param $message
      * @param $code
+     * @param string $method
+     * @param string $url
      * @return PBXAmoResult
      */
-    private static function parseResponse($resultHttp, $message, $code):PBXAmoResult
+    private static function parseResponse($resultHttp, $message, $code, string $method = '', string $url = ''):PBXAmoResult
     {
         $res = new PBXAmoResult();
         if( isset($resultHttp) && ($code === 200 || in_array($resultHttp->getReasonPhrase(), ['Created', 'Accepted'], true))){
@@ -163,6 +165,14 @@ class ClientHTTP
                     $res->messages['error-data']    = [];
                 }
             }
+            $logBody = isset($res->messages['error-string']) ? (string)$res->messages['error-string'] : '';
+            if(strlen($logBody) > 512){
+                $logBody = substr($logBody, 0, 512).'...';
+            }
+            Util::sysLogMsg(
+                'ModuleAmoCrm',
+                "HTTP $code on $method $url; msg='$message'; body='$logBody'"
+            );
         }
         return $res;
     }

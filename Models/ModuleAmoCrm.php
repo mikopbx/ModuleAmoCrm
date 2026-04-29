@@ -147,6 +147,20 @@ class ModuleAmoCrm extends ModulesModelsBase
     public $respCallMissedHaveClient = '';
 
     /**
+     * Внешний адрес АТС для прослушивания записей из amoCRM.
+     * Если задан — используется в приоритете над LanInterfaces.exthostname.
+     * @Column(type="string", nullable=true)
+     */
+    public $externalHostname = '';
+
+    /**
+     * Порт для отдельного nginx-сервера webhook.
+     * Если пуст — webhook доступен через основной HTTPS-порт.
+     * @Column(type="string", nullable=true)
+     */
+    public $webhookPort = '61445';
+
+    /**
      * Returns dynamic relations between module models and common models
      * MikoPBX check it in ModelsBase after every call to keep data consistent
      *

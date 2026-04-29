@@ -77,6 +77,26 @@ const ModuleAmoCrm = {
 		);
 		window[className].onChangeSettings()
 		window[className].$dropDowns.dropdown();
+		$('.info.circle').popup();
+		$('#webhookPort, #tokenForAmo, #externalHostname').on('input', () => window[className].updateWebhookUrlPreview());
+		$('#copy-webhook-url').on('click', function () {
+			const input = document.getElementById('webhook-url-text');
+			input.select();
+			document.execCommand('copy');
+		});
+		$('#copy-pbx-address').on('click', function () {
+			const host = $('#externalHostname').val() || $('#externalHostname').attr('placeholder') || '';
+			const port = $('#webhookPort').val();
+			const token = $('#tokenForAmo').val();
+			let address = host;
+			if (port && token) {
+				address = host + ':' + port + '/' + token;
+			}
+			const tmp = $('<input>').val(address).appendTo('body').select();
+			document.execCommand('copy');
+			tmp.remove();
+		});
+		window[className].updateWebhookUrlPreview();
 		window[className].checkStatusToggle();
 		window.addEventListener('ModuleStatusChanged', window[className].checkStatusToggle);
 		window[className].initializeForm();
@@ -89,6 +109,7 @@ const ModuleAmoCrm = {
 		$("#createPassword").on('click', function (e) {
 			$("#tokenForAmo").val(window[className].generatePassword());
 			$('#submitbutton').removeClass('disabled');
+			window[className].updateWebhookUrlPreview();
 		});
 		$("#login-button").on('click', function (e) {
 			let client_id 	 = $('#clientId').val();
@@ -125,6 +146,23 @@ const ModuleAmoCrm = {
 			language: SemanticLocalization.dataTableLocalisation,
 			order: [1, 'asc'],
 		});
+	},
+	updateWebhookUrlPreview() {
+		const port = $('#webhookPort').val();
+		const token = $('#tokenForAmo').val();
+		const host = $('#externalHostname').val() || $('#externalHostname').attr('placeholder') || window.location.hostname || 'your-pbx-host';
+		if (token) {
+			let url;
+			if (port) {
+				url = 'https://' + host + ':' + port + '/' + token + '/entity-update';
+			} else {
+				url = 'https://' + host + '/pbxcore/api/amo-crm/v1/entity-update';
+			}
+			$('#webhook-url-text').val(url);
+			$('#webhook-url-preview').show();
+		} else {
+			$('#webhook-url-preview').hide();
+		}
 	},
 	onChangeSettings() {
 		if($('#isPrivateWidget').parent().checkbox('is checked')) {
@@ -181,8 +219,12 @@ const ModuleAmoCrm = {
 	},
 
 	updateAuthInfo(e) {
+		let payload = (e && e.originalEvent && e.originalEvent.data) || {};
+		if (!payload.code) {
+			return;
+		}
 		let params = {
-			'code': e.originalEvent.data.code,
+			'code': payload.code,
 			'referer': $('#baseDomain').val(),
 			'save-only': true
 		};
@@ -192,14 +234,20 @@ const ModuleAmoCrm = {
 		elStatusAuth.text(globalTranslate.module_amo_crm_connect_refresh);
 
 		$.post(`${window.location.origin}/pbxcore/api/modules/${className}/listener`, params, function( data ) {
-			if(data.result === false){
-				let errorText = data.messages['error-data'].hint || '' + " ("+ data.messages['error-data'].detail || '' + ").";
-				$("#warning-message div.header").text(globalTranslate.mod_amo_Error)
-				$("#warning-message div.body").text(errorText)
+			if (data && data.result === false) {
+				let messages = (data && data.messages) || {};
+				let errorData = messages['error-data'] || {};
+				let hint = errorData.hint || '';
+				let detail = errorData.detail || '';
+				let errorText = hint + (detail ? " (" + detail + ")." : "");
+				$("#warning-message div.header").text(globalTranslate.mod_amo_Error);
+				$("#warning-message div.body").text(errorText);
 				$("#warning-message").show();
 			}
 		});
-		window[className].popup.close();
+		if (window[className] && window[className].popup && typeof window[className].popup.close === 'function') {
+			window[className].popup.close();
+		}
 	},
 
 	/**

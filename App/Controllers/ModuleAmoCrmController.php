@@ -240,7 +240,7 @@ class ModuleAmoCrmController extends BaseController
      *
      * @return void
      */
-    public function modifyAction(string $id = null): void
+    public function modifyAction(?string $id = null): void
     {
         $footerCollection = $this->assets->collection('footerJS');
         $footerCollection->addJs('js/pbx/main/form.js', true);

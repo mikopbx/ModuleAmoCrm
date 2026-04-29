@@ -12,6 +12,7 @@ namespace Modules\ModuleAmoCrm\Lib;
 use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\Configs\CronConf;
+use MikoPBX\Core\System\Configs\NginxConf;
 use MikoPBX\Core\System\PBX;
 use MikoPBX\Core\System\Processes;
 use MikoPBX\Core\System\Util;
@@ -83,9 +84,9 @@ class AmoCrmConf extends ConfigClass
             }
             if(in_array('tokenForAmo', $data['changedFields'], true)) {
                 $this->makeAuthFiles();
-                if($changedFields === 1){
-                    return;
-                }
+            }
+            if(in_array('tokenForAmo', $data['changedFields'], true) && $changedFields === 1){
+                return;
             }
             $this->startAllServices(true);
         }
@@ -352,6 +353,113 @@ class AmoCrmConf extends ConfigClass
     }
 
     /**
+     * Создаёт отдельный nginx server block для webhook, если задан нестандартный порт.
+     * @return string
+     */
+    public function createNginxServers(): string
+    {
+        $settings = ModuleAmoCrm::findFirst();
+        if ($settings === null) {
+            return '';
+        }
+        $port = trim($settings->webhookPort ?? '');
+        $token = trim($settings->tokenForAmo ?? '');
+        if (empty($port) || empty($token)) {
+            return '';
+        }
+
+        // Если порт совпадает с системным HTTPS — не создаём отдельный сервер
+        $webHttpsPort = PbxSettings::getValueByKey(PbxSettings::WEB_HTTPS_PORT);
+        if ((int)$port === (int)$webHttpsPort) {
+            return '';
+        }
+
+        $webPort = PbxSettings::getValueByKey(PbxSettings::WEB_PORT);
+        $proxyTarget = "http://127.0.0.1:{$webPort}";
+
+        $proxyHeaders =
+            "    proxy_set_header Host \$host;\n" .
+            "    proxy_set_header X-Real-IP \$remote_addr;\n" .
+            "    proxy_set_header X-Forwarded-For \$remote_addr;\n" .
+            "    proxy_set_header X-Amo-Webhook-Auth 1;\n";
+
+        $locations =
+            // Webhook от AmoCRM
+            "location = /{$token}/entity-update {\n" .
+            "    limit_except POST { deny all; }\n" .
+            "    proxy_pass {$proxyTarget}/pbxcore/api/amo-crm/v1/entity-update;\n" .
+            $proxyHeaders .
+            "    proxy_set_header Content-Type \$content_type;\n" .
+            "    proxy_set_header Content-Length \$content_length;\n" .
+            "    proxy_pass_request_body on;\n" .
+            "    client_max_body_size 1m;\n" .
+            "}\n\n" .
+
+            // REST API виджета (все /pbxcore/api/amo-crm/ эндпоинты)
+            "location /{$token}/pbxcore/api/amo-crm/ {\n" .
+            "    proxy_pass {$proxyTarget}/pbxcore/api/amo-crm/;\n" .
+            $proxyHeaders .
+            "    proxy_hide_header Access-Control-Allow-Origin;\n" .
+            "    add_header Access-Control-Allow-Origin * always;\n" .
+            "}\n\n" .
+
+            // Nchan подписки (EventSource/WebSocket)
+            "location /{$token}/pbxcore/api/nchan/sub/ {\n" .
+            "    proxy_pass {$proxyTarget}/pbxcore/api/nchan/sub/;\n" .
+            $proxyHeaders .
+            "    proxy_hide_header Access-Control-Allow-Origin;\n" .
+            "    add_header Access-Control-Allow-Origin * always;\n" .
+            "    proxy_set_header Upgrade \$http_upgrade;\n" .
+            "    proxy_set_header Connection \"upgrade\";\n" .
+            "    proxy_read_timeout 86400;\n" .
+            "}\n\n" .
+
+            // WebRTC-телефон (статика iframe)
+            "location /{$token}/webrtc-phone/ {\n" .
+            "    proxy_pass {$proxyTarget}/webrtc-phone/;\n" .
+            $proxyHeaders .
+            "    proxy_hide_header Access-Control-Allow-Origin;\n" .
+            "    add_header Access-Control-Allow-Origin * always;\n" .
+            "}\n\n" .
+
+            // Catch-all — всё остальное отклоняем
+            "location / {\n" .
+            "    return 444;\n" .
+            "}\n";
+
+        $serverBlock = NginxConf::buildServerBlock((int)$port, false, $locations);
+        if (empty($serverBlock)) {
+            return '';
+        }
+
+        // Добавляем SSL
+        $serverBlock = str_replace(
+            "listen      {$port};",
+            "listen      {$port} ssl;",
+            $serverBlock
+        );
+        $serverBlock = str_replace(
+            "listen      [::]:{$port};",
+            "listen      [::]:{$port} ssl;",
+            $serverBlock
+        );
+
+        $sslDirectives =
+            "    ssl_protocols TLSv1.2 TLSv1.3;\n" .
+            "    ssl_ciphers HIGH:!aNULL:!MD5;\n" .
+            "    ssl_certificate        /etc/ssl/certs/nginx.crt;\n" .
+            "    ssl_certificate_key    /etc/ssl/private/nginx.key;\n";
+
+        $serverBlock = str_replace(
+            "server_name",
+            $sslDirectives . "    server_name",
+            $serverBlock
+        );
+
+        return $serverBlock;
+    }
+
+    /**
      * Process after disable action in web interface
      *
      * @return void
@@ -371,6 +479,41 @@ class AmoCrmConf extends ConfigClass
         $cron = new CronConf();
         $cron->reStart();
         PBX::dialplanReload();
+        $nginxConf = new NginxConf();
+        $nginxConf->generateConf();
+        $nginxConf->reStart();
+    }
+
+    /**
+     * Правила сетевого экрана для webhook-порта.
+     * @return array
+     */
+    public function getDefaultFirewallRules(): array
+    {
+        $settings = ModuleAmoCrm::findFirst();
+        if ($settings === null || empty(trim($settings->webhookPort ?? ''))) {
+            return [];
+        }
+        $webhookPort = (int)$settings->webhookPort;
+        // Если порт совпадает с системным HTTPS — отдельное правило не нужно
+        $webHttpsPort = (int)PbxSettings::getValueByKey(PbxSettings::WEB_HTTPS_PORT);
+        if ($webhookPort === $webHttpsPort) {
+            return [];
+        }
+        return [
+            'ModuleAmoCrm' => [
+                'rules' => [
+                    [
+                        'portfrom' => $webhookPort,
+                        'portto'   => $webhookPort,
+                        'protocol' => 'tcp',
+                        'name'     => 'AmoCrmWebhook',
+                    ],
+                ],
+                'action'    => 'allow',
+                'shortName' => 'AmoCRM Webhook',
+            ],
+        ];
     }
 
     /**

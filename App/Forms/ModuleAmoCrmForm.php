@@ -20,6 +20,7 @@
 
 namespace Modules\ModuleAmoCrm\App\Forms;
 
+use MikoPBX\Common\Models\LanInterfaces;
 use MikoPBX\Core\System\Util;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMainBase;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
@@ -105,6 +106,18 @@ class ModuleAmoCrmForm extends ModuleBaseForm
                                         ]
         );
         $this->add($type);
+
+        $lanData = LanInterfaces::findFirst("internet = '1'");
+        $placeholder = '';
+        if ($lanData !== null) {
+            $placeholder = $lanData->exthostname;
+        }
+        $this->add(new Text('externalHostname', ['placeholder' => $placeholder]));
+
+        $this->add(new Text('webhookPort', [
+            'placeholder' => '61445',
+            'maxlength' => 5,
+        ]));
     }
 
 }

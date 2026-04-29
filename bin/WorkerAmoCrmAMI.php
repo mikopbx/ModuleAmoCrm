@@ -160,29 +160,43 @@ class WorkerAmoCrmAMI extends WorkerBase
      * Функция обработки оповещений.
      * @param $parameters
      * @return void
-     * @throws \JsonException
      */
     public function callback($parameters):void{
 
         if ($this->replyOnPingRequest($parameters)){
             return;
         }
-        if (stripos($parameters['UserEvent'],'InterceptionAMO' ) !== false) {
+        if (stripos($parameters['UserEvent'] ?? '','InterceptionAMO' ) !== false) {
             $this->interception($parameters);
             return;
         }
-        if ('CdrConnector' !== $parameters['UserEvent']) {
+        if ('CdrConnector' !== ($parameters['UserEvent'] ?? '')) {
             return;
         }
         $this->checkUpdateSettings();
 
-        $agiData = $parameters['AgiData'];
+        $agiData = $parameters['AgiData'] ?? '';
+        if ($agiData === '') {
+            return;
+        }
         if (strpos($agiData, 'GZ:') === 0) {
-            $stringData = gzdecode(base64_decode(substr($agiData, 3)));
+            $stringData = @gzdecode(base64_decode(substr($agiData, 3)));
         } else {
             $stringData = base64_decode($agiData);
         }
-        $data = json_decode($stringData, true, 512, JSON_THROW_ON_ERROR);
+        if (!is_string($stringData) || $stringData === '') {
+            $this->logger->writeError("Empty/invalid AgiData payload", "callback");
+            return;
+        }
+        try {
+            $data = json_decode($stringData, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            $this->logger->writeError("JSON decode failed: " . $e->getMessage(), "callback");
+            return;
+        }
+        if (!is_array($data) || empty($data['action']) || empty($data['linkedid'])) {
+            return;
+        }
         $this->logger->writeInfo($data['action'], "AMI event: {$data['linkedid']}");
         switch ($data['action']) {
             case 'hangup_chan':
@@ -234,7 +248,7 @@ class WorkerAmoCrmAMI extends WorkerBase
                 } else {
                     $general_src_num = $history[0]['src'];
                 }
-                $numbers['numbers'][] = $general_src_num;
+                $numbers[] = $general_src_num;
             }
         }
         ConnectorDb::invoke('findContacts', [array_unique($numbers)], false);
@@ -261,6 +275,7 @@ class WorkerAmoCrmAMI extends WorkerBase
         foreach ($tmpCalls as $call){
             $callFound = false;
             $callsById = $this->calls[$data['linkedid']]??[];
+            if (!is_array($callsById)) { $callsById = []; }
             foreach ($callsById as $oldCall) {
                 if($call['uid'] === $oldCall['uid']){
                     $callFound = true;
@@ -403,10 +418,11 @@ class WorkerAmoCrmAMI extends WorkerBase
         }
         $transferCall = [];
         $data['end'] = date(\DateTimeInterface::ATOM, strtotime($data['end']));
-        if(empty($this->calls[$data['linkedid']])){
+        $linkedId = $data['linkedid'] ?? '';
+        if($linkedId === '' || empty($this->calls[$linkedId]) || !is_array($this->calls[$linkedId])){
             return;
         }
-        foreach ($this->calls[$data['linkedid']] as &$call) {
+        foreach ($this->calls[$linkedId] as &$call) {
             if(isset($call['end'])){
                 continue;
             }
@@ -509,12 +525,13 @@ class WorkerAmoCrmAMI extends WorkerBase
      */
     private function actionDialCreateChan($data):void{
         $uid = $data['transfer_UNIQUEID']??$data['UNIQUEID'];
-        if(empty($this->calls[$data['linkedid']])){
-            $this->logger->writeInfo("No calls for linkedid", "actionDialCreateChan {$data['linkedid']}");
+        $linkedId = $data['linkedid'] ?? '';
+        if($linkedId === '' || empty($this->calls[$linkedId]) || !is_array($this->calls[$linkedId])){
+            $this->logger->writeInfo("No calls for linkedid", "actionDialCreateChan $linkedId");
             return;
         }
         $matched = false;
-        foreach ($this->calls[$data['linkedid']] as &$call){
+        foreach ($this->calls[$linkedId] as &$call){
             if($uid !== $call['uid']){
                 continue;
             }
@@ -558,13 +575,14 @@ class WorkerAmoCrmAMI extends WorkerBase
      */
     private function actionDialAnswer($params):void
     {
-        $channel = $params['agi_channel'];
-        if(empty($this->calls[$params['linkedid']])){
-            $this->logger->writeInfo("No calls for linkedid, channel=$channel", "actionDialAnswer {$params['linkedid']}");
+        $channel = $params['agi_channel'] ?? '';
+        $linkedId = $params['linkedid'] ?? '';
+        if($linkedId === '' || empty($this->calls[$linkedId]) || !is_array($this->calls[$linkedId])){
+            $this->logger->writeInfo("No calls for linkedid, channel=$channel", "actionDialAnswer $linkedId");
             return;
         }
         $matched = false;
-        foreach ($this->calls[$params['linkedid']] as &$call){
+        foreach ($this->calls[$linkedId] as &$call){
             if(isset($call['answer'])){
                 $this->logger->writeInfo("Skip already answered uid={$call['uid']}", "actionDialAnswer {$params['linkedid']}");
                 continue;
@@ -640,6 +658,7 @@ class WorkerAmoCrmAMI extends WorkerBase
         $endTime = date(\DateTimeInterface::ATOM, strtotime($data['endtime']));
         $start   = date(\DateTimeInterface::ATOM, strtotime($data['start']));
         $callsById = $this->calls[$data['linkedid']]??[];
+        if (!is_array($callsById)) { $callsById = []; }
         foreach ($callsById as $index => $callData){
             if($callData['src'] === $srcNum && $callData['dst'] === $dstNum
                && $callData['date'] === $start && ($callData['end']??'') === $endTime){

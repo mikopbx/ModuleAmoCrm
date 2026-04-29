@@ -83,8 +83,8 @@ class Logger
         }
         $this->lastRotateCheckTs = $now;
         $rotation = new Rotation([
-             'files' => 5,
-             'compress' => false,
+             'files' => 10,
+             'compress' => true,
              'min-size' => 10*1024*1024,
              'truncate' => false,
              'catch' => function (RotationFailed $exception) {
@@ -128,6 +128,57 @@ class Logger
             }
             $this->logger->info('['.getmypid().'] '.$preMessage.$this->getDecodedString($data));
         }
+    }
+
+    /**
+     * Записать в лог краткую сводку по массиву данных.
+     * Для массивов <= 3 элементов — полный дамп через writeInfo().
+     * Для больших массивов — count + извлечённые ключевые поля.
+     *
+     * @param mixed  $data
+     * @param string $preMessage
+     * @param bool   $logFirstElement  Включить первый элемент как образец
+     * @param array  $extractKeys      Ключи для извлечения из каждого элемента
+     * @return void
+     */
+    public function writeSummary($data, string $preMessage = '', bool $logFirstElement = false, array $extractKeys = []): void
+    {
+        if (!$this->debug) {
+            return;
+        }
+        if (!is_array($data) || count($data) <= 3) {
+            $this->writeInfo($data, $preMessage);
+            return;
+        }
+        $count = count($data);
+        $summary = "count=$count";
+        if (!empty($extractKeys)) {
+            $extracted = [];
+            foreach ($data as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $vals = [];
+                foreach ($extractKeys as $key) {
+                    if (isset($item[$key])) {
+                        $vals[] = $key . '=' . $item[$key];
+                    }
+                }
+                if (!empty($vals)) {
+                    $extracted[] = implode(',', $vals);
+                }
+            }
+            $summary .= ' items=[' . implode('; ', $extracted) . ']';
+        }
+        if ($logFirstElement) {
+            $first = reset($data);
+            $summary .= ' sample=' . $this->getDecodedString($first);
+        }
+        $this->rotate();
+        if (!empty($preMessage)) {
+            $preMessage .= ': ';
+        }
+        $this->logger->info('[' . getmypid() . '] ' . $preMessage . $summary);
     }
 
     /**
