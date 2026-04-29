@@ -170,7 +170,11 @@ class SyncDaemon extends WorkerBase
                 $nextPage = $result->data['nextPage']??'';
                 $tryGetCount--;
                 if($result === false || !empty($result->messages)){
-                    $this->logger->writeError($result->data, 'Fail getChangedEntity... sleep...');
+                    $errCtx = [
+                        'messages' => isset($result->messages) ? $result->messages : null,
+                        'data'     => isset($result->data) ? $result->data : null,
+                    ];
+                    $this->logger->writeError($errCtx, 'Fail getChangedEntity... sleep...');
                     sleep(10);
                 }else{
                     break;
@@ -178,7 +182,11 @@ class SyncDaemon extends WorkerBase
             }while($tryGetCount >=0);
 
             if(!isset($result->data[$entityType])){
-                $this->logger->writeError($result->data, 'Fail getChangedEntity... stop...');
+                $errCtx = [
+                    'messages' => isset($result->messages) ? $result->messages : null,
+                    'data'     => isset($result->data) ? $result->data : null,
+                ];
+                $this->logger->writeError($errCtx, 'Fail getChangedEntity... stop...');
                 continue;
             }
             $nextPage = $result->data['nextPage'];
