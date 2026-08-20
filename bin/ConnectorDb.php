@@ -32,6 +32,7 @@ use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 use Modules\ModuleAmoCrm\Lib\Logger;
+use Modules\ModuleAmoCrm\Lib\ResponsibleResolver;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
 use Modules\ModuleAmoCrm\Models\ModuleAmoLeads;
@@ -1112,6 +1113,16 @@ class ConnectorDb extends WorkerBase
     public function saveEntitySettingsAction($data):array
     {
         $result = new PBXApiResult();
+
+        if (
+            ResponsibleResolver::requiresDefault($data)
+            && ResponsibleResolver::resolve(null, $data['def_responsible'] ?? null) === null
+        ) {
+            $result->messages[] = Util::translate('module_amo_crmValidateValueIsEmpty', false)
+                . ': ' . Util::translate('mod_amo_entitySettingsDefResponsibleField', false);
+            $result->success = false;
+            return $result->getResult();
+        }
 
         $did = trim($data['did']);
         $filter = [
