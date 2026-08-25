@@ -25,8 +25,10 @@ use MikoPBX\Core\System\Storage;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
+use Modules\ModuleAmoCrm\Lib\CdrBatch;
 use Modules\ModuleAmoCrm\Lib\Logger;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
+use Modules\ModuleAmoCrm\Lib\ResponsibleResolver;
 use MikoPBX\Common\Providers\CDRDatabaseProvider;
 use DateTime;
 use MikoPBX\Common\Models\Extensions;
@@ -1020,9 +1022,31 @@ class AmoCdrDaemon extends WorkerBase
                 }else{
                     $responsibleField = $settings['responsible']."MissedUser";
                 }
-                // Получим ответственного.
-                $responsible = 1*($this->cdrRows[$call['id']][$responsibleField]??$settings['def_responsible']);
-                $this->cdrRows[$call['id']]['responsibleRule']      = $responsible;
+                // Получим ответственного. Пустые и нечисловые значения нельзя приводить
+                // арифметикой: в PHP 8 это завершает весь воркер с TypeError.
+                $callResponsible = $this->cdrRows[$call['id']][$responsibleField] ?? null;
+                $responsible = ResponsibleResolver::resolve(
+                    $callResponsible,
+                    $settings['def_responsible'] ?? null
+                );
+                if ($responsible === null && ResponsibleResolver::requiresDefault($settings)) {
+                    $reason = "Responsible amoCRM user is not configured for call type {$type}";
+                    $this->logger->writeError(
+                        [
+                            'linkedid' => $call['id'],
+                            'type' => $type,
+                            'responsibleField' => $responsibleField,
+                            'callResponsible' => $callResponsible,
+                            'defaultResponsible' => $settings['def_responsible'] ?? null,
+                        ],
+                        $reason
+                    );
+                    ConnectorDb::invoke('saveFailedCdr', [[$call['id']], $reason], false);
+                    $calls = CdrBatch::removeLinkedId($calls, $call['id']);
+                    unset($callCounter[$call['id']]);
+                    continue;
+                }
+                $this->cdrRows[$call['id']]['responsibleRule']      = $responsible ?? 0;
                 $this->cdrRows[$call['id']]['resp_contact_user_id'] = intval($contactsData[$phoneId]['resp_contact_user_id']??'');
 
                 $indexAction = AmoCrmMain::getPhoneIndex($phone);

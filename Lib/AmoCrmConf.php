@@ -467,6 +467,7 @@ class AmoCrmConf extends ConfigClass
     public function onAfterModuleDisable(): void
     {
         PBX::dialplanReload();
+        RestApiWorkerRefresher::restart();
     }
 
     /**
@@ -482,6 +483,7 @@ class AmoCrmConf extends ConfigClass
         $nginxConf = new NginxConf();
         $nginxConf->generateConf();
         $nginxConf->reStart();
+        RestApiWorkerRefresher::restart();
     }
 
     /**
