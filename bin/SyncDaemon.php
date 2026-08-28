@@ -23,6 +23,7 @@ require_once 'Globals.php';
 use MikoPBX\Core\Workers\WorkerBase;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\Logger;
+use Modules\ModuleAmoCrm\Lib\SyncPageRetrier;
 
 class SyncDaemon extends WorkerBase
 {
@@ -161,34 +162,47 @@ class SyncDaemon extends WorkerBase
         $nextPage = $url."?".http_build_query($params);
         $count = 0;
         while(!empty($nextPage)){
+            $pageUrl = $nextPage;
             $logUrl = parse_url($nextPage, PHP_URL_PATH);
             $logQuery = parse_url($nextPage, PHP_URL_QUERY);
             $this->logger->writeInfo("SYNC: $count, GET '$entityType' ".$logUrl.($logQuery ? "?$logQuery" : ''));
-            $tryGetCount = 20;
-            do{
-                $result   = WorkerAmoHTTP::invokeAmoApi('getChangedEntity', [$nextPage, $entityType]);
-                $nextPage = $result->data['nextPage']??'';
-                $tryGetCount--;
-                if($result === false || !empty($result->messages)){
-                    $errCtx = [
-                        'messages' => isset($result->messages) ? $result->messages : null,
-                        'data'     => isset($result->data) ? $result->data : null,
-                    ];
-                    $this->logger->writeError($errCtx, 'Fail getChangedEntity... sleep...');
+            $retryResult = SyncPageRetrier::run(
+                $pageUrl,
+                function (string $retryUrl) use ($entityType): array {
+                    $result = WorkerAmoHTTP::invokeAmoApi('getChangedEntity', [$retryUrl, $entityType]);
+                    $success = $result !== false
+                        && empty($result->messages)
+                        && isset($result->data[$entityType]);
+                    if (!$success) {
+                        $errCtx = [
+                            'messages' => isset($result->messages) ? $result->messages : null,
+                            'data' => isset($result->data) ? $result->data : null,
+                            'url' => $retryUrl,
+                        ];
+                        $this->logger->writeError($errCtx, 'Fail getChangedEntity attempt');
+                    }
+                    return ['success' => $success, 'result' => $result];
+                },
+                static function (): void {
                     sleep(10);
-                }else{
-                    break;
                 }
-            }while($tryGetCount >=0);
+            );
+            $result = $retryResult['result'];
 
-            if(!isset($result->data[$entityType])){
+            if (!$retryResult['success']) {
                 $errCtx = [
+                    'entityType' => $entityType,
+                    'url' => $pageUrl,
+                    'from' => $this->$fieldName,
+                    'to' => $endTime,
+                    'attempts' => $retryResult['attempts'],
                     'messages' => isset($result->messages) ? $result->messages : null,
-                    'data'     => isset($result->data) ? $result->data : null,
+                    'data' => isset($result->data) ? $result->data : null,
                 ];
-                $this->logger->writeError($errCtx, 'Fail getChangedEntity... stop...');
-                continue;
+                $this->logger->writeError($errCtx, 'Fail getChangedEntity after retries, advance sync interval');
+                break;
             }
+
             $nextPage = $result->data['nextPage'];
             $count += count($result->data[$entityType]);
             $chunks   = array_chunk($result->data[$entityType], 25, false);
