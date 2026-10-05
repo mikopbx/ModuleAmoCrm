@@ -20,65 +20,11 @@
 namespace Modules\ModuleAmoCrm\Lib;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 
+/**
+ * Result type of the module's amoCRM calls. Kept as a distinct class:
+ * WorkerAmoHTTP::invokeAmoApi() unserializes worker replies with an
+ * allowed_classes list and checks instanceof PBXAmoResult.
+ */
 class PBXAmoResult extends PBXApiResult
 {
-    /**
-     * @var string
-     */
-    public string $redirect = '';
-
-    public array  $headers   = [];
-
-    public string $echo_file = '';
-    public string $echo      = '';
-    public string $html      = '';
-
-    /**
-     * Prepare structured result
-     *
-     * @return array
-     */
-    public function getResult(): array
-    {
-        $result = [
-            'result'    => $this->success,
-            'data'      => $this->data,
-            'messages'  => $this->messages,
-            'function'  => $this->function,
-            'processor' => $this->processor,
-            'pid'       => getmypid(),
-        ];
-
-        if(!empty($this->redirect)){
-            $result['redirect'] = $this->redirect;
-        }
-        if(!empty($this->echo_file)){
-            $result['echo_file'] = $this->echo_file;
-        }
-        if(!empty($this->echo_file)){
-            $result['echo_file'] = $this->echo_file;
-        }
-        if(!empty($this->html)){
-            $result['html'] = $this->html;
-        }
-        return $result;
-    }
-
-    public function setEchoFile($path):void
-    {
-        if(file_exists($path)){
-            $this->echo_file = $path;
-        }
-    }
-
-    public function setEcho($data):void
-    {
-        $this->echo = $data;
-    }
-    public function setHtml($path):void
-    {
-        if(file_exists($path)){
-            $this->html = file_get_contents($path);
-        }
-    }
 }

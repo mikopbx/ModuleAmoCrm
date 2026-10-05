@@ -63,9 +63,6 @@ class RestHandlers extends AmoCrmMainBase
             WorkerAmoHTTP::invokeAmoApi('checkConnection', [true]);
         }
         $result->processor = __METHOD__;
-        if(!isset($params['save-only']) && isset($params['code'])){
-            $result->setHtml($this->moduleDir.'/public/assets/html/auth-ok.html');
-        }
         return $result;
     }
 
