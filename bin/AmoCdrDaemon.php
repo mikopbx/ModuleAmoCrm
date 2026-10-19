@@ -33,6 +33,7 @@ use MikoPBX\Common\Providers\CDRDatabaseProvider;
 use DateTime;
 use MikoPBX\Common\Models\Extensions;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
+use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use Throwable;
 use DateTimeInterface;
 use Exception;
@@ -120,10 +121,28 @@ class AmoCdrDaemon extends WorkerBase
      */
     public function start($argv):void
     {
-        $res = LanInterfaces::findFirst("internet = '1'")->toArray();
-        $this->extHostname  = $res['exthostname']??'';
         $this->logger =  new Logger('cdr-daemon', 'ModuleAmoCrm');
         $this->logger->writeInfo('Starting '. basename(__CLASS__).'...');
+
+        $settings = ModuleAmoCrm::findFirst();
+        $this->portalId = (int) ($settings->portalId ?? 0);
+        $this->extHostname = trim($settings->externalHostname ?? '');
+        $hostnameSource = 'ModuleAmoCrm.externalHostname';
+        if ($this->extHostname === '') {
+            $interface = LanInterfaces::findFirst("internet = '1'");
+            $this->extHostname = trim($interface->exthostname ?? '');
+            $hostnameSource = 'LanInterfaces.exthostname';
+        }
+        $this->logger->writeInfo([
+            'portalId' => $this->portalId,
+            'externalHostname' => $this->extHostname,
+            'hostnameSource' => $hostnameSource,
+        ], 'Startup settings');
+        $startupUsers = ModuleAmoUsers::find(['order' => 'portalId,id'])->toArray();
+        $this->logger->writeInfo(count($startupUsers), 'Startup m_ModuleAmoUsers count');
+        foreach ($startupUsers as $user) {
+            $this->logger->writeInfo($user, 'Startup m_ModuleAmoUsers');
+        }
 
         $workIsAllowed = false;
         while ($this->needRestart === false){
@@ -163,12 +182,6 @@ class AmoCdrDaemon extends WorkerBase
             $this->respCallAnsweredNoClient   = ($allSettings['ModuleAmoCrm']['respCallAnsweredNoClient']??'');
             $this->respCallMissedNoClient     = ($allSettings['ModuleAmoCrm']['respCallMissedNoClient']??'');
             $this->respCallMissedHaveClient   = ($allSettings['ModuleAmoCrm']['respCallMissedHaveClient']??'');
-
-            // Внешний адрес АТС из настроек модуля — приоритет над LanInterfaces
-            $moduleHostname = trim($allSettings['ModuleAmoCrm']['externalHostname']??'');
-            if (!empty($moduleHostname)) {
-                $this->extHostname = $moduleHostname;
-            }
 
             if($oldOffset !== $this->offset){
                 $this->logger->writeInfo("Update settings, Reference date: $this->referenceDate, offset: $this->offset");
@@ -349,16 +362,21 @@ class AmoCdrDaemon extends WorkerBase
                 'id'  => $this->offset,
                 'referenceDate' => $this->referenceDate
             ],
-            'group'   => 'linkedid',
-            'columns' => 'linkedid',
+            'order'   => 'id',
+            'columns' => 'id,linkedid',
             'limit'   => self::LIMIT_CDR,
-            'add_pack_query' => $add_query
         ];
 
         try {
-            $rows = CDRDatabaseProvider::getCdr($filter);
+            $batch = CdrBatch::loadPage([CDRDatabaseProvider::class, 'getCdr'], $filter, $add_query);
+            if ($batch === null) {
+                return;
+            }
+            $pageOffset = $batch['offset'];
+            $rows = $batch['rows'];
         }catch (Throwable $e){
-            $rows = [];
+            $this->logger->writeError($e->getMessage(), 'Failed to load CDR page, offset unchanged');
+            return;
         }
         $calls    = [];
 
@@ -378,7 +396,7 @@ class AmoCdrDaemon extends WorkerBase
                 && in_array($dstNum, $this->innerNums, true)){
                 // Это внутренний разговор.
                 // Не переносим его в AMO.
-                $this->offset = max($this->offset,$row['id']);
+                $this->offset = $pageOffset;
                 $this->logger->writeInfo("Is Inner call... linkedid: $id");
                 continue;
             }
@@ -400,7 +418,7 @@ class AmoCdrDaemon extends WorkerBase
                 $amoUserId = null;
                 $userPhone = '';
             }else{
-                $this->offset = max($this->offset,$row['id']);
+                $this->offset = $pageOffset;
                 $this->logger->writeInfo("Is unknown call... linkedid: $id");
                 continue;
             }
@@ -435,7 +453,7 @@ class AmoCdrDaemon extends WorkerBase
             }
             $this->cdrRows[$id]['haveUser'] |= ($row['is_app'] !== '1');
 
-            $this->offset = max($this->offset,$row['id']);
+            $this->offset = $pageOffset;
             $created_at = $this->getTimestamp($row['start'], $row['UNIQUEID']);
             if($created_at === 0){
                 $this->logger->writeInfo("Skip it: fail parse date: {$row['start']}, linkedid: $id");
@@ -1180,7 +1198,7 @@ class AmoCdrDaemon extends WorkerBase
                 $this->newTasks[$indexAction]['entity_id'] = (int) $lead;
             }elseif ($contactExists){
                 if(!empty($contData['contactId'])){
-                    $this->newTasks[$indexAction]['entity_type'] = 'contact';
+                    $this->newTasks[$indexAction]['entity_type'] = 'contacts';
                     $this->newTasks[$indexAction]['entity_id']    = (int) $contData['contactId'];
                 }else{
                     $this->newTasks[$indexAction]['entity_type'] = 'companies';
@@ -1298,7 +1316,7 @@ class AmoCdrDaemon extends WorkerBase
                     }
                     if (isset($this->newTasks[$phoneId])) {
                         $this->newTasks[$phoneId]['entity_id'] = $contactId;
-                        $this->newTasks[$phoneId]['entity_type'] = 'contact';
+                        $this->newTasks[$phoneId]['entity_type'] = 'contacts';
                     }
                     if (isset($this->incompleteAnswered[$phoneId])) {
                         $this->incompleteAnswered[$phoneId]['client'] = $contactId;
@@ -1337,7 +1355,7 @@ class AmoCdrDaemon extends WorkerBase
             }
             if( isset($this->newTasks[$contact['request_id']]) ){
                 $this->newTasks[$contact['request_id']]['entity_id'] = $contact['id'];
-                $this->newTasks[$contact['request_id']]['entity_type'] = 'contact';
+                $this->newTasks[$contact['request_id']]['entity_type'] = 'contacts';
             }
             if( isset($this->incompleteAnswered[$contact['request_id']]) ){
                 $this->incompleteAnswered[$contact['request_id']]['client'] = $contact['id'];
