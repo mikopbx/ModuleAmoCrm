@@ -234,17 +234,27 @@ var ModuleAmoCrm = {
     var elStatusAuth = $('#login-button');
     elStatusAuth.removeClass('red green');
     elStatusAuth.text(globalTranslate.module_amo_crm_connect_refresh);
-    $.post("".concat(window.location.origin, "/pbxcore/api/modules/").concat(className, "/listener"), params, function (data) {
-      if (data && data.result === false) {
+    var onResponse = function onResponse(data, requestFailed) {
+      if (requestFailed === true || data && data.result === false) {
         var messages = data && data.messages || {};
         var errorData = messages['error-data'] || {};
         var hint = errorData.hint || '';
         var detail = errorData.detail || '';
         var errorText = hint + (detail ? " (" + detail + ")." : "");
+        if (!errorText) {
+          errorText = globalTranslate.module_amo_crm_connect_fail;
+        }
+        elStatusAuth.removeClass('green').addClass('red');
+        elStatusAuth.text(globalTranslate.module_amo_crm_connect_fail);
         $("#warning-message div.header").text(globalTranslate.mod_amo_Error);
         $("#warning-message div.body").text(errorText);
         $("#warning-message").show();
       }
+    };
+    $.post("".concat(window.location.origin, "/pbxcore/api/modules/").concat(className, "/listener"), params, onResponse)
+    // Newer cores preserve HTTP 4xx/5xx for failed module REST actions.
+    .fail(function (xhr) {
+      return onResponse(xhr.responseJSON, true);
     });
     if (window[className] && window[className].popup && typeof window[className].popup.close === 'function') {
       window[className].popup.close();

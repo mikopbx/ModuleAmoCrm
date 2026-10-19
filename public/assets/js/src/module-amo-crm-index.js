@@ -233,18 +233,26 @@ const ModuleAmoCrm = {
 		elStatusAuth.removeClass('red green');
 		elStatusAuth.text(globalTranslate.module_amo_crm_connect_refresh);
 
-		$.post(`${window.location.origin}/pbxcore/api/modules/${className}/listener`, params, function( data ) {
-			if (data && data.result === false) {
+		const onResponse = function(data, requestFailed) {
+			if (requestFailed === true || (data && data.result === false)) {
 				let messages = (data && data.messages) || {};
 				let errorData = messages['error-data'] || {};
 				let hint = errorData.hint || '';
 				let detail = errorData.detail || '';
 				let errorText = hint + (detail ? " (" + detail + ")." : "");
+				if (!errorText) {
+					errorText = globalTranslate.module_amo_crm_connect_fail;
+				}
+				elStatusAuth.removeClass('green').addClass('red');
+				elStatusAuth.text(globalTranslate.module_amo_crm_connect_fail);
 				$("#warning-message div.header").text(globalTranslate.mod_amo_Error);
 				$("#warning-message div.body").text(errorText);
 				$("#warning-message").show();
 			}
-		});
+		};
+		$.post(`${window.location.origin}/pbxcore/api/modules/${className}/listener`, params, onResponse)
+			// Newer cores preserve HTTP 4xx/5xx for failed module REST actions.
+			.fail((xhr) => onResponse(xhr.responseJSON, true));
 		if (window[className] && window[className].popup && typeof window[className].popup.close === 'function') {
 			window[className].popup.close();
 		}
@@ -666,4 +674,3 @@ const ModuleAmoCrm = {
 $(document).ready(() => {
 	window[className].initialize();
 });
-
