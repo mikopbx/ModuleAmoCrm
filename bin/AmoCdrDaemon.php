@@ -69,6 +69,9 @@ class AmoCdrDaemon extends WorkerBase
     private array $incompleteAnswered = [];
     private array $createdLeads = []; // Кэш создана ли сделка для звонка. 1 звонок = 1 сделка
     private int $addCallsFailCount = 0; // Счётчик последовательных неудач addCalls
+    private string $addCallsPage = '';
+    private array $completedCallRequests = []; // Только в пределах текущей страницы/retry.
+    private array $pendingCallLinkedIds = [];
     private const MAX_ADD_CALLS_FAILURES = 5; // Максимум попыток перед пропуском батча
 
     // ВИДЫ ЗВОНКОВ.
@@ -378,6 +381,12 @@ class AmoCdrDaemon extends WorkerBase
             $this->logger->writeError($e->getMessage(), 'Failed to load CDR page, offset unchanged');
             return;
         }
+        $pageKey = $this->portalId . ':' . $this->referenceDate . ':' . $oldOffset . ':' . $pageOffset;
+        if ($this->addCallsPage !== $pageKey) {
+            $this->addCallsPage = $pageKey;
+            $this->completedCallRequests = [];
+            $this->addCallsFailCount = 0;
+        }
         $calls    = [];
 
         $countCDR = count($rows);
@@ -530,9 +539,9 @@ class AmoCdrDaemon extends WorkerBase
             $this->addCallsFailCount++;
             if($this->addCallsFailCount >= self::MAX_ADD_CALLS_FAILURES){
                 // Превышен лимит попыток — пропускаем батч, фиксируем в БД и в лог.
-                $failedIds = array_unique(array_keys($this->cdrRows));
-                $this->logger->writeError("addCalls failed $this->addCallsFailCount times in a row, skipping batch. Lost linkedids: " . implode(', ', $failedIds));
-                ConnectorDb::invoke('saveFailedCdr', [$failedIds, 'addCalls timeout after ' . self::MAX_ADD_CALLS_FAILURES . ' attempts'], false);
+                $failedIds = array_values(array_unique($this->pendingCallLinkedIds));
+                $this->logger->writeError("addCalls failed $this->addCallsFailCount times in a row, skipping batch. Failed linkedids: " . implode(', ', $failedIds));
+                ConnectorDb::invoke('saveFailedCdr', [$failedIds, 'addCalls failed after ' . self::MAX_ADD_CALLS_FAILURES . ' attempts; see HTTP error log'], false);
                 $this->addCallsFailCount = 0;
                 // offset НЕ откатываем — пропускаем батч
             }else{
@@ -639,10 +648,11 @@ class AmoCdrDaemon extends WorkerBase
      * Вызов REST API amoCRM
      * @param $calls
      * @param $callCounter
-     * @return void
+     * @return bool
      */
     private function addCalls($calls, $callCounter):bool
     {
+        $this->pendingCallLinkedIds = [];
         $calls  = array_merge(... array_values($calls));
         if(!empty($calls)){
             $this->logger->writeSummary($calls, "CDR synchronization. Step 1 Count: ".count($calls), false, ['id']);
@@ -653,6 +663,7 @@ class AmoCdrDaemon extends WorkerBase
         }
         $this->logger->writeSummary($calls, "CDR synchronization. Step 2. Count: ".count($calls), false, ['id']);
         $ids = '';
+        $linkedIds = [];
 
         $callsArray = [
             'contacts' => [],
@@ -667,6 +678,12 @@ class AmoCdrDaemon extends WorkerBase
             }
             $ids.= $call['id'].'|';
             $entity_type = $this->cdrRows[$call['id']]['entity_type']??'contacts';
+            $requestId = (string)$call['request_id'];
+            if (isset($this->completedCallRequests[$entity_type][$requestId])) {
+                unset($call);
+                continue;
+            }
+            $linkedIds[$entity_type][$requestId] = $call['id'];
             unset($call['id'],$call['is_app'],$call['did']);
             $callsArray[$entity_type][] = $call;
         }
@@ -679,16 +696,81 @@ class AmoCdrDaemon extends WorkerBase
             if(empty($callsData)){
                 continue;
             }
-            // Пытаемся добавить вызовы. Это получится, если контакты существуют.
-            $result = WorkerAmoHTTP::invokeAmoApi('addCalls', [$callsData, $entity_type]);
-            $this->logger->writeSummary($callsData, "Create calls (REQ): $ids", true, ['request_id']);
-            $this->logger->writeInfo($result, "Create calls (RES): $ids");
-            if(!$result->success){
-                $this->logger->writeError("Failed to add calls for $entity_type, offset will be rolled back");
-                $allSuccess = false;
+            while (!empty($callsData)) {
+                $result = WorkerAmoHTTP::invokeAmoApi('addCalls', [$callsData, $entity_type]);
+                $this->logger->writeSummary($callsData, "Create calls (REQ): $ids", true, ['request_id']);
+                $this->logger->writeInfo($result, "Create calls (RES): $ids");
+                if ($result->success) {
+                    foreach ($callsData as $sentCall) {
+                        $this->completedCallRequests[$entity_type][(string)$sentCall['request_id']] = true;
+                    }
+                    break;
+                }
+                $rejected = $this->getRejectedCallRequests($result, $callsData);
+                if ($rejected === []) {
+                    $this->logger->writeError("Failed to add calls for $entity_type, offset will be rolled back");
+                    $allSuccess = false;
+                    break;
+                }
+                // A validation response rejects the whole request, not just these records.
+                // Persist only explicitly identified errors, then resend the remaining records.
+                foreach ($rejected as $requestId => $errors) {
+                    $reason = "addCalls HTTP 400 validation-errors; entity=$entity_type; request_id=$requestId; "
+                        . json_encode($errors, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    $this->logger->writeError($reason);
+                    if (ConnectorDb::invoke('saveFailedCdr', [[$linkedIds[$entity_type][$requestId]], $reason]) !== true) {
+                        $this->logger->writeError('Failed to persist rejected CDR, offset will be rolled back');
+                        $allSuccess = false;
+                        break 2;
+                    }
+                    $this->completedCallRequests[$entity_type][$requestId] = true;
+                }
+                $callsData = array_values(array_filter($callsData, fn(array $item): bool =>
+                    !isset($this->completedCallRequests[$entity_type][(string)$item['request_id']])));
+            }
+            foreach ($callsData as $pendingCall) {
+                $requestId = (string)$pendingCall['request_id'];
+                if (!isset($this->completedCallRequests[$entity_type][$requestId])) {
+                    $this->pendingCallLinkedIds[] = $linkedIds[$entity_type][$requestId];
+                }
             }
         }
         return $allSuccess;
+    }
+
+    /**
+     * Fail closed: never infer a bad record from an index, a network error or a
+     * partially understood response. Every validation error must match exactly
+     * one request in the current HTTP payload.
+     */
+    private function getRejectedCallRequests($result, array $callsData): array
+    {
+        if (($result->messages['error-code'] ?? null) !== 400) {
+            return [];
+        }
+        $validation = $result->messages['error-data']['validation-errors'] ?? null;
+        if (!is_array($validation) || $validation === []) {
+            return [];
+        }
+        $counts = [];
+        foreach ($callsData as $call) {
+            $id = (string)$call['request_id'];
+            $counts[$id] = ($counts[$id] ?? 0) + 1;
+        }
+        $rejected = [];
+        foreach ($validation as $entry) {
+            if (!is_array($entry) || !isset($entry['request_id'])
+                || !is_scalar($entry['request_id'])
+                || !is_array($entry['errors'] ?? null) || $entry['errors'] === []) {
+                return [];
+            }
+            $id = (string)$entry['request_id'];
+            if (($counts[$id] ?? 0) !== 1) {
+                return [];
+            }
+            $rejected[$id] = array_merge($rejected[$id] ?? [], $entry['errors']);
+        }
+        return $rejected;
     }
 
     /**
