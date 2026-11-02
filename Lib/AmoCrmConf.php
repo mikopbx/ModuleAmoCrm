@@ -85,6 +85,9 @@ class AmoCrmConf extends ConfigClass
             if(in_array('tokenForAmo', $data['changedFields'], true)) {
                 $this->makeAuthFiles();
             }
+            if (!empty(array_intersect(['tokenForAmo', 'webhookPort'], $data['changedFields']))) {
+                $this->rebuildWafExemptions();
+            }
             if(in_array('tokenForAmo', $data['changedFields'], true) && $changedFields === 1){
                 return;
             }
@@ -353,26 +356,88 @@ class AmoCrmConf extends ConfigClass
     }
 
     /**
+     * Параметры отдельного nginx server block для webhook.
+     * Возвращает null, если отдельный сервер не создаётся (не задан порт/токен
+     * или порт совпадает с системным HTTPS).
+     *
+     * @return array|null ['port' => string, 'token' => string]
+     */
+    private function getWebhookServerSettings(): ?array
+    {
+        $settings = ModuleAmoCrm::findFirst();
+        if ($settings === null) {
+            return null;
+        }
+        $port  = trim((string)($settings->webhookPort ?? ''));
+        $token = trim((string)($settings->tokenForAmo ?? ''));
+        if ($port === '' || $token === '') {
+            return null;
+        }
+        $webHttpsPort = PbxSettings::getValueByKey(PbxSettings::WEB_HTTPS_PORT);
+        if ((int)$port === (int)$webHttpsPort) {
+            return null;
+        }
+        return ['port' => $port, 'token' => $token];
+    }
+
+    /**
+     * Исключения WAF (MikoPBX 2026+, на старых версиях метод не вызывается).
+     *
+     * Webhook amoCRM приходит пачками (сотни запросов в минуту с одного IP
+     * при массовом создании сделок/контактов из CDR) и упирается в lua
+     * rate-limit (strict: 205 req/60s), после чего amoCRM отключает хук.
+     * Исключаем из rate-limit только точный путь webhook на отдельном порту:
+     * путь содержит секретный токен, location существует только в server
+     * block модуля. Прочие проверки WAF (blacklist, request-line, body-scan)
+     * продолжают действовать.
+     *
+     * Ядро перечитывает исключения cron-задачей WorkerWafExemptions раз в минуту.
+     *
+     * @return array
+     */
+    public function getWafExemptions(): array
+    {
+        $webhookServer = $this->getWebhookServerSettings();
+        if ($webhookServer === null) {
+            return [];
+        }
+        return [
+            '/' . $webhookServer['token'] . '/entity-update' => ['rate-limit'],
+        ];
+    }
+
+    /**
+     * Немедленно перепубликовать исключения WAF (иначе — в течение минуты по cron).
+     */
+    private function rebuildWafExemptions(): void
+    {
+        $providerClass = '\MikoPBX\Common\Providers\WafProvider';
+        if (!class_exists($providerClass) || $this->di === null) {
+            return;
+        }
+        try {
+            $serviceName = constant($providerClass . '::SERVICE_NAME');
+            if (!$this->di->has($serviceName)) {
+                return;
+            }
+            $this->di->getShared($serviceName)->rebuildAll();
+        } catch (\Throwable $e) {
+            Util::sysLogMsg(__METHOD__, 'WAF rebuild failed: ' . $e->getMessage(), LOG_WARNING);
+        }
+    }
+
+    /**
      * Создаёт отдельный nginx server block для webhook, если задан нестандартный порт.
      * @return string
      */
     public function createNginxServers(): string
     {
-        $settings = ModuleAmoCrm::findFirst();
-        if ($settings === null) {
+        $webhookServer = $this->getWebhookServerSettings();
+        if ($webhookServer === null) {
             return '';
         }
-        $port = trim($settings->webhookPort ?? '');
-        $token = trim($settings->tokenForAmo ?? '');
-        if (empty($port) || empty($token)) {
-            return '';
-        }
-
-        // Если порт совпадает с системным HTTPS — не создаём отдельный сервер
-        $webHttpsPort = PbxSettings::getValueByKey(PbxSettings::WEB_HTTPS_PORT);
-        if ((int)$port === (int)$webHttpsPort) {
-            return '';
-        }
+        $port  = $webhookServer['port'];
+        $token = $webhookServer['token'];
 
         $webPort = PbxSettings::getValueByKey(PbxSettings::WEB_PORT);
         $proxyTarget = "http://127.0.0.1:{$webPort}";
