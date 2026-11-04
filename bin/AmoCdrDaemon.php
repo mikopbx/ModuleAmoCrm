@@ -372,15 +372,19 @@ class AmoCdrDaemon extends WorkerBase
 
         try {
             $batch = CdrBatch::loadPage([CDRDatabaseProvider::class, 'getCdr'], $filter, $add_query);
-            if ($batch === null) {
-                return;
-            }
-            $pageOffset = $batch['offset'];
-            $rows = $batch['rows'];
         }catch (Throwable $e){
             $this->logger->writeError($e->getMessage(), 'Failed to load CDR page, offset unchanged');
             return;
         }
+        if ($batch === null) {
+            // Новых завершённых CDR нет, но текущие отвеченные вызовы
+            // нужно обработать сразу (автооткрытие карточки), а не ждать
+            // завершения какого-либо другого звонка.
+            $this->processIncompleteAnswered();
+            return;
+        }
+        $pageOffset = $batch['offset'];
+        $rows = $batch['rows'];
         $pageKey = $this->portalId . ':' . $this->referenceDate . ':' . $oldOffset . ':' . $pageOffset;
         if ($this->addCallsPage !== $pageKey) {
             $this->addCallsPage = $pageKey;
@@ -522,15 +526,7 @@ class AmoCdrDaemon extends WorkerBase
             // Произошел сбой, повторим запрос через некоторое время.
             return;
         }
-        ////
-        // Создание сущностей amoCRM
-        ////
-        $this->createContacts($calls);
-        $this->createLeads();
-        $this->createTasks();
-        $this->createUnsorted();
-
-        $this->alertIncompleteAnswered();
+        $this->createEntities($calls);
         ////
         // Прикрепление звонков к сущностям.
         ////
@@ -556,6 +552,42 @@ class AmoCdrDaemon extends WorkerBase
         if($oldOffset !== $this->offset){
             ConnectorDb::invoke('saveNewSettings', [['offsetCdr' => $this->offset]]);
         }
+    }
+
+    /**
+     * Обработка текущих (ещё не завершённых) отвеченных входящих вызовов,
+     * когда новых CDR для синхронизации нет: поиск/создание контакта и сделки
+     * и отправка команды открытия карточки.
+     * @return void
+     */
+    private function processIncompleteAnswered():void
+    {
+        $pending = array_filter($this->incompleteAnswered, static function ($call) {
+            return !isset($call['finished']);
+        });
+        if(empty($pending)){
+            return;
+        }
+        $calls       = [];
+        $callCounter = [];
+        if($this->prepareDataCreatingEntities($calls, $callCounter) === false){
+            return;
+        }
+        $this->createEntities($calls);
+    }
+
+    /**
+     * Создание сущностей amoCRM и команда открытия карточки для отвеченных вызовов.
+     * @param array $calls
+     * @return void
+     */
+    private function createEntities(array &$calls):void
+    {
+        $this->createContacts($calls);
+        $this->createLeads();
+        $this->createTasks();
+        $this->createUnsorted();
+        $this->alertIncompleteAnswered();
     }
 
     /**
