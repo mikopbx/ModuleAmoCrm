@@ -392,10 +392,19 @@ class ConnectorDb extends WorkerBase
                 if($action === 'delete'){
                     continue;
                 }
-                $custom_fields = $entity['custom_fields']??$entity['custom_fields_values']??'';
+                // API v4 отдаёт custom_fields_values = null у сущности без доп. полей.
+                // Раньше подставлялась строка '' и foreach по ней на PHP 8 бросал исключение,
+                // прерывая сохранение всей пачки (до 25 контактов) из SyncDaemon.
+                $custom_fields = $entity['custom_fields']??$entity['custom_fields_values']??[];
+                if(!is_array($custom_fields)){
+                    continue;
+                }
                 foreach ($custom_fields as $field){
+                    if(!is_array($field)){
+                        continue;
+                    }
                     $fCode = $field['code']??$field['field_code']??'';
-                    if($fCode !== 'PHONE'){
+                    if($fCode !== 'PHONE' || !is_array($field['values']??null)){
                         continue;
                     }
                     foreach ($field['values'] as $value){
