@@ -33,6 +33,7 @@ use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 use Modules\ModuleAmoCrm\Lib\Logger;
 use Modules\ModuleAmoCrm\Lib\ModelsEventMessage;
+use Modules\ModuleAmoCrm\Lib\PhoneBookEntity;
 use Modules\ModuleAmoCrm\Lib\ResponsibleResolver;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
@@ -412,58 +413,58 @@ class ConnectorDb extends WorkerBase
                 $this->logger->writeInfo("New initTime: $initTime");
             }
         }
-        $idEntityFields = [
-            'contact' => 'idEntity',
-            'company' => 'linked_company_id',
-        ];
-
         $actions = ['update', 'add', 'delete'];
         foreach ($actions as $action){
             $entities = $updates[$action]??[];
+            if (!is_array($entities)) {
+                $entities = [];
+            }
             $result[$action.'-all'] = count($entities);
             $result[$action.'-saved'] = 0;
             $result[$action.'-fail'] = 0;
             foreach ($entities as $entity){
-                $idEntity = $idEntityFields[$entity['type']];
-                ModuleAmoPhones::find("$idEntity='$entity[id]'")->delete();
-                if($action === 'delete'){
+                // Некорректная сущность не должна обрывать сохранение всей пачки (GitHub #55).
+                // Счётчики -saved / -fail — в сущностях (как и -all).
+                $idEntity = PhoneBookEntity::idField($entity);
+                if ($idEntity === null) {
+                    $result[$action.'-fail']++;
+                    $this->logger->writeError(['error' => 'Invalid phone book entity', 'action' => $action, 'data' => $entity]);
                     continue;
                 }
-                // API v4 отдаёт custom_fields_values = null у сущности без доп. полей.
-                // Раньше подставлялась строка '' и foreach по ней на PHP 8 бросал исключение,
-                // прерывая сохранение всей пачки (до 25 контактов) из SyncDaemon.
-                $custom_fields = $entity['custom_fields']??$entity['custom_fields_values']??[];
-                if(!is_array($custom_fields)){
-                    continue;
-                }
-                foreach ($custom_fields as $field){
-                    if(!is_array($field)){
-                        continue;
-                    }
-                    $fCode = $field['code']??$field['field_code']??'';
-                    if($fCode !== 'PHONE' || !is_array($field['values']??null)){
-                        continue;
-                    }
-                    foreach ($field['values'] as $value){
+                $db = null;
+                try {
+                    $rows = $action === 'delete' ? [] : PhoneBookEntity::rows($entity, $idEntity);
+                    // Удаление старых телефонов и запись новых — одной транзакцией: при сбое у сущности
+                    // остаются прежние телефоны, а не пустота до следующего init.
+                    $db = (new ModuleAmoPhones())->getWriteConnection();
+                    $db->begin();
+                    ModuleAmoPhones::find([
+                        'conditions' => "$idEntity = :id:",
+                        'bind'       => ['id' => (string)$entity['id']],
+                    ])->delete();
+                    foreach ($rows as $row){
                         /** @var ModuleAmoPhones $newRecord */
                         $newRecord = new ModuleAmoPhones();
-                        $newRecord->portalId            = $this->portalId;
-                        $newRecord->entityType          = $entity['type'];
-                        $newRecord->responsible_user_id = $entity['responsible_user_id'];
-                        $newRecord->phone               = $value['value'];
-                        $newRecord->idPhone             = AmoCrmMain::getPhoneIndex($value['value']);
-                        $newRecord->name                = $entity['name']??'';
-                        $newRecord->company_name        = $entity['company_name']??'';
-                        $newRecord->linked_company_id   = $entity['linked_company_id']??'';
-                        $newRecord->initTime            = $this->initTime;
-                        $newRecord->writeAttribute($idEntity,$entity['id']);
+                        foreach ($row as $column => $value){
+                            $newRecord->writeAttribute($column, $value);
+                        }
+                        $newRecord->idPhone  = AmoCrmMain::getPhoneIndex($row['phone']);
+                        $newRecord->portalId = $this->portalId;
+                        $newRecord->initTime = $this->initTime;
                         if(!$newRecord->save()){
-                            $result[$action.'-fail']++;
-                            $this->logger->writeError(['error' => 'Fail save contact', 'msg' => $newRecord->getMessages(), 'data' => $entity]);
-                        }else{
-                            $result[$action.'-saved']++ ;
+                            throw new \RuntimeException('Fail save contact: '.implode('; ', array_map('strval', $newRecord->getMessages())));
                         }
                     }
+                    $db->commit();
+                    $result[$action.'-saved']++;
+                } catch (\Throwable $e) {
+                    if ($db !== null && $db->isUnderTransaction()) {
+                        $db->rollback();
+                    }
+                    $result[$action.'-fail']++;
+                    $this->logger->writeError(
+                        ['error' => 'Fail update phone book entity', 'msg' => $e->getMessage(), 'action' => $action, 'data' => $entity]
+                    );
                 }
             }
         }
