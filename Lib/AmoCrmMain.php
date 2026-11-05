@@ -311,15 +311,24 @@ class AmoCrmMain extends AmoCrmMainBase
         $url = str_replace(self::EMPTY_HOST_VALUE, $this->baseDomain ,$pageLink);
         $params = [];
         $response = ClientHTTP::sendHttpGetRequest($url, $params, $headers);
-        $result   = new PBXApiResult();
-        $nextUrl = $response->data['_links']['next']['href']??'';
-        $result->data = [
-            $type => [],
-            'nextPage' => $nextUrl,
-        ];
-        foreach ($response->data['_embedded'][$type]??[] as $contact){
-            $contact['type'] = $types[$type];
-            $result->data[$type][]  = $contact;
+        $page     = ChangedEntityPage::parse(
+            (bool)$response->success,
+            $response->data,
+            (array)$response->messages,
+            $type,
+            $types[$type] ?? $type
+        );
+        $result          = new PBXApiResult();
+        $result->success = $page['success'];
+        if ($page['success']) {
+            $result->data = [
+                $type      => $page['items'],
+                'nextPage' => $page['nextPage'],
+            ];
+        } else {
+            // Ошибка HTTP (401, 5xx, таймаут) — не пустая страница: SyncDaemon повторит запрос,
+            // а в init не завершит проход и не удалит кэш.
+            $result->messages = $page['messages'];
         }
         return $result;
     }

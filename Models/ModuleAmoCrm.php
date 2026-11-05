@@ -89,6 +89,35 @@ class ModuleAmoCrm extends ModulesModelsBase
     public $lastLeadsSyncTime = 0;
 
     /**
+     * Время старта текущей init-синхронизации (0 — init не выполняется).
+     * Сохраняется между перезапусками SyncDaemon, используется как initTime записей.
+     *
+     * @Column(type="integer", default="0", nullable=true)
+     */
+    public $initSyncTime = 0;
+
+    /**
+     * Последняя обработанная страница init-синхронизации контактов (-1 — проход завершён).
+     *
+     * @Column(type="integer", default="0", nullable=true)
+     */
+    public $initSyncPageContacts = 0;
+
+    /**
+     * Последняя обработанная страница init-синхронизации сделок (-1 — проход завершён).
+     *
+     * @Column(type="integer", default="0", nullable=true)
+     */
+    public $initSyncPageLeads = 0;
+
+    /**
+     * Последняя обработанная страница init-синхронизации компаний (-1 — проход завершён).
+     *
+     * @Column(type="integer", default="0", nullable=true)
+     */
+    public $initSyncPageCompanies = 0;
+
+    /**
      *
      * @Column(type="integer", default="0", nullable=true)
      */

@@ -77,18 +77,22 @@ class AmoCrmConf extends ConfigClass
     public function modelsEventChangeData($data): void
     {
         if ($data['model'] === ModuleAmoCrm::class) {
-            $changedFields = count($data['changedFields']);
-            $syncKeys = ['offsetCdr', 'lastContactsSyncTime', 'lastCompaniesSyncTime', 'lastLeadsSyncTime'];
-            if ($changedFields === 1 && in_array($data['changedFields'][0],$syncKeys, true)) {
-                return;
-            }
-            if(in_array('tokenForAmo', $data['changedFields'], true)) {
+            $changedFields = (array)($data['changedFields'] ?? []);
+            if(in_array('tokenForAmo', $changedFields, true)) {
                 $this->makeAuthFiles();
             }
-            if (!empty(array_intersect(['tokenForAmo', 'webhookPort'], $data['changedFields']))) {
+            if (!empty(array_intersect(['tokenForAmo', 'webhookPort'], $changedFields))) {
                 $this->rebuildWafExemptions();
             }
-            if(in_array('tokenForAmo', $data['changedFields'], true) && $changedFields === 1){
+            // Курсоры/состояние синхронизации и OAuth-токен (обновляет сам WorkerAmoHTTP)
+            // не требуют перезапуска: иначе ежедневное обновление токена прерывает
+            // ночную init-синхронизацию. Очистка токена — требует (см. SyncState::needRestart).
+            $authData = null;
+            if (in_array('authData', $changedFields, true)) {
+                $settings = ModuleAmoCrm::findFirst();
+                $authData = $settings ? (string)$settings->authData : '';
+            }
+            if (!SyncState::needRestart($changedFields, $authData)) {
                 return;
             }
             $this->startAllServices(true);

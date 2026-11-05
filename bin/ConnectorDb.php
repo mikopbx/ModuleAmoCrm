@@ -124,6 +124,12 @@ class ConnectorDb extends WorkerBase
         $settings = ModuleAmoCrm::findFirst();
         if($settings){
             $this->portalId              = (int)$settings->portalId;
+            // Перезапуск во время init: записи из webhook/CDR должны получить текущий initTime,
+            // иначе deleteWithFailTime удалит их по завершении init.
+            $initSyncTime = (int)($settings->initSyncTime ?? 0);
+            if ($initSyncTime > 0) {
+                $this->initTime = $initSyncTime;
+            }
         }else{
             $settings = new ModuleAmoCrm();
             $settings->lastContactsSyncTime  = 0;
@@ -348,6 +354,34 @@ class ConnectorDb extends WorkerBase
     }
 
     /**
+     * Атомарное изменение состояния init: применяется, только если сохранённый initSyncTime
+     * равен ожидаемому. ConnectorDb — единственный процесс, обрабатывающий запросы последовательно,
+     * и все записи initSyncTime (cron, SyncDaemon) идут через него, поэтому проверка и запись
+     * не разделены гонкой. Защищает от перезаписи состояния нового init процессом со старым initTime.
+     *
+     * @param int   $expectedInitTime   Ожидаемый initSyncTime (0 — init не идёт).
+     * @param array $data               Новые значения настроек.
+     * @param bool  $deleteNotSynced    Перед сохранением удалить записи, не обновлённые в init $expectedInitTime.
+     * @return bool false — состояние init сменилось (или настройки не найдены), ничего не изменено.
+     */
+    public function saveInitSettings(int $expectedInitTime, array $data, bool $deleteNotSynced = false): bool
+    {
+        $settings = ModuleAmoCrm::findFirst();
+        $current  = $settings ? (int)($settings->initSyncTime ?? 0) : -1;
+        if ($current !== $expectedInitTime) {
+            $this->logger->writeInfo(
+                ['expected' => $expectedInitTime, 'current' => $current, 'data' => array_keys($data)],
+                'Init state changed, settings are not saved'
+            );
+            return false;
+        }
+        if ($deleteNotSynced && $expectedInitTime > 0) {
+            $this->deleteWithFailTime($expectedInitTime);
+        }
+        return $this->saveNewSettings($data);
+    }
+
+    /**
      * Удаляет все записи, что не соответствуют $initTime
      * Используется при синхронизации / актуализации контактов
      * @param int $initTime
@@ -370,7 +404,9 @@ class ConnectorDb extends WorkerBase
         $result = [];
         if(isset($updates['initTime'])){
             $initTime = (int)$updates['initTime'];
-            if($initTime !== $this->initTime){
+            // initTime только растёт: страница устаревшего (заменённого) init не должна
+            // откатывать initTime нового — иначе записи webhook/CDR удалит deleteWithFailTime.
+            if($initTime > $this->initTime){
                 $this->initTime = $initTime;
                 $this->logger->writeInfo("New initTime: $initTime");
             }
@@ -614,7 +650,8 @@ class ConnectorDb extends WorkerBase
         $isSync = true; $logMessage = '';
         if (isset($updates['initTime'])) {
             $initTimeValue = (int)$updates['initTime'];
-            if ($initTimeValue !== $this->initTime) {
+            // initTime только растёт (см. updatePhoneBook).
+            if ($initTimeValue > $this->initTime) {
                 $this->initTime = $initTimeValue;
                 $logMessage = "Updated initTime to $initTimeValue";
             }
@@ -986,6 +1023,11 @@ class ConnectorDb extends WorkerBase
         // не отправляется автоматически. Отправляем вручную.
         $changedFields = $settings->getChangedFields();
         $result = $settings->save();
+        if ($result && isset($data['initSyncTime']) && (int)$data['initSyncTime'] > $this->initTime) {
+            // Старт init (cron или SyncDaemon): записи из webhook/CDR сразу получают новый initTime,
+            // не дожидаясь первой страницы SyncDaemon — иначе deleteWithFailTime удалит их по завершении init.
+            $this->initTime = (int)$data['initSyncTime'];
+        }
         if ($result && !empty($changedFields)) {
             $queue = $this->di->getShared(BeanstalkConnectionModelsProvider::SERVICE_NAME);
             if ($queue !== null) {

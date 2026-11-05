@@ -51,7 +51,10 @@ class RestHandlers extends AmoCrmMainBase
         $result = new PBXAmoResult();
         $params = $request['data']??[];
         if(isset($params['error'])) {
-            ConnectorDb::invoke('saveNewSettings', ['authData' => '']);
+            // Отказ/ошибка авторизации (например, администратор отменил повторную авторизацию в amoCRM).
+            // Рабочий токен не очищаем: иначе отмена повторной авторизации отключает интеграцию.
+            $result->success = false;
+            $result->messages[] = 'OAuth error: ' . substr((string)preg_replace('/[^\w.\- ]/u', '', is_scalar($params['error']) ? (string)$params['error'] : ''), 0, 100);
         }elseif (isset($params['code']) && !empty($params['code'])){
             $apiResult = WorkerAmoHTTP::invokeAmoApi('getAccessTokenByCode', [$params['code']]);
             if ($apiResult instanceof PBXAmoResult) {
