@@ -76,7 +76,8 @@ class AmoCrmConf extends ConfigClass
      */
     public function modelsEventChangeData($data): void
     {
-        if ($data['model'] === ModuleAmoCrm::class) {
+        // Задания SOURCE_INVOKE_ACTION (в т.ч. от других модулей) могут прийти без 'model' (GitHub #54).
+        if (($data['model'] ?? '') === ModuleAmoCrm::class) {
             $changedFields = (array)($data['changedFields'] ?? []);
             if(in_array('tokenForAmo', $changedFields, true)) {
                 $this->makeAuthFiles();

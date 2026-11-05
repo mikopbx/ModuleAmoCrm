@@ -32,6 +32,7 @@ use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 use Modules\ModuleAmoCrm\Lib\Logger;
+use Modules\ModuleAmoCrm\Lib\ModelsEventMessage;
 use Modules\ModuleAmoCrm\Lib\ResponsibleResolver;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
@@ -1032,28 +1033,25 @@ class ConnectorDb extends WorkerBase
             $queue = $this->di->getShared(BeanstalkConnectionModelsProvider::SERVICE_NAME);
             if ($queue !== null) {
                 // Уведомляем модули об изменении модели
-                $queue->publish(json_encode([
-                    'source' => BeanstalkConnectionModelsProvider::SOURCE_MODELS_CHANGED,
-                    'model'  => get_class($settings),
-                    'recordId' => $settings->id,
-                    'action' => 'afterSave',
-                    'changedFields' => $changedFields,
-                ]));
+                $queue->publish(json_encode(ModelsEventMessage::modelChanged(
+                    BeanstalkConnectionModelsProvider::SOURCE_MODELS_CHANGED,
+                    get_class($settings),
+                    $settings->id,
+                    $changedFields
+                )));
                 // Перегенерация nginx и firewall при изменении webhook-порта или токена
                 $nginxFields = ['webhookPort', 'tokenForAmo'];
                 if (!empty(array_intersect($nginxFields, $changedFields))) {
-                    $queue->publish(json_encode([
-                        'source' => BeanstalkConnectionModelsProvider::SOURCE_INVOKE_ACTION,
-                        'action' => ReloadNginxConfAction::class,
-                        'parameters' => [],
-                    ]));
+                    $queue->publish(json_encode(ModelsEventMessage::invokeAction(
+                        BeanstalkConnectionModelsProvider::SOURCE_INVOKE_ACTION,
+                        ReloadNginxConfAction::class
+                    )));
                 }
                 if (in_array('webhookPort', $changedFields, true)) {
-                    $queue->publish(json_encode([
-                        'source' => BeanstalkConnectionModelsProvider::SOURCE_INVOKE_ACTION,
-                        'action' => ReloadFirewallAction::class,
-                        'parameters' => [],
-                    ]));
+                    $queue->publish(json_encode(ModelsEventMessage::invokeAction(
+                        BeanstalkConnectionModelsProvider::SOURCE_INVOKE_ACTION,
+                        ReloadFirewallAction::class
+                    )));
                 }
             }
         }
