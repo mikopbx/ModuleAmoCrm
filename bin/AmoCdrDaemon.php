@@ -28,6 +28,7 @@ use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 use Modules\ModuleAmoCrm\Lib\CdrBatch;
 use Modules\ModuleAmoCrm\Lib\CallTypeResolver;
 use Modules\ModuleAmoCrm\Lib\IncompleteCallTypes;
+use Modules\ModuleAmoCrm\Lib\RetryBackoff;
 use Modules\ModuleAmoCrm\Lib\Logger;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ResponsibleResolver;
@@ -77,6 +78,10 @@ class AmoCdrDaemon extends WorkerBase
     private array $completedCallRequests = []; // Только в пределах текущей страницы/retry.
     private array $pendingCallLinkedIds = [];
     private const MAX_ADD_CALLS_FAILURES = 5; // Максимум попыток перед пропуском батча
+    // #57: ConnectorDb недоступен — не блокируем цикл на 60 с и не повторяем каждую секунду.
+    private const CONTACTS_DATA_TIMEOUT = 10; // Ожидание ответа getContactsData, секунд
+    private const CARD_OPEN_DEADLINE    = 60; // Позже этого срока после ответа карточку не открываем
+    private ?RetryBackoff $contactsBackoff = null;
 
     // ВИДЫ ЗВОНКОВ.
     // Входящие
@@ -281,7 +286,8 @@ class AmoCdrDaemon extends WorkerBase
                     'id'                  => $cdr['linkedid'],
                     'did'                 => $cdr['did'],
                     'responsible'         => $dstUser,
-                    'type'                => null
+                    'type'                => null,
+                    'answeredAt'          => $this->getAnswerTimestamp((string)$cdr['answer']),
                 ];
                 $this->logger->writeInfo($this->incompleteAnswered[$srcNum], "New incomplete answered");
             }
@@ -365,13 +371,18 @@ class AmoCdrDaemon extends WorkerBase
      */
     private function cdrSyncInternal():void
     {
+        $now = time();
+        if(!$this->contactsBackoff()->canAttempt($now)){
+            // ConnectorDb недавно не ответил (#57): пауза до следующей попытки.
+            $this->expireIncompleteAnswered($now);
+            return;
+        }
         $oldOffset = $this->offset;
         $this->cdrRows = [];
         // Типы, запомненные во время разговора (#56), не удаляются при закреплении
         // батча: CDR этого звонка может прийти позже, в том числе плечами в разных
         // батчах (CdrBatch::loadPage). Очистка только по TTL. Типы, определённые
         // самим CDR-путём, здесь не хранятся.
-        $now = time();
         if($now - $this->incompleteTypesPurgedAt >= 60){
             $this->incompleteTypes()->purge($now);
             $this->incompleteTypesPurgedAt = $now;
@@ -627,6 +638,53 @@ class AmoCdrDaemon extends WorkerBase
                 ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['data' => $call, 'action' => 'open-card']);
             }
             $this->incompleteAnswered[$id]['finished'] = true;
+        }
+    }
+
+    /**
+     * Состояние повторов getContactsData (#57).
+     * @return RetryBackoff
+     */
+    private function contactsBackoff():RetryBackoff
+    {
+        if($this->contactsBackoff === null){
+            $this->contactsBackoff = new RetryBackoff(2, 60, 60);
+        }
+        return $this->contactsBackoff;
+    }
+
+    /**
+     * Время ответа из кэша CDR. Не хранится счётчиком в incompleteAnswered:
+     * updateActiveCalls() перезаписывает запись каждую секунду.
+     * @param string $answer
+     * @return int
+     */
+    private function getAnswerTimestamp(string $answer):int
+    {
+        $ts = strtotime($answer);
+        return $ts === false ? time() : $ts;
+    }
+
+    /**
+     * Данные контактов недоступны дольше CARD_OPEN_DEADLINE после ответа —
+     * отказываемся от открытия карточки. Звонок обработается по CDR как обычно (#57).
+     * @param int $now
+     * @return void
+     */
+    private function expireIncompleteAnswered(int $now):void
+    {
+        foreach ($this->incompleteAnswered as $id => $call){
+            if(isset($call['finished'])){
+                continue;
+            }
+            $answeredAt = (int)($call['answeredAt'] ?? 0);
+            if($answeredAt > 0 && $now - $answeredAt > self::CARD_OPEN_DEADLINE){
+                $this->incompleteAnswered[$id]['finished'] = true;
+                $this->logger->writeInfo(
+                    $this->callSummary($call),
+                    'Card will not be opened: contacts data unavailable for ' . ($now - $answeredAt) . ' s after answer'
+                );
+            }
         }
     }
 
@@ -1054,11 +1112,26 @@ class AmoCdrDaemon extends WorkerBase
         $this->newTasks = [];
 
         $phones       = array_unique(array_merge(array_keys($this->incompleteAnswered), array_keys($calls)));
-        $contactsData = ConnectorDb::invoke('getContactsData', [$phones]);
-        if(count($phones) !== count($contactsData)){
-            // getContactsData - должен вернуть столько элементов, сколько передано уникальных номеров телевонов.
-            $this->logger->writeError($contactsData, "An incorrect response was received when requesting getContactsData");
+        $contactsData = empty($phones) ? [] : ConnectorDb::tryInvoke('getContactsData', [$phones], self::CONTACTS_DATA_TIMEOUT);
+        $now          = time();
+        if(!is_array($contactsData) || count($phones) !== count($contactsData)){
+            // getContactsData - должен вернуть столько элементов, сколько передано уникальных номеров телефонов.
+            $backoff = $this->contactsBackoff();
+            if($backoff->fail($now)){
+                $this->logger->writeError([
+                    'reason'    => is_array($contactsData) ? 'count mismatch' : 'no response from ConnectorDb',
+                    'requested' => count($phones),
+                    'received'  => is_array($contactsData) ? count($contactsData) : null,
+                    'failures'  => $backoff->failures(),
+                    'retryIn'   => $backoff->retryAt() - $now,
+                ], "An incorrect response was received when requesting getContactsData");
+            }
+            $this->expireIncompleteAnswered($now);
             return false;
+        }
+        $outage = $this->contactsBackoff()->succeed($now);
+        if($outage !== null){
+            $this->logger->writeInfo("getContactsData recovered after $outage s");
         }
         // Не завершенные вызовы
         foreach ($this->incompleteAnswered as $id => $call){

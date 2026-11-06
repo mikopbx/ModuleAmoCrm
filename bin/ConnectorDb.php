@@ -1086,32 +1086,71 @@ class ConnectorDb extends WorkerBase
      * @param string $function
      * @param array $args
      * @param bool $retVal
-     * @return array|bool|mixed
+     * @param int $timeout Ожидание ответа, секунд.
+     * @return array|bool|mixed При отказе (таймаут, ошибка очереди, битый ответ) — [].
      */
-    public static function invoke(string $function, array $args = [], bool $retVal = true){
+    public static function invoke(string $function, array $args = [], bool $retVal = true, int $timeout = 60){
+        if(!$retVal){
+            try {
+                $client = new BeanstalkClient(self::class);
+                $client->publish(json_encode([
+                    'action'   => 'invoke',
+                    'function' => $function,
+                    'args'     => $args
+                ], JSON_THROW_ON_ERROR));
+                return true;
+            } catch (\Throwable $e) {
+                return [];
+            }
+        }
+        $ok     = false;
+        $object = self::requestResult($function, $args, $timeout, $ok);
+        return $ok ? $object : [];
+    }
+
+    /**
+     * Как invoke() с ожиданием результата, но отказ отличим от пустого результата.
+     * @param string $function
+     * @param array $args
+     * @param int $timeout Ожидание ответа, секунд.
+     * @return mixed|null null — ConnectorDb не ответил или ответ не разобран.
+     */
+    public static function tryInvoke(string $function, array $args = [], int $timeout = 60)
+    {
+        $ok     = false;
+        $object = self::requestResult($function, $args, $timeout, $ok);
+        return $ok ? $object : null;
+    }
+
+    /**
+     * @param string $function
+     * @param array $args
+     * @param int $timeout
+     * @param bool $ok true, если получен и разобран ответ ConnectorDb.
+     * @return mixed
+     */
+    private static function requestResult(string $function, array $args, int $timeout, bool &$ok)
+    {
+        $ok  = false;
         $req = [
             'action'   => 'invoke',
             'function' => $function,
-            'args'     => $args
+            'args'     => $args,
+            'need-ret' => true,
         ];
-        $client = new BeanstalkClient(self::class);
-        $object = [];
         try {
-            if($retVal){
-                $req['need-ret'] = true;
-                $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), 60);
-            }else{
-                $client->publish(json_encode($req, JSON_THROW_ON_ERROR));
-                return true;
+            $client = new BeanstalkClient(self::class);
+            $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), $timeout);
+            if(!is_string($result) || $result === '' || !file_exists($result)){
+                return null;
             }
-            if(file_exists($result)){
-                $object = json_decode(file_get_contents($result), true, 512, JSON_THROW_ON_ERROR);
-                unlink($result);
-            }
+            $object = json_decode(file_get_contents($result), true, 512, JSON_THROW_ON_ERROR);
+            unlink($result);
+            $ok = true;
+            return $object;
         } catch (\Throwable $e) {
-            $object = [];
+            return null;
         }
-        return $object;
     }
 
     /**

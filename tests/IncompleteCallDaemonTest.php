@@ -42,6 +42,10 @@ namespace Modules\ModuleAmoCrm\bin {
             }
             return $result;
         }
+        public static function tryInvoke($method, $args, $timeout = 60)
+        {
+            return self::invoke($method, $args);
+        }
     }
     class WorkerAmoHTTP {}
 }
@@ -62,6 +66,7 @@ namespace {
         require_once $root . '/Lib/ResponsibleResolver.php';
         require_once $root . '/Lib/CallTypeResolver.php';
         require_once $root . '/Lib/IncompleteCallTypes.php';
+        require_once $root . '/Lib/RetryBackoff.php';
         require_once $root . '/bin/AmoCdrDaemon.php';
     } finally {
         set_include_path($includePath);
