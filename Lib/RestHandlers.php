@@ -35,10 +35,19 @@ class RestHandlers extends AmoCrmMainBase
     public function saveSettings(array $request):PBXAmoResult{
         $res = new PBXAmoResult();
         $res->success = true;
-        $users = $request['data']['users']??[];
-        if(is_array($users)){
-            ConnectorDb::invoke('saveAmoUsers', [$users,$request['data']['portalId']]);
+        // Сохранение настроек виджета в amoCRM: сопоставление пользователей могло измениться.
+        // Изменённый номер принимается, если он есть на АТС, иначе сопоставление обнуляется
+        // (только локально, настройки виджета не перезаписываются).
+        $users = $request['data']['users'] ?? [];
+        if (is_string($users)) {
+            $decoded = json_decode($users, true);
+            $users   = is_array($decoded) ? $decoded : [];
         }
+        if (is_array($users) && !empty($users)) {
+            $res->data = ConnectorDb::invoke('saveUsersMapping', [$users, (int)($request['data']['portalId'] ?? 0)]);
+        }
+        // Список пользователей amoCRM мог измениться.
+        IntegrationSync::startInBackground(IntegrationSync::MODE_USERS);
         return $res;
     }
     /**
@@ -64,6 +73,10 @@ class RestHandlers extends AmoCrmMainBase
                 $result->messages[] = 'Invalid response from WorkerAmoHTTP';
             }
             WorkerAmoHTTP::invokeAmoApi('checkConnection', [true]);
+            if ($result->success) {
+                // Новая авторизация: webhook, виджет, пользователи. Пауза — на перезапуск воркеров.
+                IntegrationSync::startInBackground(IntegrationSync::MODE_ALL, 20);
+            }
         }
         $result->processor = __METHOD__;
         return $result;

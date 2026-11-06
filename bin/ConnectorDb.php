@@ -32,10 +32,13 @@ use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 use Modules\ModuleAmoCrm\Lib\EntitySettingsDefaults;
+use Modules\ModuleAmoCrm\Lib\IntegrationConfig;
+use Modules\ModuleAmoCrm\Lib\IntegrationSync;
 use Modules\ModuleAmoCrm\Lib\Logger;
 use Modules\ModuleAmoCrm\Lib\ModelsEventMessage;
 use Modules\ModuleAmoCrm\Lib\PhoneBookEntity;
 use Modules\ModuleAmoCrm\Lib\ResponsibleResolver;
+use Modules\ModuleAmoCrm\Models\ModuleAmoAccountUsers;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
 use Modules\ModuleAmoCrm\Models\ModuleAmoLeads;
@@ -264,8 +267,9 @@ class ConnectorDb extends WorkerBase
         if($data['action'] === 'entity-update'){
             $this->checkMemLimits();
 
-            $res_data['entity'] = $this->updatePhoneBook($data['data']['contacts']??[]);
-            $this->updateLeads($data['data']['leads']??[]);
+            $webhookData = is_array($data['data'] ?? null) ? $data['data'] : [];
+            $res_data['entity'] = $this->updatePhoneBook(PhoneBookEntity::webhookUpdates($webhookData));
+            $this->updateLeads(is_array($webhookData['leads'] ?? null) ? $webhookData['leads'] : []);
         }elseif($data['action'] === 'invoke'){
             $this->checkMemLimits();
 
@@ -304,8 +308,9 @@ class ConnectorDb extends WorkerBase
      */
     public function entityUpdate($data):void
     {
-        $this->updatePhoneBook($data['contacts']??[]);
-        $this->updateLeads($data['leads']??[]);
+        $data = is_array($data) ? $data : [];
+        $this->updatePhoneBook(PhoneBookEntity::webhookUpdates($data));
+        $this->updateLeads(is_array($data['leads'] ?? null) ? $data['leads'] : []);
     }
 
     /**
@@ -1075,6 +1080,259 @@ class ConnectorDb extends WorkerBase
             $result = min($dbData->save(), $result);
         }
         return $result;
+    }
+
+    /**
+     * Пользователи amoCRM текущего аккаунта с сопоставлением.
+     * @return array
+     */
+    public function getAccountUsers():array
+    {
+        if ($this->portalId === 0) {
+            return [];
+        }
+        return ModuleAmoAccountUsers::find([
+            'conditions' => 'portalId = :portalId:',
+            'bind'       => ['portalId' => $this->portalId],
+            'order'      => 'isActive DESC, name',
+        ])->toArray();
+    }
+
+    /**
+     * Сохраняет список пользователей аккаунта amoCRM.
+     * Прежние сопоставления переносятся из m_ModuleAmoUsers как есть; новым пользователям
+     * номер берётся из настроек виджета (только номера, существующие на АТС).
+     * Пользователи, удалённые из amoCRM, удаляются вместе с сопоставлением.
+     * @param array $amoUsers  [['id','name','email','is_active'], ...]
+     * @param array $widgetMap amoUserId => номер из настройки виджета pbx_users.
+     * @return array ['success' => bool, 'users' => getAccountUsers()]
+     */
+    public function saveAccountUsers(array $amoUsers, array $widgetMap = []):array
+    {
+        if ($this->portalId === 0) {
+            return ['success' => false, 'users' => []];
+        }
+        $this->seedAccountUsersFromLegacy();
+        $pbxNumbers = array_flip($this->getPbxNumbers());
+        $existing = [];
+        $rows = ModuleAmoAccountUsers::find([
+            'conditions' => 'portalId = :portalId:',
+            'bind'       => ['portalId' => $this->portalId],
+        ]);
+        foreach ($rows as $row) {
+            $existing[(string)$row->amoUserId] = $row;
+        }
+        $seen = [];
+        $success = true;
+        foreach ($amoUsers as $user) {
+            $amoUserId = (string)($user['id'] ?? '');
+            if (preg_match('/^[1-9][0-9]*$/', $amoUserId) !== 1) {
+                continue;
+            }
+            $seen[$amoUserId] = true;
+            $record = $existing[$amoUserId] ?? null;
+            if ($record === null) {
+                $record = new ModuleAmoAccountUsers();
+                $record->portalId  = $this->portalId;
+                $record->amoUserId = $amoUserId;
+                // Прежние сопоставления перенесены seedAccountUsersFromLegacy(); новому пользователю —
+                // номер из настроек виджета, если он есть на АТС.
+                $number = trim((string)($widgetMap[$amoUserId] ?? ''));
+                $record->number = isset($pbxNumbers[$number]) ? $number : '';
+            }
+            $record->name      = (string)($user['name'] ?? '');
+            $record->email     = (string)($user['email'] ?? '');
+            $record->isActive  = empty($user['is_active']) ? '0' : '1';
+            $record->inAccount = '1';
+            if (!$record->save()) {
+                $success = false;
+                $this->logger->writeError(['error' => 'Fail save amoCRM user', 'msg' => $record->getMessages(), 'data' => $user]);
+            }
+        }
+        if (!empty($seen)) {
+            foreach ($existing as $amoUserId => $record) {
+                if (!isset($seen[$amoUserId])) {
+                    $this->logger->writeInfo($record->toArray(), 'amoCRM user removed from account');
+                    $record->delete();
+                }
+            }
+        }
+        $this->rebuildPortalUsers();
+        return ['success' => $success, 'users' => $this->getAccountUsers()];
+    }
+
+    /**
+     * Изменение сопоставления пользователей (из настроек модуля или виджета amoCRM).
+     * Номер, которого нет на АТС, обнуляет сопоставление. Пользователи, которых нет
+     * во входных данных, не меняются.
+     * @param array $map amoUserId => внутренний номер.
+     * @param int $portalId Аккаунт, из которого пришли данные (0 — текущий).
+     * @return array ['success' => bool, 'changed' => string[], 'rejected' => [amoUserId => номер]]
+     */
+    public function saveUsersMapping(array $map, int $portalId = 0):array
+    {
+        if ($this->portalId === 0 || ($portalId > 0 && $portalId !== $this->portalId)) {
+            $this->logger->writeError(['portalId' => $portalId, 'modulePortalId' => $this->portalId], 'Users mapping ignored: other amoCRM account');
+            return ['success' => false, 'changed' => [], 'rejected' => []];
+        }
+        $this->seedAccountUsersFromLegacy();
+        $records = [];
+        $current = [];
+        $rows = ModuleAmoAccountUsers::find([
+            'conditions' => 'portalId = :portalId:',
+            'bind'       => ['portalId' => $this->portalId],
+        ]);
+        foreach ($rows as $row) {
+            $records[(string)$row->amoUserId] = $row;
+            $current[(string)$row->amoUserId] = trim((string)$row->number);
+        }
+        $result  = IntegrationConfig::applyUsersMap($current, $map, $this->getPbxNumbers());
+        $success = true;
+        foreach ($result['changed'] as $amoUserId) {
+            $record = $records[$amoUserId] ?? null;
+            if ($record === null) {
+                // Пользователь ещё не загружен из amoCRM (виджет сохранён раньше обновления списка).
+                $record = new ModuleAmoAccountUsers();
+                $record->portalId  = $this->portalId;
+                $record->amoUserId = $amoUserId;
+                $record->inAccount = '0';
+            }
+            $record->number = $result['map'][$amoUserId];
+            if (!$record->save()) {
+                $success = false;
+                $this->logger->writeError(['error' => 'Fail save users mapping', 'msg' => $record->getMessages(), 'amoUserId' => $amoUserId]);
+            }
+        }
+        if (!empty($result['rejected'])) {
+            $this->logger->writeInfo($result['rejected'], 'Users mapping: numbers not found on PBX, reset');
+        }
+        if (!empty($result['changed'])) {
+            $this->logger->writeInfo(array_intersect_key($result['map'], array_flip($result['changed'])), 'Users mapping changed');
+            $this->rebuildPortalUsers();
+        }
+        return ['success' => $success, 'changed' => $result['changed'], 'rejected' => $result['rejected']];
+    }
+
+    /**
+     * Первое заполнение m_ModuleAmoAccountUsers из прежней таблицы m_ModuleAmoUsers (обновление модуля).
+     * Номера переносятся без проверки: рабочие сопоставления не должны пропасть, пока список
+     * пользователей amoCRM ещё не загружен (иначе rebuildPortalUsers удалил бы их).
+     * @return void
+     */
+    private function seedAccountUsersFromLegacy():void
+    {
+        $exists = ModuleAmoAccountUsers::findFirst([
+            'conditions' => 'portalId = :portalId:',
+            'bind'       => ['portalId' => $this->portalId],
+        ]);
+        if ($exists) {
+            return;
+        }
+        $legacy = ModuleAmoUsers::find([
+            'conditions' => 'portalId = :portalId: AND enable = 1',
+            'bind'       => ['portalId' => $this->portalId],
+        ]);
+        $seeded = [];
+        foreach ($legacy as $row) {
+            $amoUserId = trim((string)$row->amoUserId);
+            $number    = trim((string)$row->number);
+            if (preg_match('/^[1-9][0-9]*$/', $amoUserId) !== 1 || $number === '' || isset($seeded[$amoUserId])) {
+                continue;
+            }
+            $record = new ModuleAmoAccountUsers();
+            $record->portalId  = $this->portalId;
+            $record->amoUserId = $amoUserId;
+            $record->number    = $number;
+            $record->inAccount = '0';
+            if ($record->save()) {
+                $seeded[$amoUserId] = $number;
+            }
+        }
+        if (!empty($seeded)) {
+            $this->logger->writeInfo($seeded, 'Users mapping migrated from m_ModuleAmoUsers');
+        }
+    }
+
+    /**
+     * Пересобирает рабочую таблицу m_ModuleAmoUsers (её читают AmoCdrDaemon, WorkerAmoCrmAMI)
+     * по сопоставлению из m_ModuleAmoAccountUsers.
+     * @return void
+     */
+    private function rebuildPortalUsers():void
+    {
+        $desired = [];
+        $rows = ModuleAmoAccountUsers::find([
+            'conditions' => 'portalId = :portalId:',
+            'bind'       => ['portalId' => $this->portalId],
+        ]);
+        foreach ($rows as $row) {
+            $number = trim((string)$row->number);
+            if ($number !== '') {
+                $desired[(string)$row->amoUserId] = $number;
+            }
+        }
+        $legacy = ModuleAmoUsers::find([
+            'conditions' => 'portalId = :portalId:',
+            'bind'       => ['portalId' => $this->portalId],
+        ]);
+        foreach ($legacy as $row) {
+            $amoUserId = (string)$row->amoUserId;
+            if (!isset($desired[$amoUserId])) {
+                $row->delete();
+                continue;
+            }
+            if ((string)$row->number !== $desired[$amoUserId] || (int)$row->enable !== 1) {
+                $row->number = $desired[$amoUserId];
+                $row->enable = '1';
+                $row->save();
+            }
+            unset($desired[$amoUserId]);
+        }
+        foreach ($desired as $amoUserId => $number) {
+            $row = new ModuleAmoUsers();
+            $row->amoUserId = $amoUserId;
+            $row->portalId  = $this->portalId;
+            $row->number    = $number;
+            $row->enable    = '1';
+            $row->save();
+        }
+        $this->users = [];
+        foreach (ModuleAmoUsers::find('enable=1') as $user) {
+            if (is_numeric($user->amoUserId)) {
+                $this->users[1 * $user->amoUserId] = (string)$user->number;
+            }
+        }
+    }
+
+    /**
+     * Запуск настройки интеграции в amoCRM отдельным процессом (от root).
+     * Для веб-интерфейса, который работает не от root.
+     * @param string $mode all | users | widget
+     * @param int $delay
+     * @return bool
+     */
+    public function startIntegrationSync(string $mode = IntegrationSync::MODE_ALL, int $delay = 0):bool
+    {
+        IntegrationSync::startInBackground($mode, $delay);
+        return true;
+    }
+
+    /**
+     * Внутренние номера сотрудников АТС.
+     * @return string[]
+     */
+    private function getPbxNumbers():array
+    {
+        $numbers = [];
+        $extensions = Extensions::find([
+            'conditions' => 'type = :type:',
+            'bind'       => ['type' => Extensions::TYPE_SIP],
+            'columns'    => 'number',
+        ]);
+        foreach ($extensions as $ext) {
+            $numbers[] = (string)$ext->number;
+        }
+        return $numbers;
     }
 
     /**

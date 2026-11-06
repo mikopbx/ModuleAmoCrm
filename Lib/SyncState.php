@@ -68,6 +68,8 @@ final class SyncState
         'initSyncPageContacts',
         'initSyncPageLeads',
         'initSyncPageCompanies',
+        'widgetCode',
+        'integrationState',
     ];
 
     /**

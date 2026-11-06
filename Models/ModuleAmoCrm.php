@@ -190,6 +190,18 @@ class ModuleAmoCrm extends ModulesModelsBase
     public $webhookPort = '61445';
 
     /**
+     * Код виджета MikoPBX в аккаунте amoCRM (у приватного виджета — случайный).
+     * @Column(type="string", nullable=true)
+     */
+    public $widgetCode = '';
+
+    /**
+     * Состояние настройки интеграции (webhook, виджет, пользователи), JSON.
+     * @Column(type="string", nullable=true)
+     */
+    public $integrationState = '';
+
+    /**
      * Returns dynamic relations between module models and common models
      * MikoPBX check it in ModelsBase after every call to keep data consistent
      *

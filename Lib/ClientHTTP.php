@@ -64,6 +64,26 @@ class ClientHTTP
     }
 
     /**
+     * Отправка DELETE запроса с JSON-телом (например, DELETE /api/v4/webhooks).
+     * Ответ 204 No Content считается успехом с пустыми данными.
+     * @param string $url
+     * @param array $params
+     * @param array $headers
+     * @return PBXAmoResult
+     */
+    public static function sendHttpDeleteRequest(string $url, array $params, array $headers=[]):PBXAmoResult{
+        $client  = new GuzzleHttp\Client();
+        $options = [
+            'timeout'         => 15,
+            'connect_timeout' => 5,
+            'http_errors'     => false,
+            'headers'         => $headers,
+            'json'            => $params,
+        ];
+        return self::executeWithRetry($client, 'DELETE', $url, $options);
+    }
+
+    /**
      * Отправка http GET запроса.
      * @param string $url
      * @param array  $params
@@ -138,7 +158,12 @@ class ClientHTTP
     private static function parseResponse($resultHttp, $message, $code, string $method = '', string $url = ''):PBXAmoResult
     {
         $res = new PBXAmoResult();
-        if( isset($resultHttp) && ($code === 200 || in_array($resultHttp->getReasonPhrase(), ['Created', 'Accepted'], true))){
+        if (isset($resultHttp) && $code === 204 && $method === 'DELETE') {
+            $res->success = true;
+            $res->data    = [];
+            return $res;
+        }
+        if( isset($resultHttp) && ($code === 200|| in_array($resultHttp->getReasonPhrase(), ['Created', 'Accepted'], true))){
             $content = $resultHttp->getBody()->getContents();
             $data    = [];
             try {

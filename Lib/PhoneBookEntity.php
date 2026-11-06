@@ -36,6 +36,41 @@ final class PhoneBookEntity
     ];
 
     /**
+     * Изменения телефонной книги из webhook: контакты и компании.
+     * amoCRM может присылать компании внутри contacts (type = company) или отдельным
+     * ключом companies — второй вариант приводится к первому.
+     * @param array $data Тело webhook (contacts[...], companies[...]).
+     * @return array ['add' => [...], 'update' => [...], 'delete' => [...]]
+     */
+    public static function webhookUpdates(array $data): array
+    {
+        $result = [];
+        foreach (['add', 'update', 'delete'] as $action) {
+            $entities = [];
+            foreach (['contacts' => 'contact', 'companies' => 'company'] as $key => $defaultType) {
+                $items = $data[$key][$action] ?? [];
+                if (!is_array($items)) {
+                    continue;
+                }
+                foreach ($items as $item) {
+                    if (!is_array($item)) {
+                        $entities[] = $item;
+                        continue;
+                    }
+                    if ($key === 'companies' || !isset($item['type'])) {
+                        $item['type'] = $defaultType;
+                    }
+                    $entities[] = $item;
+                }
+            }
+            if (!empty($entities)) {
+                $result[$action] = $entities;
+            }
+        }
+        return $result;
+    }
+
+    /**
      * Колонка ID для сущности или null, если тип неизвестен или ID некорректен.
      * ID — положительное целое (int или строка из цифр, как в form-encoded webhook).
      * @param mixed $entity

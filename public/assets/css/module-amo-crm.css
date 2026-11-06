@@ -6,3 +6,101 @@
  *
  */
 
+
+/* Компактный интерфейс модуля */
+#module-amo-crm-form .ui.bottom.tab.segment,
+#module-amo-crm-entity-settings-form .ui.segment {
+    padding: .9em 1em;
+}
+#module-amo-crm-form .ui.segment {
+    padding: .7em 1em;
+    margin: .5em 0;
+}
+#module-amo-crm-form .field,
+#module-amo-crm-entity-settings-form .field {
+    margin-bottom: .8em;
+}
+#module-amo-crm-form .ui.message,
+#module-amo-crm-entity-settings-form .ui.message {
+    padding: .7em 1em;
+    margin: .5em 0;
+}
+#module-amo-crm-form .ui.table th,
+#module-amo-crm-form .ui.table td {
+    padding: .5em .7em;
+}
+#module-amo-crm-form .ui.table .ui.buttons .button,
+#module-amo-crm-form .ui.table .action-buttons .button {
+    padding: .55em .7em;
+}
+#module-amo-crm-form .dataTables_wrapper .ui.grid {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+#module-amo-crm-form .dataTables_wrapper .ui.grid > .row {
+    padding-top: .4em;
+    padding-bottom: .4em;
+}
+#module-amo-crm-form .ui.selection.dropdown,
+#module-amo-crm-entity-settings-form .ui.selection.dropdown {
+    min-height: 0;
+    padding-top: .6em;
+    padding-bottom: .6em;
+}
+#module-amo-crm-form .ui.selection.dropdown > .dropdown.icon,
+#module-amo-crm-form .ui.selection.dropdown > .search.icon,
+#module-amo-crm-entity-settings-form .ui.selection.dropdown > .dropdown.icon,
+#module-amo-crm-entity-settings-form .ui.selection.dropdown > .search.icon {
+    padding-top: .6em;
+    padding-bottom: .6em;
+}
+/* .ui.segment сбрасывает размер шрифта до 1rem — поля внутри наследуют размер формы. */
+#module-amo-crm-form .ui.segment,
+#module-amo-crm-entity-settings-form .ui.segment {
+    font-size: inherit;
+}
+#amo-users-table .ui.selection.dropdown {
+    font-size: 1em;
+}
+/* Тип звонка в таблице правил: ↙ входящий, ↗ исходящий. */
+#entitySettingsTable i.icon.call-incoming:before {
+    content: "\f358"; /* arrow-alt-circle-down */
+}
+#entitySettingsTable i.icon.call-incoming {
+    transform: rotate(45deg);
+}
+#entitySettingsTable i.icon.call-outgoing:before {
+    content: "\f35b"; /* arrow-alt-circle-up */
+}
+#entitySettingsTable i.icon.call-outgoing {
+    transform: rotate(45deg);
+}
+#entitySettingsTable i.icon.call-incoming,
+#entitySettingsTable i.icon.call-outgoing {
+    font-size: 1.2em;
+    margin-right: .4em;
+}
+/* Метки состояния интеграции в строке "Модуль включен". */
+/* Выравнивание с кнопкой настроек модуля: у неё в ядре margin-top: -.5em, высота 36px;
+   рамка группы ui.basic.buttons добавляет 2px — уменьшаем padding кнопок на 1px. */
+#integration-badges.ui.buttons {
+    float: right;
+    /* rem: у .ui.buttons font-size: 0, em не работает. */
+    margin-top: -.5rem;
+    margin-right: .5rem;
+}
+#integration-badges.ui.buttons > .button {
+    padding-top: calc(.78571429em - 1px);
+    padding-bottom: calc(.78571429em - 1px);
+}
+#integration-badges .integration-badge {
+    cursor: default;
+}
+/* Значки (i) и действия в заголовках вкладок. */
+.ui.tabular.menu .item .tab-hint,
+.ui.tabular.menu .item .tab-action {
+    margin: 0 0 0 .4em;
+}
+.ui.tabular.menu .item .tab-action {
+    color: #4183c4;
+}

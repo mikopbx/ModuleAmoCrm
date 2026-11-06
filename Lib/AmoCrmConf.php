@@ -31,6 +31,19 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 class AmoCrmConf extends ConfigClass
 {
     /**
+     * Поля настроек, при изменении которых обновляются webhook и настройки виджета в amoCRM.
+     */
+    private const INTEGRATION_FIELDS = [
+        'tokenForAmo',
+        'webhookPort',
+        'externalHostname',
+        'baseDomain',
+        'portalId',
+        'isPrivateWidget',
+        'privateClientId',
+    ];
+
+    /**
      * Prepares additional contexts sections in the extensions.conf file
      *
      * @return string
@@ -93,7 +106,12 @@ class AmoCrmConf extends ConfigClass
                 $settings = ModuleAmoCrm::findFirst();
                 $authData = $settings ? (string)$settings->authData : '';
             }
-            if (!SyncState::needRestart($changedFields, $authData)) {
+            $needRestart = SyncState::needRestart($changedFields, $authData);
+            if (!empty(array_intersect(self::INTEGRATION_FIELDS, $changedFields))) {
+                // Webhook и настройки виджета в amoCRM: после перезапуска воркеров и перегенерации nginx.
+                IntegrationSync::startInBackground(IntegrationSync::MODE_ALL, $needRestart ? 20 : 5);
+            }
+            if (!$needRestart) {
                 return;
             }
             $this->startAllServices(true);
@@ -599,5 +617,7 @@ class AmoCrmConf extends ConfigClass
         $tasks[]    = "*/1 * * * * $findPath $tmpDir -mmin +1 -type f -delete> /dev/null 2>&1".PHP_EOL;
         $tasks[]    = "*/1 * * * * $phpPath $this->moduleDir/bin/safe.php > /dev/null 2>&1".PHP_EOL;
         $tasks[]    = "0 1 * * * $phpPath $this->moduleDir/bin/start-init-sync.php > /dev/null 2>&1".PHP_EOL;
+        // Проверка webhook и настроек виджета, обновление списка пользователей amoCRM.
+        $tasks[]    = "30 1 * * * $phpPath $this->moduleDir/bin/sync-integration.php all > /dev/null 2>&1".PHP_EOL;
     }
 }

@@ -1,4 +1,4 @@
-<form class="ui large grey form" id="module-amo-crm-entity-settings-form">
+<form class="ui form" id="module-amo-crm-entity-settings-form">
     {{ form.render('id') }}
     {{ form.render('pipeLineStatuses') }}
     {{ form.render('portalId') }}
@@ -43,7 +43,6 @@
             {{ form.render('create_contact') }}
         </div>
         <div class="field ten wide">
-            <br>
             <label>{{ t._('mod_amo_entitySettingsTemplateContactNameField') }}</label>
             {{ form.render('template_contact_name') }}
         </div>
@@ -54,7 +53,6 @@
             {{ form.render('create_lead') }}
         </div>
         <div class="field ten wide">
-            <br>
             <label>{{ t._('mod_amo_entitySettingsTemplateLeadNameField') }}</label>
             {{ form.render('template_lead_name') }}
         </div>
@@ -69,7 +67,6 @@
             {{ form.render('create_task') }}
         </div>
         <div class="field ten wide">
-            <br>
             <label>{{ t._('mod_amo_entitySettingsTemplateTaskNameField') }}</label>
             {{ form.render('template_task_text') }}
         </div>

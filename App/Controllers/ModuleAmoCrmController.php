@@ -16,6 +16,7 @@ use Modules\ModuleAmoCrm\App\Forms\ModuleAmoCrmEntitySettingsModifyForm;
 use Modules\ModuleAmoCrm\App\Forms\ModuleAmoCrmForm;
 use Modules\ModuleAmoCrm\bin\ConnectorDb;
 use Modules\ModuleAmoCrm\bin\WorkerAmoHTTP;
+use Modules\ModuleAmoCrm\Lib\IntegrationSync;
 use MikoPBX\Common\Models\Providers;
 
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
@@ -23,6 +24,21 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
 
 class ModuleAmoCrmController extends BaseController
 {
+    /**
+     * Порядок и иконка типа звонка в таблице правил: направление — стрелкой
+     * (входящий ↙, исходящий ↗), результат — цветом (отвечен — зелёный, пропущен/неудачный — красный).
+     */
+    private const CALL_TYPE_VIEW = [
+        'INCOMING_KNOWN'        => [1, 'green call-incoming'],
+        'INCOMING_UNKNOWN'      => [2, 'green call-incoming'],
+        'MISSING_KNOWN'         => [3, 'red call-incoming'],
+        'MISSING_UNKNOWN'       => [4, 'red call-incoming'],
+        'OUTGOING_KNOWN'        => [5, 'green call-outgoing'],
+        'OUTGOING_UNKNOWN'      => [6, 'green call-outgoing'],
+        'OUTGOING_KNOWN_FAIL'   => [7, 'red call-outgoing'],
+        'OUTGOING_UNKNOWN_FAIL' => [8, 'red call-outgoing'],
+    ];
+
     private $moduleUniqueID = 'ModuleAmoCrm';
     private $moduleDir;
 
@@ -102,6 +118,8 @@ class ModuleAmoCrmController extends BaseController
             $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
             $lastContactsSyncTime = (int)($allSettings['ModuleAmoCrm']['lastContactsSyncTime']??0);
             $result->data['lastContactsSyncTime'] = $lastContactsSyncTime;
+            $integrationState = json_decode((string)($allSettings['ModuleAmoCrm']['integrationState'] ?? ''), true);
+            $result->data['integrationState'] = is_array($integrationState) ? $integrationState : [];
             $this->view->success = $result->success;
             $this->view->data    = $result->data;
             $this->view->messages= $result->messages;
@@ -152,6 +170,9 @@ class ModuleAmoCrmController extends BaseController
             $rules[$index]['create_task']     = intval($rule['create_task']);
             $rules[$index]['create_unsorted'] = intval($rule['create_unsorted']);
             $rules[$index]['type_translate'] = 'mod_amo_type_'.$rule['type'];
+            [$typeOrder, $typeIcon] = self::CALL_TYPE_VIEW[$rule['type']] ?? [99, 'grey question circle'];
+            $rules[$index]['type_order'] = sprintf('%02d-%s', $typeOrder, $rule['did']);
+            $rules[$index]['type_icon']  = $typeIcon;
         }
 
         // For example we add providers list on the form
@@ -180,8 +201,9 @@ class ModuleAmoCrmController extends BaseController
         $data   = $this->request->getPost();
         $ModuleSettings = PbxExtensionModules::findFirst(["uniqid='$this->moduleUniqueID'",'columns' => ['disabled']]);
 
-        $ignoreColumns = ['id','offsetCdr','authData'];
+        $ignoreColumns = ['id','offsetCdr','authData','widgetCode','integrationState','amoUsersMapping'];
         $boolColumns = ['useInterception', 'isPrivateWidget', 'disableDetailedCdr', 'panelIsEnable', 'restrictCdrToKnownEmployees'];
+        $usersMapping = json_decode((string)($data['amoUsersMapping'] ?? ''), true);
         if(intval($ModuleSettings->disabled) !== 1){
             $settings = [];
             foreach ($data as $key => $value) {
@@ -197,6 +219,12 @@ class ModuleAmoCrmController extends BaseController
             $this->view->success = ConnectorDb::invoke('saveNewSettings', [$settings]);
             if(!$this->view->success){
                 $this->flash->error(implode('<br>', [$this->translation->_('mod_amo_SaveSettingsError')]));
+            }elseif(is_array($usersMapping) && !empty($usersMapping)){
+                $mappingResult = ConnectorDb::invoke('saveUsersMapping', [$usersMapping]);
+                if(!empty($mappingResult['changed'])){
+                    // Сопоставление изменилось — передаём его в настройки виджета amoCRM.
+                    ConnectorDb::invoke('startIntegrationSync', [IntegrationSync::MODE_WIDGET], false);
+                }
             }
         }else{
             $this->db->begin();
@@ -236,6 +264,79 @@ class ModuleAmoCrmController extends BaseController
     }
 
     /**
+     * Пользователи amoCRM с сопоставлением и сотрудники MikoPBX для выбора.
+     * @return void
+     */
+    public function getAccountUsersAction(): void
+    {
+        $users = ConnectorDb::invoke('getAccountUsers', []);
+        $this->view->success   = is_array($users);
+        $this->view->users     = is_array($users) ? $this->usersForView($users) : [];
+        $this->view->employees = $this->getEmployees();
+    }
+
+    /**
+     * Обновление списка пользователей из amoCRM.
+     * @return void
+     */
+    public function refreshUsersAction(): void
+    {
+        $result = (new IntegrationSync(false))->refreshUsersNow();
+        $this->view->success   = $result['success'];
+        $this->view->users     = $this->usersForView($result['users']);
+        $this->view->employees = $this->getEmployees();
+        $this->view->message   = $result['message'];
+    }
+
+    /**
+     * Запуск настройки webhook, виджета и пользователей в amoCRM (выполняется в фоне).
+     * @return void
+     */
+    public function syncIntegrationAction(): void
+    {
+        $this->view->success = ConnectorDb::invoke('startIntegrationSync', [IntegrationSync::MODE_ALL], false) === true;
+    }
+
+    /**
+     * @param array $users Строки m_ModuleAmoAccountUsers.
+     * @return array
+     */
+    private function usersForView(array $users): array
+    {
+        $result = [];
+        foreach ($users as $user) {
+            $result[] = [
+                'amoUserId' => (string)($user['amoUserId'] ?? ''),
+                'name'      => (string)($user['name'] ?? ''),
+                'email'     => (string)($user['email'] ?? ''),
+                'isActive'  => (int)($user['isActive'] ?? 1) === 1,
+                'inAccount' => (int)($user['inAccount'] ?? 0) === 1,
+                'number'    => (string)($user['number'] ?? ''),
+            ];
+        }
+        return $result;
+    }
+
+    /**
+     * Сотрудники MikoPBX: внутренний номер и имя.
+     * @return array
+     */
+    private function getEmployees(): array
+    {
+        $employees  = [];
+        $extensions = Extensions::find([
+            'conditions' => 'type = :type:',
+            'bind'       => ['type' => Extensions::TYPE_SIP],
+            'columns'    => 'number,callerid',
+            'order'      => 'number',
+        ]);
+        foreach ($extensions as $ext) {
+            $employees[] = ['number' => (string)$ext->number, 'name' => (string)$ext->callerid];
+        }
+        return $employees;
+    }
+
+    /**
      * The modify action for creating or editing
      *
      * @param string|null $id The ID of the user group (optional)
@@ -247,6 +348,7 @@ class ModuleAmoCrmController extends BaseController
         $footerCollection = $this->assets->collection('footerJS');
         $footerCollection->addJs('js/pbx/main/form.js', true);
         $footerCollection->addJs("js/cache/{$this->moduleUniqueID}/module-amo-crm-modify-entity-settings.js", true);
+        $this->assets->collection('headerCSS')->addCss("css/cache/{$this->moduleUniqueID}/module-amo-crm.css", true);
 
         $result = ConnectorDb::invoke('getEntitySettings', [$id]);
         if(!$result){

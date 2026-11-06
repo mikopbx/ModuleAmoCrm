@@ -12,12 +12,13 @@
 {% endif %}
 
 <div class="ui top attached tabular menu">
-  <a class="active item" data-tab="rules">{{ t._('mod_amo_rules') }}</a>
-  <a class="item" data-tab="settings">{{ t._('mod_amo_settingsConnection') }}</a>
-  <a class="item" data-tab="calls">{{ t._('mod_amo_settingsCalls') }}</a>
+  <a class="active item" data-tab="rules">{{ t._('mod_amo_rules') }}<i class="ui icon blue info circle tab-hint" data-content="{{ t._('mod_amo_tabRulesHint') }}"></i></a>
+  <a class="item" data-tab="settings">{{ t._('mod_amo_settingsConnection') }}<i class="ui icon blue info circle tab-hint" data-content="{{ t._('mod_amo_tabSettingsHint') }}"></i></a>
+  <a class="item" data-tab="calls">{{ t._('mod_amo_settingsCalls') }}<i class="ui icon blue info circle tab-hint" data-content="{{ t._('mod_amo_tabCallsHint') }}"></i></a>
+  <a class="item" data-tab="users">{{ t._('mod_amo_tabUsers') }}<i class="ui icon blue info circle tab-hint" data-content="{{ t._('mod_amo_usersHint') }}"></i><i class="ui icon sync link tab-action" id="refresh-users-button" data-content="{{ t._('mod_amo_usersRefresh') }}"></i></a>
 </div>
 
-<form class="ui large grey form" id="module-amo-crm-form">
+<form class="ui form" id="module-amo-crm-form">
 
 <div class="ui bottom active tab segment disability" data-tab="rules">
     {{ link_to("module-amo-crm/module-amo-crm/modify/", '<i class="add circle icon"></i> '~t._('mod_amo_AddRules'), "class": "ui blue button", "id":"add-new-button") }}
@@ -40,7 +41,7 @@
 
         <tr class="rule-row " id="{{ rule['id'] }}">
             <td class="">{{ rule['did'] }}</td>
-            <td class="">{{ t._(rule['type_translate']) }}</td>
+            <td class="" data-order="{{ rule['type_order'] }}"><i class="icon {{ rule['type_icon'] }}"></i>{{ t._(rule['type_translate']) }}</td>
             <td class="">
                 <i class="icons">
                 {% if (rule['create_contact'] === 1) %}
@@ -141,13 +142,6 @@
                     </div>
                 </div>
             </div>
-            <div id="webhook-url-preview" class="ui info message" style="display: none;">
-                <label>Webhook URL:</label>
-                <div class="ui fluid action input">
-                    <input type="text" id="webhook-url-text" readonly="readonly" />
-                    <button class="ui icon button" id="copy-webhook-url" type="button"><i class="copy icon"></i></button>
-                </div>
-            </div>
             <div class="field disability">
                 <div class="ui segment">
                     <div class="ui toggle checkbox ">
@@ -239,6 +233,20 @@
              {{ form.render('respCallMissedNoClient') }}
         </div>
     </div>
+</div>
+
+<div class="ui bottom tab segment disability" data-tab="users">
+    <div id="users-message" class="ui message" style="display: none;"></div>
+    <table class="ui selectable compact unstackable table" id="amo-users-table" style="display: none;">
+        <thead>
+        <tr>
+            <th>{{ t._('mod_amo_usersTableAmoUser') }}</th>
+            <th>{{ t._('mod_amo_usersTableEmail') }}</th>
+            <th class="six wide">{{ t._('mod_amo_usersTablePbxUser') }}</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
 </div>
 
 {{ partial("partials/submitbutton",['indexurl':'pbx-extension-modules/index/']) }}
