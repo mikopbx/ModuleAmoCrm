@@ -43,7 +43,7 @@
             <td class="">{{ t._(rule['type_translate']) }}</td>
             <td class="">
                 <i class="icons">
-                {% if (rule['create_contact'] === '1') %}
+                {% if (rule['create_contact'] === 1) %}
                     <i class="icon checkmark green" data-value="on"></i>
                 {% else %}
                     <i class="icon close red" data-value="off"></i>
@@ -52,7 +52,7 @@
             </td>
             <td class="">
                 <i class="icons">
-                {% if (rule['create_lead'] === '1') %}
+                {% if (rule['create_lead'] === 1) %}
                     <i class="icon checkmark green" data-value="on"></i>
                 {% else %}
                     <i class="icon close red" data-value="off"></i>
@@ -61,7 +61,7 @@
             </td>
             <td class="">
                 <i class="icons">
-                {% if (rule['create_task'] === '1') %}
+                {% if (rule['create_task'] === 1) %}
                     <i class="icon checkmark green" data-value="on"></i>
                 {% else %}
                     <i class="icon close red" data-value="off"></i>
@@ -70,7 +70,7 @@
             </td>
             <td class="">
                 <i class="icons">
-                {% if (rule['create_unsorted'] === '1') %}
+                {% if (rule['create_unsorted'] === 1) %}
                     <i class="icon checkmark green" data-value="on"></i>
                 {% else %}
                     <i class="icon close red" data-value="off"></i>

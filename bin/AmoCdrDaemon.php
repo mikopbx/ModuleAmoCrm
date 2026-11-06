@@ -1357,7 +1357,8 @@ class AmoCdrDaemon extends WorkerBase
      */
     private function addNewUnsorted($settings, &$calls, $call, $responsible):void
     {
-        if($settings['create_unsorted'] === '1'){
+        // Флаг приходит из integer-столбца числом (#65).
+        if(intval($settings['create_unsorted']) === 1){
             $indexAction = AmoCrmMain::getPhoneIndex($call['params']['phone']);
             // Наполняем неразобранное.
             $this->newUnsorted[$indexAction] = [

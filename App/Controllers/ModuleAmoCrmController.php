@@ -146,9 +146,11 @@ class ModuleAmoCrmController extends BaseController
             $rules       = $allSettings['ModuleAmoEntitySettings'];
         }
         foreach ($rules as $index => $rule){
-            $rules[$index]['create_contact'] = (string)$rule['create_contact'];
-            $rules[$index]['create_lead']    = (string)$rule['create_lead'];
-            $rules[$index]['create_task']    = (string)$rule['create_task'];
+            // Флаги из integer-столбцов: в PHP 8.1+ приходят числом, раньше — строкой (#65).
+            $rules[$index]['create_contact']  = intval($rule['create_contact']);
+            $rules[$index]['create_lead']     = intval($rule['create_lead']);
+            $rules[$index]['create_task']     = intval($rule['create_task']);
+            $rules[$index]['create_unsorted'] = intval($rule['create_unsorted']);
             $rules[$index]['type_translate'] = 'mod_amo_type_'.$rule['type'];
         }
 

@@ -116,7 +116,8 @@ class WorkerAmoCrmAMI extends WorkerBase
 
         $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
         if(!empty($allSettings) && is_array($allSettings)){
-            $this->useInterception = ($allSettings['ModuleAmoCrm']['useInterception']??'0') === '1';
+            // Флаг приходит из integer-столбца числом (#65).
+            $this->useInterception = intval($allSettings['ModuleAmoCrm']['useInterception'] ?? 0) === 1;
         }
     }
 
