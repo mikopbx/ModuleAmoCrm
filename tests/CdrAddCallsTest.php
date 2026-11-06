@@ -53,6 +53,8 @@ namespace {
     $includePath = get_include_path();
     set_include_path($bootstrapDir . PATH_SEPARATOR . $includePath);
     try {
+        require_once dirname(__DIR__) . '/Lib/CallTypeResolver.php';
+        require_once dirname(__DIR__) . '/Lib/IncompleteCallTypes.php';
         require_once dirname(__DIR__) . '/bin/AmoCdrDaemon.php';
     } finally {
         set_include_path($includePath);

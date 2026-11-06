@@ -26,6 +26,8 @@ use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 use Modules\ModuleAmoCrm\Lib\CdrBatch;
+use Modules\ModuleAmoCrm\Lib\CallTypeResolver;
+use Modules\ModuleAmoCrm\Lib\IncompleteCallTypes;
 use Modules\ModuleAmoCrm\Lib\Logger;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ResponsibleResolver;
@@ -67,6 +69,8 @@ class AmoCdrDaemon extends WorkerBase
     private array $newUnsorted = [];
     private array $newTasks = [];
     private array $incompleteAnswered = [];
+    private ?IncompleteCallTypes $incompleteTypes = null; // linkedid => тип, определённый во время разговора (#56)
+    private int $incompleteTypesPurgedAt = 0;
     private array $createdLeads = []; // Кэш создана ли сделка для звонка. 1 звонок = 1 сделка
     private int $addCallsFailCount = 0; // Счётчик последовательных неудач addCalls
     private string $addCallsPage = '';
@@ -76,14 +80,14 @@ class AmoCdrDaemon extends WorkerBase
 
     // ВИДЫ ЗВОНКОВ.
     // Входящие
-    public const MISSING_UNKNOWN    = 'MISSING_UNKNOWN';
-    public const MISSING_KNOWN      = 'MISSING_KNOWN';
-    public const INCOMING_UNKNOWN   = 'INCOMING_UNKNOWN';
-    public const INCOMING_KNOWN     = 'INCOMING_KNOWN';
+    public const MISSING_UNKNOWN    = CallTypeResolver::MISSING_UNKNOWN;
+    public const MISSING_KNOWN      = CallTypeResolver::MISSING_KNOWN;
+    public const INCOMING_UNKNOWN   = CallTypeResolver::INCOMING_UNKNOWN;
+    public const INCOMING_KNOWN     = CallTypeResolver::INCOMING_KNOWN;
     // Исходящие
-    public const OUTGOING_UNKNOWN   = 'OUTGOING_UNKNOWN';
-    public const OUTGOING_KNOWN     = 'OUTGOING_KNOWN';
-    public const OUTGOING_KNOWN_FAIL= 'OUTGOING_KNOWN_FAIL';
+    public const OUTGOING_UNKNOWN   = CallTypeResolver::OUTGOING_UNKNOWN;
+    public const OUTGOING_KNOWN     = CallTypeResolver::OUTGOING_KNOWN;
+    public const OUTGOING_KNOWN_FAIL= CallTypeResolver::OUTGOING_KNOWN_FAIL;
 
     /**
      * Handles the received signal.
@@ -344,6 +348,18 @@ class AmoCdrDaemon extends WorkerBase
     }
 
     /**
+     * Хранилище типов звонков, определённых во время разговора (#56).
+     * @return IncompleteCallTypes
+     */
+    private function incompleteTypes():IncompleteCallTypes
+    {
+        if($this->incompleteTypes === null){
+            $this->incompleteTypes = new IncompleteCallTypes();
+        }
+        return $this->incompleteTypes;
+    }
+
+    /**
      * Внутренняя логика синхронизации CDR (защищена file lock в cdrSync).
      * @return void
      */
@@ -351,6 +367,15 @@ class AmoCdrDaemon extends WorkerBase
     {
         $oldOffset = $this->offset;
         $this->cdrRows = [];
+        // Типы, запомненные во время разговора (#56), не удаляются при закреплении
+        // батча: CDR этого звонка может прийти позже, в том числе плечами в разных
+        // батчах (CdrBatch::loadPage). Очистка только по TTL. Типы, определённые
+        // самим CDR-путём, здесь не хранятся.
+        $now = time();
+        if($now - $this->incompleteTypesPurgedAt >= 60){
+            $this->incompleteTypes()->purge($now);
+            $this->incompleteTypesPurgedAt = $now;
+        }
         $add_query                     = [
             'columns' => 'id,start,answer,src_num,dst_num,billsec,recordingfile,UNIQUEID,linkedid,disposition,is_app,did',
             'linkedid IN ({linkedid:array})',
@@ -443,9 +468,6 @@ class AmoCdrDaemon extends WorkerBase
                     'answered' => false,
                     'records'  => []
                 ];
-            }
-            if(isset($this->incompleteAnswered[$srcNum])){
-                $this->cdrRows[$id]['incompleteType'] = $this->incompleteAnswered[$srcNum]['type'];
             }
             if(file_exists($row['recordingfile'])){
                 $this->cdrRows[$id]['records'][] = $row['recordingfile'];
@@ -1071,13 +1093,21 @@ class AmoCdrDaemon extends WorkerBase
                 $this->incompleteAnswered[$id]['lead']    =  $contData['leadId'];
             }
 
-            $type = $this->getCallType(false, $contactExists, true);
+            $type = CallTypeResolver::classify(false, $contactExists, true);
             $this->incompleteAnswered[$id]['type']  = $type;
 
             $settings = $this->entitySettings[$type][$call['did']]??$this->entitySettings[$type]['']??[];
             if(empty($settings) || $settings['responsible'] !== 'first'){
                 $this->logger->writeInfo($settings, "Automatic card opening for incoming calls only: {$call['id']}");
                 continue;
+            }
+            // Модуль создаёт контакт/сделку во время разговора с неизвестным. Тип
+            // переносится в CDR-путь по linkedid, чтобы CDR не классифицировал звонок
+            // как известный из-за только что созданного контакта (#56). В остальных
+            // случаях CDR классифицирует звонок сам, как раньше.
+            if($type === self::INCOMING_UNKNOWN
+                && (intval($settings['create_contact']) === 1 || intval($settings['create_lead']) === 1)){
+                $this->incompleteTypes()->remember((string)$call['id'], $type, time());
             }
             $params = ['id' => $call['id'], 'params' => ['phone' => $call['phone']]];
             if(intval($settings['create_contact']) === 1 && !$contactExists){
@@ -1129,11 +1159,15 @@ class AmoCdrDaemon extends WorkerBase
                 $isIncoming    = $call['note_type'] === 'call_in';
 
                 $did           =  $this->cdrRows[$call['id']]['did']??'';
-                if(isset($this->cdrRows[$call['id']]['incompleteType'])){
-                    $type = $this->cdrRows[$call['id']]['incompleteType'];
-                }else{
-                    $type = $this->getCallType($isMissed, $contactExists, $isIncoming);
-                }
+                // Тип, определённый во время разговора (#56), хранится по linkedid.
+                $type = CallTypeResolver::resolve(
+                    $this->incompleteTypes()->get((string)$call['id']),
+                    $isMissed,
+                    $contactExists,
+                    $isIncoming
+                );
+                // Тип перенесён из разговора и отличается от классификации по CDR.
+                $typeCarried = $type !== CallTypeResolver::classify($isMissed, $contactExists, $isIncoming);
                 $this->cdrRows[$call['id']]['type'] = $type;
                 $settings = $this->entitySettings[$type][$did]??$this->entitySettings[$type]['']??[];
 
@@ -1194,7 +1228,11 @@ class AmoCdrDaemon extends WorkerBase
 
                 $this->addNewLead($settings, $call, $contData, $responsible);
                 $this->addNewTask($settings, $call, $contData);
-                $this->addNewUnsorted($settings,$calls, $call, $responsible);
+                if(!($typeCarried && $contactExists)){
+                    // Неразобранное создаёт новый контакт и сделку. Если тип перенесён
+                    // из разговора (#56), контакт уже создан модулем — это был бы дубль.
+                    $this->addNewUnsorted($settings,$calls, $call, $responsible);
+                }
             }
         }
 
@@ -1367,33 +1405,6 @@ class AmoCdrDaemon extends WorkerBase
         $leadData['responsible_user_id'] = $responsible;
         $leadData['request_id']          = $indexAction;
         $this->newLeads[$indexAction]    = $leadData;
-    }
-
-    /**
-     * Получаем тип телефонного звонка. Классификация вызова.
-     * @param $isMissed
-     * @param $contactExists
-     * @param $isIncoming
-     * @return string
-     */
-    private function getCallType($isMissed, $contactExists, $isIncoming):string
-    {
-        if ($isMissed && !$contactExists) {
-            $type = self::MISSING_UNKNOWN;
-        } elseif ($isIncoming && $isMissed) {
-            $type = self::MISSING_KNOWN;
-        } elseif ($isIncoming && !$contactExists) {
-            $type = self::INCOMING_UNKNOWN;
-        } elseif ($isIncoming) {
-            $type = self::INCOMING_KNOWN;
-        } elseif ($isMissed) {
-            $type = self::OUTGOING_KNOWN_FAIL;
-        } elseif ($contactExists) {
-            $type = self::OUTGOING_KNOWN;
-        } else {
-            $type = self::OUTGOING_UNKNOWN;
-        }
-        return $type;
     }
 
     /**
