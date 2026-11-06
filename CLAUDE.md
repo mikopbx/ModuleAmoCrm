@@ -182,10 +182,10 @@ Webhooks → ApiController → ConnectorDb → обработка
 
 ### Call Processing Rules
 
-Модель `ModuleAmoEntitySettings` определяет правила для 7 типов звонков:
-`INCOMING_UNKNOWN`, `MISSING_UNKNOWN`, `INCOMING_KNOWN`, `MISSING_KNOWN`, `OUTGOING_UNKNOWN`, `OUTGOING_KNOWN`, `OUTGOING_KNOWN_FAIL`
+Модель `ModuleAmoEntitySettings` определяет правила для 8 типов звонков:
+`INCOMING_UNKNOWN`, `MISSING_UNKNOWN`, `INCOMING_KNOWN`, `MISSING_KNOWN`, `OUTGOING_UNKNOWN`, `OUTGOING_UNKNOWN_FAIL`, `OUTGOING_KNOWN`, `OUTGOING_KNOWN_FAIL`
 
-Каждое правило задаёт: ответственного, создание контакта/сделки/задачи/unsorted, шаблоны имён, воронку и статус. Defaults хранятся в `db/default-entity-settings.json`.
+Каждое правило задаёт: ответственного, создание контакта/сделки/задачи/unsorted, шаблоны имён, воронку и статус. Defaults хранятся в `Setup/default-entity-settings.json` (не в `db/`: установщик восстанавливает `db/` из Backup поверх новой версии).
 
 ### OAuth2 & AmoCRM API
 

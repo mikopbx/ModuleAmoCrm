@@ -31,6 +31,7 @@ use MikoPBX\Core\Workers\WorkerBase;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
+use Modules\ModuleAmoCrm\Lib\EntitySettingsDefaults;
 use Modules\ModuleAmoCrm\Lib\Logger;
 use Modules\ModuleAmoCrm\Lib\ModelsEventMessage;
 use Modules\ModuleAmoCrm\Lib\PhoneBookEntity;
@@ -575,12 +576,7 @@ class ConnectorDb extends WorkerBase
         $haveEmptyDefUser  = false;
         $haveEmptyPipeline = false;
         if(count($dbSettings->toArray()) === 0){
-            $defSettingsFile = dirname(__DIR__).'/db/default-entity-settings.json';
-            try {
-                $defSettings = json_decode(file_get_contents($defSettingsFile), true, 512, JSON_THROW_ON_ERROR);
-            }catch (\Exception $e){
-                $defSettings = [];
-            }
+            $defSettings = EntitySettingsDefaults::load();
             foreach ($defSettings as $defSetting){
                 $setting = new ModuleAmoEntitySettings();
                 foreach ($defSetting as $key => $value){

@@ -124,5 +124,23 @@
     "create_unsorted": "0",
     "template_task_text": "",
     "deadline_task": "1"
+  },
+  {
+    "did": "",
+    "type": "OUTGOING_UNKNOWN_FAIL",
+    "def_responsible": "",
+    "task_responsible_type": "firstMissedUser",
+    "responsible": "first",
+    "template_contact_name": "Новый контакт <PhoneNumber>",
+    "template_lead_name": "",
+    "template_lead_text": "",
+    "lead_pipeline_id": "",
+    "lead_pipeline_status_id": "",
+    "create_task": "0",
+    "create_contact": "0",
+    "create_lead": "0",
+    "create_unsorted": "0",
+    "template_task_text": "Перезвонить по номеру <PhoneNumber>",
+    "deadline_task": "1"
   }
 ]

@@ -28,6 +28,10 @@ namespace Modules\ModuleAmoCrm\Setup;
 
 use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Modules\Setup\PbxExtensionSetupBase;
+use Modules\ModuleAmoCrm\Lib\CallTypeResolver;
+use Modules\ModuleAmoCrm\Lib\EntitySettingsDefaults;
+use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
+use Throwable;
 
 
 /**
@@ -62,6 +66,55 @@ class PbxExtensionSetup extends PbxExtensionSetupBase
         $menuSettings->value = json_encode($value);
 
         return $menuSettings->save();
+    }
+
+    /**
+     * Создаёт таблицы и добавляет правила для типов звонков, появившихся
+     * в новых версиях модуля.
+     *
+     * @return bool
+     */
+    public function installDB(): bool
+    {
+        $result = parent::installDB();
+        if ($result) {
+            $this->addNewDefaultRules();
+        }
+        return $result;
+    }
+
+    /**
+     * #64: на существующих установках правила по умолчанию не создаются
+     * (ConnectorDb::fillEntitySettings заполняет только пустую таблицу).
+     * Правило OUTGOING_UNKNOWN_FAIL ничего не создаёт и добавляется, чтобы тип
+     * был виден в настройках. Выполняется только при установке/обновлении,
+     * поэтому удалённое пользователем правило вернётся лишь при следующем обновлении.
+     * Ошибка не прерывает установку.
+     *
+     * @return void
+     */
+    private function addNewDefaultRules(): void
+    {
+        try {
+            $existing = ModuleAmoEntitySettings::find(['columns' => 'portalId,type,did'])->toArray();
+            $rules    = EntitySettingsDefaults::missingRules(
+                $existing,
+                EntitySettingsDefaults::load(),
+                [CallTypeResolver::OUTGOING_UNKNOWN_FAIL]
+            );
+            foreach ($rules as $rule) {
+                $record = new ModuleAmoEntitySettings();
+                foreach ($rule as $key => $value) {
+                    $record->writeAttribute($key, $value);
+                }
+                if (!$record->save()) {
+                    $this->messages[] = 'ModuleAmoCrm: failed to add rule '
+                        . $rule['type'] . ': ' . implode(', ', $record->getMessages());
+                }
+            }
+        } catch (Throwable $e) {
+            $this->messages[] = 'ModuleAmoCrm: failed to add new default rules: ' . $e->getMessage();
+        }
     }
 
 }

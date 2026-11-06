@@ -9,9 +9,11 @@ namespace MikoPBX\Core\Workers {
 namespace Modules\ModuleAmoCrm\Lib {
     class Logger
     {
+        public static array $errors = [];
+        public static array $infos = [];
         public function writeSummary(...$args): void {}
-        public function writeInfo(...$args): void {}
-        public function writeError(...$args): void {}
+        public function writeInfo($data, ...$args): void { self::$infos[] = is_string($data) ? $data : ''; }
+        public function writeError($data, ...$args): void { self::$errors[] = is_string($data) ? $data : ''; }
     }
 }
 
@@ -138,8 +140,25 @@ namespace {
     check(!$method->invoke($worker, [[$a, $b]], $counter), 'Error after isolation remains visible');
     WorkerAmoHTTP::$responses = [response(true)];
     check($method->invoke($worker, [[$a, $b]], $counter), 'Remaining record retries');
+
     check(array_column(WorkerAmoHTTP::$calls[2][0], 'request_id') === ['leg-b'], 'Quarantined request is not resent');
     check(count(ConnectorDb::$calls) === 1, 'Quarantine is not saved twice on retry');
+
+    // #64: звонок на неизвестный номер, для которого правило ничего не создаёт,
+    // пропускается без ERROR; прочие звонки без сущности — по-прежнему ERROR.
+    $worker = $newWorker();
+    $set($worker, 'cdrRows', ['linked-e' => ['noEntityExpected' => true], 'linked-u' => []]);
+    Logger::$errors = [];
+    Logger::$infos = [];
+    $expected = ['id' => 'linked-e', 'request_id' => 'leg-e', 'entity_id' => null, 'is_app' => '0', 'params' => ['uniq' => 'leg-e']];
+    $unexpected = ['id' => 'linked-u', 'request_id' => 'leg-u', 'entity_id' => null, 'is_app' => '0', 'params' => ['uniq' => 'leg-u']];
+    check($method->invoke($worker, [[$expected, $unexpected]], ['linked-e' => 1, 'linked-u' => 1]), 'Calls without entity do not fail the page');
+    check(WorkerAmoHTTP::$calls === [], 'Calls without entity are not sent');
+    $errorText = implode("\n", Logger::$errors);
+    $infoText = implode("\n", Logger::$infos);
+    check(strpos($errorText, 'linked-u|') !== false, 'Unexpected missing entity is an ERROR');
+    check(strpos($errorText, 'linked-e|') === false, 'Expected missing entity is not an ERROR');
+    check(strpos($infoText, 'Skipped calls to unknown numbers, the rule creates no entity: linked-e|') !== false, 'Expected missing entity is logged as INFO');
 
     foreach ([validation(['unknown']), validation(['leg-a', 'unknown']),
         response(false, ['error-code' => 500, 'error-data' => ['validation-errors' => [['request_id' => 'leg-a', 'errors' => [[]]]]]]),

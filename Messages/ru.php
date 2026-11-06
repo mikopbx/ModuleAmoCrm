@@ -78,6 +78,7 @@ return [
     'mod_amo_type_OUTGOING_UNKNOWN'             => 'Отвеченный исходящий на неизвестный номер',
     'mod_amo_type_OUTGOING_KNOWN'               => 'Отвеченный исходящий на известный номер',
     'mod_amo_type_OUTGOING_KNOWN_FAIL'          => 'Неудачный исходящий на известный номер',
+    'mod_amo_type_OUTGOING_UNKNOWN_FAIL'        => 'Неудачный исходящий на неизвестный номер',
 
     'mod_amo_task_responsible_type'                  => 'Ответственный по задаче',
     'mod_amo_task_responsible_type_'                 => 'Не выбран',
@@ -87,6 +88,7 @@ return [
     'mod_amo_task_responsible_type_firstAnswerUser'  => 'Первый, кто ответил на вызов',
     'mod_amo_task_responsible_type_clientResponsible'=> 'Ответственный по клиенту',
     'mod_amo_task_responsible_type_def_responsible'  => 'Ответственный по умолчанию',
+    'mod_amo_task_responsible_type_caller'           => 'Сотрудник, совершивший вызов',
 
     'mod_amo_entitySettingsEntityActionField'   => 'Действие со сделками и контактами',
     'mod_amo_action_none'                       => 'Ничего не делать',

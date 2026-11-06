@@ -21,11 +21,11 @@ function checkIncompleteType($expected, $actual, string $message): void
     }
 }
 
-// --- CallTypeResolver::classify: прежняя классификация не изменилась.
+// --- CallTypeResolver::classify. #64: неотвеченный исходящий на неизвестный — OUTGOING_UNKNOWN_FAIL.
 $classifyCases = [
     // isMissed, contactExists, isIncoming => type
     [true,  false, true,  CallTypeResolver::MISSING_UNKNOWN],
-    [true,  false, false, CallTypeResolver::MISSING_UNKNOWN],
+    [true,  false, false, CallTypeResolver::OUTGOING_UNKNOWN_FAIL], // #64
     [true,  true,  true,  CallTypeResolver::MISSING_KNOWN],
     [false, false, true,  CallTypeResolver::INCOMING_UNKNOWN],
     [false, true,  true,  CallTypeResolver::INCOMING_KNOWN],

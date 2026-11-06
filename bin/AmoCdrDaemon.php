@@ -93,6 +93,7 @@ class AmoCdrDaemon extends WorkerBase
     public const OUTGOING_UNKNOWN   = CallTypeResolver::OUTGOING_UNKNOWN;
     public const OUTGOING_KNOWN     = CallTypeResolver::OUTGOING_KNOWN;
     public const OUTGOING_KNOWN_FAIL= CallTypeResolver::OUTGOING_KNOWN_FAIL;
+    public const OUTGOING_UNKNOWN_FAIL = CallTypeResolver::OUTGOING_UNKNOWN_FAIL;
 
     /**
      * Handles the received signal.
@@ -782,9 +783,14 @@ class AmoCdrDaemon extends WorkerBase
             'companies' => []
         ];
         $skippedIds = '';
+        $expectedSkippedIds = '';
         foreach ($calls as &$call) {
             if ($call['entity_id'] === null) {
-                $skippedIds .= $call['id'] . '|';
+                if (!empty($this->cdrRows[$call['id']]['noEntityExpected'])) {
+                    $expectedSkippedIds .= $call['id'] . '|';
+                } else {
+                    $skippedIds .= $call['id'] . '|';
+                }
                 unset($call);
                 continue;
             }
@@ -801,6 +807,9 @@ class AmoCdrDaemon extends WorkerBase
         }
         if (!empty($skippedIds)) {
             $this->logger->writeError("Skipped calls with null entity_id: $skippedIds");
+        }
+        if (!empty($expectedSkippedIds)) {
+            $this->logger->writeInfo("Skipped calls to unknown numbers, the rule creates no entity: $expectedSkippedIds");
         }
         unset($call, $calls);
         $allSuccess = true;
@@ -1256,7 +1265,11 @@ class AmoCdrDaemon extends WorkerBase
                     }
                     continue;
                 }
-                if($answered === 1){
+                if($type === self::OUTGOING_UNKNOWN_FAIL){
+                    // Ответственный — сотрудник, совершивший вызов (#64). Для
+                    // неотвеченного исходящего он записан как firstMissedUser.
+                    $responsibleField = 'firstMissedUser';
+                }elseif($answered === 1){
                     $responsibleField = $settings['responsible']."AnswerUser";
                 }else{
                     $responsibleField = $settings['responsible']."MissedUser";
@@ -1289,6 +1302,11 @@ class AmoCdrDaemon extends WorkerBase
                 $this->cdrRows[$call['id']]['resp_contact_user_id'] = intval($contactsData[$phoneId]['resp_contact_user_id']??'');
 
                 $indexAction = AmoCrmMain::getPhoneIndex($phone);
+                if(!$contactExists && intval($settings['create_contact']) !== 1 && intval($settings['create_unsorted']) !== 1){
+                    // Правило не создаёт сущность для неизвестного номера: звонок
+                    // прикреплять некуда, это штатная ситуация, а не сбой (#64).
+                    $this->cdrRows[$call['id']]['noEntityExpected'] = true;
+                }
                 if(!$contactExists && intval($settings['create_contact']) === 1){
                     $this->newContacts[$indexAction] = [
                         'phone'               => $phone,

@@ -16,6 +16,7 @@ final class CallTypeResolver
     public const OUTGOING_UNKNOWN    = 'OUTGOING_UNKNOWN';
     public const OUTGOING_KNOWN      = 'OUTGOING_KNOWN';
     public const OUTGOING_KNOWN_FAIL = 'OUTGOING_KNOWN_FAIL';
+    public const OUTGOING_UNKNOWN_FAIL = 'OUTGOING_UNKNOWN_FAIL';
 
     /**
      * Тип звонка по итоговым данным CDR.
@@ -23,7 +24,8 @@ final class CallTypeResolver
     public static function classify(bool $isMissed, bool $contactExists, bool $isIncoming): string
     {
         if ($isMissed && !$contactExists) {
-            return self::MISSING_UNKNOWN;
+            // Неотвеченный исходящий не должен попадать в правило пропущенного входящего (#64).
+            return $isIncoming ? self::MISSING_UNKNOWN : self::OUTGOING_UNKNOWN_FAIL;
         }
         if ($isIncoming && $isMissed) {
             return self::MISSING_KNOWN;
