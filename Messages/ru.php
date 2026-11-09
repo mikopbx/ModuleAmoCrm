@@ -18,8 +18,8 @@ return [
     'mod_amo_NeedWaitSyncTitle'     => 'Синхронизация контактов',
     'mod_amo_NeedWaitSyncBody'      => 'Выполняется синхронизация контактов и сделок. Дождитесь завершения процесса. Загрузка звонков на портал остановлена.',
 
-    'repModuleAmoCrm'               => 'Модуль шаблон - %repesent%',
-    'mo_ModuleModuleAmoCrm'         => 'Модуль шаблон',
+    'repModuleAmoCrm'               => 'Модуль amoCRM - %repesent%',
+    'mo_ModuleModuleAmoCrm'         => 'Модуль amoCRM',
     'module_amo_crm_connect_ok'     => 'Авторизован',
     'module_amo_crm_connect_fail'   => 'Нажмите для авторизации',
     'module_amo_crm_connect_refresh'=> 'Запрос статуса...',

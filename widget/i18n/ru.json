@@ -16,7 +16,8 @@
         "alert": "MikoPBX: Внимание!",
         "errorLoadFrame": "Нет связи с сервером.",
         "errorAuthAPI": "Ошибка авторизации.",
-        "errorAPITimeOut": "Потеряна связь с сервером."
+        "errorAPITimeOut": "Потеряна связь с сервером.",
+        "createContactError": "Ошибка создания контакта."
     },
     "advanced":{
         "title":"Интеграция с MikoPBX"
