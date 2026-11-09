@@ -426,6 +426,12 @@ class AmoCdrDaemon extends WorkerBase
             $batch = CdrBatch::loadPage([CDRDatabaseProvider::class, 'getCdr'], $filter, $add_query);
         }catch (Throwable $e){
             $this->logger->writeError($e->getMessage(), 'Failed to load CDR page, offset unchanged');
+            // Сбой загрузки CDR не должен блокировать открытие карточки текущих
+            // звонков (#58). CDR в этом проходе нет, как и в ветке $batch === null.
+            // Компромисс: CDR предыдущего звонка с того же номера не виден, поэтому
+            // отложить повторный звонок (#59) нельзя — CDR предыдущего после
+            // восстановления может классифицироваться как звонок от известного.
+            $this->processIncompleteAnswered();
             return;
         }
         if ($batch === null) {
@@ -563,7 +569,6 @@ class AmoCdrDaemon extends WorkerBase
             $phoneId = AmoCrmMain::getPhoneIndex($call['params']['phone']);
 
             $calls[$phoneId][] = $call;
-            $this->cdrRows[$row['UNIQUEID']] = $call;
             $this->logger->writeInfo($this->callSummary($call), "Result call data");
         }
 
