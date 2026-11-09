@@ -681,69 +681,18 @@ class ConnectorDb extends WorkerBase
                 $contacts = $lead['_embedded']['contacts']??[];
                 $company  = $lead['_embedded']['companies'][0]['id']??'';
 
-                $oldData = ModuleAmoLeads::find("idAmo='{$lead['id']}' AND {$this->portalId}=portalId");
+                // Значения только через bind: Phalcon кэширует разбор каждой уникальной строки PHQL
+                // навсегда, и интерполяция id приводит к росту памяти воркера (#63).
+                $oldData = ModuleAmoLeads::find($this->leadFilter($lead['id']));
                 if($action === 'delete'){
                     $this->logger->writeInfo($lead, "Remove all lead data (action '$action')");
                     $oldData->delete();
                     unset($oldData);
                     continue;
                 }
-                if ($isSync) {
-                    foreach ($oldData as $oldRecord) {
-                        $haveContact = false;
-                        foreach ($contacts as $contact) {
-                            if ((int)$oldRecord->contactId === $contact['id']) {
-                                $haveContact = true;
-                                break;
-                            }
-                        }
-                        // Если контакт не найден и $oldRecord->contactId пустой и $company совпадает, считаем, что контакт есть
-                        if (!$haveContact && $oldRecord->contactId === '' && $company === (int)$oldRecord->companyId) {
-                            $haveContact = true;
-                        }
-                        if (!$haveContact) {
-                            $this->logger->writeInfo($oldRecord->toArray(), "Remove data for removed contact (action '$action')");
-                            $oldRecord->delete();
-                        }
-                    }
-                }
-                unset($oldData);
-
-                if($isSync){
-                    // В этом случае есть данные о контактах.
-                    foreach ($contacts as $contact) {
-                        $newRecord = $this->findOrCreateAmoLead($lead['id'], $contact['id']);
-                        $newRecord->portalId = $this->portalId;
-                        $newRecord->idAmo = $lead['id'];
-                        $newRecord->name = $lead['name'];
-                        $newRecord->responsible_user_id = $lead['responsible_user_id'];
-                        $newRecord->status_id = $lead['status_id'];
-                        $newRecord->pipeline_id = $lead['pipeline_id'];
-                        $newRecord->contactId = $contact['id'];
-                        $newRecord->companyId = $company;
-                        $newRecord->isMainContact = $contact['is_main'] ? '1' : '0';
-                        $newRecord->closed_at = $lead['closed_at'] ?? 0;
-                        $newRecord->initTime = $this->initTime;
-                        $this->saveAmoLead($newRecord, $contact);
-                    }
-
-                    if (!empty($company) && empty($contacts)) {
-                        $newRecord = $this->findOrCreateAmoLead($lead['id'], null, $company);
-                        $newRecord->portalId = $this->portalId;
-                        $newRecord->idAmo = $lead['id'];
-                        $newRecord->name = $lead['name'];
-                        $newRecord->responsible_user_id = $lead['responsible_user_id'];
-                        $newRecord->status_id = $lead['status_id'];
-                        $newRecord->pipeline_id = $lead['pipeline_id'];
-                        $newRecord->companyId = $company;
-                        $newRecord->closed_at = $lead['closed_at'] ?? 0;
-                        $newRecord->initTime = $this->initTime;
-                        $this->saveAmoLead($newRecord, $lead);
-                    }
-                }else{
+                if(!$isSync){
                     // В этом случае нет информации о контактах. Обновляем поля сделки.
-                    $records = ModuleAmoLeads::find("idAmo = '{$lead['id']}' AND $this->portalId = portalId");
-                    foreach ($records as $record){
+                    foreach ($oldData as $record){
                         $record->name = $lead['name'];
                         $record->responsible_user_id = $lead['responsible_user_id'];
                         $record->status_id = $lead['status_id'];
@@ -751,6 +700,58 @@ class ConnectorDb extends WorkerBase
                         $record->closed_at = $lead['closed_at'] ?? 0;
                         $this->saveAmoLead($record, $lead);
                     }
+                    unset($oldData);
+                    continue;
+                }
+
+                foreach ($oldData as $oldRecord) {
+                    $haveContact = false;
+                    foreach ($contacts as $contact) {
+                        if ((int)$oldRecord->contactId === $contact['id']) {
+                            $haveContact = true;
+                            break;
+                        }
+                    }
+                    // Если контакт не найден и $oldRecord->contactId пустой и $company совпадает, считаем, что контакт есть
+                    if (!$haveContact && $oldRecord->contactId === '' && $company === (int)$oldRecord->companyId) {
+                        $haveContact = true;
+                    }
+                    if (!$haveContact) {
+                        $this->logger->writeInfo($oldRecord->toArray(), "Remove data for removed contact (action '$action')");
+                        $oldRecord->delete();
+                    }
+                }
+                unset($oldData);
+
+                // В этом случае есть данные о контактах.
+                foreach ($contacts as $contact) {
+                    $newRecord = $this->findOrCreateAmoLead($lead['id'], $contact['id']);
+                    $newRecord->portalId = $this->portalId;
+                    $newRecord->idAmo = $lead['id'];
+                    $newRecord->name = $lead['name'];
+                    $newRecord->responsible_user_id = $lead['responsible_user_id'];
+                    $newRecord->status_id = $lead['status_id'];
+                    $newRecord->pipeline_id = $lead['pipeline_id'];
+                    $newRecord->contactId = $contact['id'];
+                    $newRecord->companyId = $company;
+                    $newRecord->isMainContact = $contact['is_main'] ? '1' : '0';
+                    $newRecord->closed_at = $lead['closed_at'] ?? 0;
+                    $newRecord->initTime = $this->initTime;
+                    $this->saveAmoLead($newRecord, $contact);
+                }
+
+                if (!empty($company) && empty($contacts)) {
+                    $newRecord = $this->findOrCreateAmoLead($lead['id'], null, $company);
+                    $newRecord->portalId = $this->portalId;
+                    $newRecord->idAmo = $lead['id'];
+                    $newRecord->name = $lead['name'];
+                    $newRecord->responsible_user_id = $lead['responsible_user_id'];
+                    $newRecord->status_id = $lead['status_id'];
+                    $newRecord->pipeline_id = $lead['pipeline_id'];
+                    $newRecord->companyId = $company;
+                    $newRecord->closed_at = $lead['closed_at'] ?? 0;
+                    $newRecord->initTime = $this->initTime;
+                    $this->saveAmoLead($newRecord, $lead);
                 }
             }
         }
@@ -768,21 +769,38 @@ class ConnectorDb extends WorkerBase
     private function findOrCreateAmoLead($leadId, $contactId = null, $companyId = null):ModuleAmoLeads
     {
         // Формирование условий для поиска записи в базе данных
-        $conditions = "idAmo = '$leadId' AND ";
+        $filter = $this->leadFilter($leadId);
         if(!empty($contactId)){
-            $conditions .= "contactId = $contactId AND ";
+            $filter['conditions'] .= ' AND contactId = :contactId:';
+            $filter['bind']['contactId'] = (string)$contactId;
         }
         if(!empty($companyId)){
-            $conditions .= "companyId = $companyId AND ";
+            $filter['conditions'] .= ' AND companyId = :companyId:';
+            $filter['bind']['companyId'] = (string)$companyId;
         }
-        $conditions .= "$this->portalId = portalId";
         // Поиск записи в базе данных по указанным условиям
-        $newRecord = ModuleAmoLeads::findFirst($conditions);
+        $newRecord = ModuleAmoLeads::findFirst($filter);
         // Если запись не найдена, создается новая запись
         if (!$newRecord) {
             $newRecord = new ModuleAmoLeads();
         }
         return $newRecord;
+    }
+
+    /**
+     * Фильтр ModuleAmoLeads по id сделки в текущем портале (параметры через bind).
+     * @param  $leadId
+     * @return array
+     */
+    private function leadFilter($leadId):array
+    {
+        return [
+            'conditions' => 'idAmo = :idAmo: AND portalId = :portalId:',
+            'bind'       => [
+                'idAmo'    => (string)$leadId,
+                'portalId' => $this->portalId,
+            ],
+        ];
     }
 
     /**
@@ -811,7 +829,7 @@ class ConnectorDb extends WorkerBase
      */
     public function addContactLeadFromUnsorted($phone, $contactId, $leadId):bool
     {
-        $oldData = ModuleAmoLeads::findFirst("idAmo='{$leadId}'");
+        $oldData = ModuleAmoLeads::findFirst($this->leadFilter($leadId));
         if(!$oldData){
             $newRecord = new ModuleAmoLeads();
             $newRecord->portalId            = $this->portalId;
@@ -822,7 +840,11 @@ class ConnectorDb extends WorkerBase
             $newRecord->save();
         }
 
-        $oldData = ModuleAmoPhones::findFirst("idEntity='{$phone}'");
+        // $phone — request_id неразобранного, т.е. индекс телефона (AmoCrmMain::getPhoneIndex), ищем по idPhone.
+        $oldData = ModuleAmoPhones::findFirst([
+            'conditions' => 'idPhone = :phone: AND portalId = :portalId:',
+            'bind'       => ['phone' => (string)$phone, 'portalId' => $this->portalId],
+        ]);
         if(!$oldData){
             /** @var ModuleAmoPhones $newRecord */
             $newRecord = new ModuleAmoPhones();
