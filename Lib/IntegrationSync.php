@@ -316,7 +316,8 @@ class IntegrationSync
     }
 
     /**
-     * Сопоставление из БД модуля или null, если список пользователей ещё не загружен.
+     * Сопоставление для виджета из БД модуля (только активные пользователи)
+     * или null, если список пользователей ещё не загружен.
      * @return array<string, string>|null
      */
     private function localUsersMap(): ?array
@@ -325,14 +326,7 @@ class IntegrationSync
         if (!is_array($rows) || empty($rows)) {
             return null;
         }
-        $map = [];
-        foreach ($rows as $row) {
-            $number = trim((string)($row['number'] ?? ''));
-            if ($number !== '') {
-                $map[(string)$row['amoUserId']] = $number;
-            }
-        }
-        return $map;
+        return IntegrationConfig::widgetUsersMap($rows);
     }
 
     /**

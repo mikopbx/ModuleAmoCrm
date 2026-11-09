@@ -1124,7 +1124,8 @@ class ConnectorDb extends WorkerBase
      * Сохраняет список пользователей аккаунта amoCRM.
      * Прежние сопоставления переносятся из m_ModuleAmoUsers как есть; новым пользователям
      * номер берётся из настроек виджета (только номера, существующие на АТС).
-     * Пользователи, удалённые из amoCRM, удаляются вместе с сопоставлением.
+     * Неактивные пользователи не сохраняются; ставшие неактивными и удалённые из amoCRM
+     * удаляются вместе с сопоставлением (m_ModuleAmoUsers перестраивается).
      * @param array $amoUsers  [['id','name','email','is_active'], ...]
      * @param array $widgetMap amoUserId => номер из настройки виджета pbx_users.
      * @return array ['success' => bool, 'users' => getAccountUsers()]
@@ -1146,9 +1147,15 @@ class ConnectorDb extends WorkerBase
         }
         $seen = [];
         $success = true;
+        $hasUsers = false;
         foreach ($amoUsers as $user) {
             $amoUserId = (string)($user['id'] ?? '');
             if (preg_match('/^[1-9][0-9]*$/', $amoUserId) !== 1) {
+                continue;
+            }
+            $hasUsers = true;
+            if (empty($user['is_active'])) {
+                // Неактивных не храним: их нельзя назначить ответственным и передать в виджет.
                 continue;
             }
             $seen[$amoUserId] = true;
@@ -1164,17 +1171,18 @@ class ConnectorDb extends WorkerBase
             }
             $record->name      = (string)($user['name'] ?? '');
             $record->email     = (string)($user['email'] ?? '');
-            $record->isActive  = empty($user['is_active']) ? '0' : '1';
+            $record->isActive  = '1';
             $record->inAccount = '1';
             if (!$record->save()) {
                 $success = false;
                 $this->logger->writeError(['error' => 'Fail save amoCRM user', 'msg' => $record->getMessages(), 'data' => $user]);
             }
         }
-        if (!empty($seen)) {
+        // Пустой ответ amoCRM не считается пустым аккаунтом: сопоставление не трогаем.
+        if ($hasUsers) {
             foreach ($existing as $amoUserId => $record) {
                 if (!isset($seen[$amoUserId])) {
-                    $this->logger->writeInfo($record->toArray(), 'amoCRM user removed from account');
+                    $this->logger->writeInfo($record->toArray(), 'amoCRM user removed (inactive or deleted from account)');
                     $record->delete();
                 }
             }

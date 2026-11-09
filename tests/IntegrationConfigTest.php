@@ -119,4 +119,18 @@ checkIntegration('{"token":"Abc123","miko_pbx_host":"h","pbx_users":{}}', json_e
 checkIntegration(true, C::isTransientWebhookError(['error-code' => 400, 'error-string' => '{"detail":"Invalid URL"}']), 'transient 400');
 checkIntegration(false, C::isTransientWebhookError(['error-code' => 401, 'error-string' => 'Invalid URL']), 'other code');
 
+// pbx_users виджета: только активные пользователи с номером (неактивный -> 400 NotSupportedChoice).
+checkIntegration(
+    ['8132173' => '008', '8136253' => '310'],
+    C::widgetUsersMap([
+        ['amoUserId' => '8132173', 'number' => '008', 'isActive' => '1'],
+        ['amoUserId' => '8136244', 'number' => '309', 'isActive' => '0'],
+        ['amoUserId' => '6087598', 'number' => '', 'isActive' => '1'],
+        ['amoUserId' => '8136253', 'number' => ' 310 ', 'isActive' => 1],
+        ['amoUserId' => '11463766', 'number' => '114', 'isActive' => 0],
+    ]),
+    'inactive and unmapped users excluded from widget'
+);
+checkIntegration([], C::widgetUsersMap([]), 'empty rows');
+
 echo "OK\n";

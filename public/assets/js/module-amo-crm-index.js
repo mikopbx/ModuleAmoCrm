@@ -24,6 +24,8 @@ var ModuleAmoCrm = {
   $moduleStatus: $('#status'),
   authWindow: undefined,
   usersLoaded: false,
+  // Значение пункта «не сопоставлен»; при сохранении превращается в пустой номер.
+  usersNotMappedValue: '__none__',
   /**
   /**
    * Field validation rules
@@ -406,8 +408,11 @@ var ModuleAmoCrm = {
       return;
     }
     var $body = $table.find('tbody').empty();
+    var notMapped = window[className].usersNotMappedValue;
     users.forEach(function (user) {
-      var options = "<option value=\"\">".concat(escape(globalTranslate.mod_amo_usersNotMapped), "</option>");
+      // Пустое value Semantic UI делает placeholder-ом, который нельзя выбрать в списке.
+      var noneSelected = user.number === '' ? ' selected' : '';
+      var options = "<option value=\"".concat(notMapped, "\"").concat(noneSelected, ">").concat(escape(globalTranslate.mod_amo_usersNotMapped), "</option>");
       var found = user.number === '';
       employees.forEach(function (employee) {
         var selected = employee.number === user.number ? ' selected' : '';
@@ -419,11 +424,7 @@ var ModuleAmoCrm = {
       if (!found) {
         options += "<option value=\"".concat(escape(user.number), "\" selected>").concat(escape(user.number), "</option>");
       }
-      var name = escape(user.name || user.amoUserId);
-      if (!user.isActive) {
-        name += " <span class=\"ui mini grey label\">".concat(escape(globalTranslate.mod_amo_usersInactive), "</span>");
-      }
-      $body.append("<tr class=\"".concat(user.isActive ? '' : 'disabled', "\">\n\t\t\t\t<td>").concat(name, "</td>\n\t\t\t\t<td>").concat(escape(user.email), "</td>\n\t\t\t\t<td><select class=\"ui search fluid dropdown amo-user-select\" data-amo-user-id=\"").concat(escape(user.amoUserId), "\">").concat(options, "</select></td>\n\t\t\t</tr>"));
+      $body.append("<tr>\n\t\t\t\t<td>".concat(escape(user.name || user.amoUserId), "</td>\n\t\t\t\t<td>").concat(escape(user.email), "</td>\n\t\t\t\t<td><select class=\"ui search fluid dropdown amo-user-select\" data-amo-user-id=\"").concat(escape(user.amoUserId), "\">").concat(options, "</select></td>\n\t\t\t</tr>"));
     });
     $table.find('select[data-amo-user-id]').dropdown({
       fullTextSearch: true,
@@ -443,7 +444,8 @@ var ModuleAmoCrm = {
     var mapping = {};
     // Semantic UI переносит классы select на обёртку — ищем по data-атрибуту.
     $('#amo-users-table select[data-amo-user-id]').each(function (index, obj) {
-      mapping[$(obj).attr('data-amo-user-id')] = $(obj).val() || '';
+      var value = $(obj).val() || '';
+      mapping[$(obj).attr('data-amo-user-id')] = value === window[className].usersNotMappedValue ? '' : value;
     });
     return mapping;
   },

@@ -22,6 +22,8 @@ const ModuleAmoCrm = {
 	$moduleStatus: 			$('#status'),
 	authWindow: 			undefined,
 	usersLoaded: 			false,
+	// Значение пункта «не сопоставлен»; при сохранении превращается в пустой номер.
+	usersNotMappedValue: 	'__none__',
 
 	/**
 	/**
@@ -394,8 +396,11 @@ const ModuleAmoCrm = {
 			return;
 		}
 		const $body = $table.find('tbody').empty();
+		const notMapped = window[className].usersNotMappedValue;
 		users.forEach((user) => {
-			let options = `<option value="">${escape(globalTranslate.mod_amo_usersNotMapped)}</option>`;
+			// Пустое value Semantic UI делает placeholder-ом, который нельзя выбрать в списке.
+			const noneSelected = user.number === '' ? ' selected' : '';
+			let options = `<option value="${notMapped}"${noneSelected}>${escape(globalTranslate.mod_amo_usersNotMapped)}</option>`;
 			let found = user.number === '';
 			employees.forEach((employee) => {
 				const selected = employee.number === user.number ? ' selected' : '';
@@ -407,12 +412,8 @@ const ModuleAmoCrm = {
 			if (!found) {
 				options += `<option value="${escape(user.number)}" selected>${escape(user.number)}</option>`;
 			}
-			let name = escape(user.name || user.amoUserId);
-			if (!user.isActive) {
-				name += ` <span class="ui mini grey label">${escape(globalTranslate.mod_amo_usersInactive)}</span>`;
-			}
-			$body.append(`<tr class="${user.isActive ? '' : 'disabled'}">
-				<td>${name}</td>
+			$body.append(`<tr>
+				<td>${escape(user.name || user.amoUserId)}</td>
 				<td>${escape(user.email)}</td>
 				<td><select class="ui search fluid dropdown amo-user-select" data-amo-user-id="${escape(user.amoUserId)}">${options}</select></td>
 			</tr>`);
@@ -436,7 +437,8 @@ const ModuleAmoCrm = {
 		const mapping = {};
 		// Semantic UI переносит классы select на обёртку — ищем по data-атрибуту.
 		$('#amo-users-table select[data-amo-user-id]').each((index, obj) => {
-			mapping[$(obj).attr('data-amo-user-id')] = $(obj).val() || '';
+			const value = $(obj).val() || '';
+			mapping[$(obj).attr('data-amo-user-id')] = value === window[className].usersNotMappedValue ? '' : value;
 		});
 		return mapping;
 	},

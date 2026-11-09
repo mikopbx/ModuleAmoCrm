@@ -235,6 +235,27 @@ final class IntegrationConfig
     }
 
     /**
+     * Сопоставление для настройки виджета pbx_users из строк m_ModuleAmoAccountUsers.
+     * Поле типа users принимает только активных пользователей аккаунта: неактивный
+     * пользователь в теле POST /api/v4/widgets/{code} даёт 400 NotSupportedChoice
+     * и отклоняет всё сохранение. Локальное сопоставление (m_ModuleAmoUsers) не меняется.
+     * @param array $rows [['amoUserId', 'number', 'isActive'], ...]
+     * @return array<string, string> amoUserId => номер.
+     */
+    public static function widgetUsersMap(array $rows): array
+    {
+        $map = [];
+        foreach ($rows as $row) {
+            $number = trim((string)($row['number'] ?? ''));
+            if ($number === '' || (string)($row['isActive'] ?? '1') === '0') {
+                continue;
+            }
+            $map[(string)($row['amoUserId'] ?? '')] = $number;
+        }
+        return $map;
+    }
+
+    /**
      * Сопоставление пользователей из настройки виджета pbx_users.
      * UI amoCRM хранит его JSON-строкой, API — объектом.
      * @param mixed $pbxUsers
