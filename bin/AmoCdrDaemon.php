@@ -69,7 +69,11 @@ class AmoCdrDaemon extends WorkerBase
     private array $newLeads = [];
     private array $newUnsorted = [];
     private array $newTasks = [];
+    // linkedid => отвеченный входящий, который ещё идёт (#59: по linkedid, а не по номеру,
+    // чтобы CDR предыдущего звонка не удалял запись повторного звонка с того же номера).
     private array $incompleteAnswered = [];
+    // linkedid => true: записи, отложенные в текущем проходе, т.к. в батче есть CDR с тем же номером.
+    private array $deferredIncomplete = [];
     private ?IncompleteCallTypes $incompleteTypes = null; // linkedid => тип, определённый во время разговора (#56)
     private int $incompleteTypesPurgedAt = 0;
     private array $createdLeads = []; // Кэш создана ли сделка для звонка. 1 звонок = 1 сделка
@@ -81,6 +85,8 @@ class AmoCdrDaemon extends WorkerBase
     // #57: ConnectorDb недоступен — не блокируем цикл на 60 с и не повторяем каждую секунду.
     private const CONTACTS_DATA_TIMEOUT = 10; // Ожидание ответа getContactsData, секунд
     private const CARD_OPEN_DEADLINE    = 60; // Позже этого срока после ответа карточку не открываем
+    // Обработанная запись incompleteAnswered, для которой так и не пришёл CDR, удаляется через этот срок.
+    private const INCOMPLETE_TTL        = 43200;
     private ?RetryBackoff $contactsBackoff = null;
 
     // ВИДЫ ЗВОНКОВ.
@@ -271,26 +277,34 @@ class AmoCdrDaemon extends WorkerBase
     {
         $params  = [];
         $cdrData = CDRDatabaseProvider::getCacheCdr();
+        $activeIds = [];
         foreach ($cdrData as $cdr){
             $dstUser = $this->users[$cdr['dst_num']]??'';
             $srcNum = AmoCrmMain::getPhoneIndex($cdr['src_num']);
             $dstNum = AmoCrmMain::getPhoneIndex($cdr['dst_num']);
+            $linkedId = (string)$cdr['linkedid'];
+            $activeIds[$linkedId] = true;
+            // Строка с endtime — звонок уже завершён: ядро пишет CDR раньше, чем удаляет
+            // строку из кэша. Если CDR уже обработан, запись создалась бы заново.
             if( !empty($cdr['answer'])
+                && empty($cdr['endtime'])
                 && !empty($dstUser)
-                && !isset($this->incompleteAnswered[$srcNum]['finished'])
+                && $linkedId !== ''
+                && !isset($this->incompleteAnswered[$linkedId]['finished'])
                 && !in_array($srcNum, $this->innerNums, true)
                 && in_array($dstNum, $this->innerNums, true)){
                 // Входящий вызов отвечен сотрудником
-                $this->incompleteAnswered[$srcNum] = [
+                $this->incompleteAnswered[$linkedId] = [
                     'uniq'                => $cdr['UNIQUEID'],
                     'phone'               => $cdr['src_num'],
+                    'phoneIndex'          => (string)$srcNum,
                     'id'                  => $cdr['linkedid'],
                     'did'                 => $cdr['did'],
                     'responsible'         => $dstUser,
                     'type'                => null,
                     'answeredAt'          => $this->getAnswerTimestamp((string)$cdr['answer']),
                 ];
-                $this->logger->writeInfo($this->incompleteAnswered[$srcNum], "New incomplete answered");
+                $this->logger->writeInfo($this->incompleteAnswered[$linkedId], "New incomplete answered");
             }
 
             $endTime    = '';
@@ -326,6 +340,7 @@ class AmoCdrDaemon extends WorkerBase
             ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['data' => $params, 'action' => 'CDRs']);
             $this->lastCacheCdr = $md5Cdr;
         }
+        $this->purgeIncompleteAnswered(time(), $activeIds);
     }
 
     /**
@@ -441,7 +456,8 @@ class AmoCdrDaemon extends WorkerBase
             $srcNum = AmoCrmMain::getPhoneIndex($row['src_num']);
             $dstNum = AmoCrmMain::getPhoneIndex($row['dst_num']);
             $this->logger->writeInfo("From $srcNum to $dstNum, linkedid: $id, UNIQUEID:{$row['UNIQUEID']}, id: {$row['id']}");
-            unset($this->incompleteAnswered[$srcNum],$this->incompleteAnswered[$dstNum]);
+            // Только запись этого звонка: повторный звонок с того же номера уже может идти (#59).
+            unset($this->incompleteAnswered[(string)$id]);
             if( in_array($srcNum, $this->innerNums, true)
                 && in_array($dstNum, $this->innerNums, true)){
                 // Это внутренний разговор.
@@ -596,10 +612,7 @@ class AmoCdrDaemon extends WorkerBase
      */
     private function processIncompleteAnswered():void
     {
-        $pending = array_filter($this->incompleteAnswered, static function ($call) {
-            return !isset($call['finished']);
-        });
-        if(empty($pending)){
+        if(empty($this->pendingIncompletePhones())){
             return;
         }
         $calls       = [];
@@ -608,6 +621,72 @@ class AmoCdrDaemon extends WorkerBase
             return;
         }
         $this->createEntities($calls);
+    }
+
+    /**
+     * Номера (индексы) необработанных записей incompleteAnswered. Обработанные (finished)
+     * в поиск контактов не попадают: их результат не используется (#60).
+     * @return array
+     */
+    private function pendingIncompletePhones():array
+    {
+        $phones = [];
+        foreach ($this->incompleteAnswered as $call){
+            if(!isset($call['finished'])){
+                $phones[] = self::incompletePhoneIndex($call);
+            }
+        }
+        return array_values(array_unique($phones));
+    }
+
+    /**
+     * Индекс номера записи incompleteAnswered (вычисляется при создании записи).
+     * @param array $call
+     * @return string
+     */
+    private static function incompletePhoneIndex(array $call):string
+    {
+        return (string)($call['phoneIndex'] ?? AmoCrmMain::getPhoneIndex($call['phone']));
+    }
+
+    /**
+     * Записи incompleteAnswered, обрабатываемые в текущем проходе, по индексу номера:
+     * с одного номера может идти несколько звонков одновременно, а сущности создаются
+     * по номеру. Обработанные и отложенные записи не затрагиваются.
+     * @param string $phoneId
+     * @return array linkedid записей
+     */
+    private function incompleteIdsByPhone(string $phoneId):array
+    {
+        $ids = [];
+        foreach ($this->incompleteAnswered as $id => $call){
+            if(!isset($call['finished'])
+                && !isset($this->deferredIncomplete[$id])
+                && self::incompletePhoneIndex($call) === $phoneId){
+                $ids[] = $id;
+            }
+        }
+        return $ids;
+    }
+
+    /**
+     * Удаляет обработанные записи, для которых CDR так и не пришёл
+     * (иначе при ключах по linkedid они копились бы без ограничения).
+     * Звонок, который ещё есть в кэше, не удаляется: запись создалась бы заново.
+     * @param int $now
+     * @param array $activeIds linkedid => true из кэша текущих звонков
+     * @return void
+     */
+    private function purgeIncompleteAnswered(int $now, array $activeIds):void
+    {
+        foreach ($this->incompleteAnswered as $id => $call){
+            $answeredAt = (int)($call['answeredAt'] ?? 0);
+            if(isset($call['finished'])
+                && !isset($activeIds[(string)$id])
+                && $answeredAt > 0 && $now - $answeredAt > self::INCOMPLETE_TTL){
+                unset($this->incompleteAnswered[$id]);
+            }
+        }
     }
 
     /**
@@ -631,7 +710,7 @@ class AmoCdrDaemon extends WorkerBase
     private function alertIncompleteAnswered():void
     {
         foreach ($this->incompleteAnswered as $id => $call){
-            if(isset($this->incompleteAnswered[$id]['finished'])){
+            if(isset($this->incompleteAnswered[$id]['finished']) || isset($this->deferredIncomplete[$id])){
                 continue;
             }
             if(!empty($call['lead']) || !empty($call['client']) || !empty($call['company'])){
@@ -1119,8 +1198,12 @@ class AmoCdrDaemon extends WorkerBase
         $this->newLeads = [];
         $this->newUnsorted = [];
         $this->newTasks = [];
+        $this->deferredIncomplete = [];
 
-        $phones       = array_unique(array_merge(array_keys($this->incompleteAnswered), array_keys($calls)));
+        $phones       = array_values(array_unique(array_merge(
+            $this->pendingIncompletePhones(),
+            array_map('strval', array_keys($calls))
+        )));
         $contactsData = empty($phones) ? [] : ConnectorDb::tryInvoke('getContactsData', [$phones], self::CONTACTS_DATA_TIMEOUT);
         $now          = time();
         if(!is_array($contactsData) || count($phones) !== count($contactsData)){
@@ -1151,9 +1234,17 @@ class AmoCdrDaemon extends WorkerBase
                 $this->incompleteAnswered[$id]['skip'] = true;
                 continue;
             }
+            $indexAction   = self::incompletePhoneIndex($call);
+            if(isset($calls[$indexAction])){
+                // В батче CDR предыдущего звонка с этого номера (#59). Сущности создаются
+                // по номеру, и в одном проходе звонки перезаписали бы друг другу контакт
+                // и сделку. Обрабатываем в следующем проходе, после создания сущностей по CDR.
+                $this->deferredIncomplete[$id] = true;
+                $this->logger->writeInfo($this->callSummary($call), "Incomplete answered call deferred: CDR with the same phone in batch");
+                continue;
+            }
             $this->logger->writeInfo($this->callSummary($call), "Check incomplete answered call");
 
-            $indexAction   = AmoCrmMain::getPhoneIndex($call['phone']);
             $contData      = $contactsData[$indexAction];
             $contactId     = $contData['contactId']??null;
             $companyId     = $contData['companyId']??null;
@@ -1535,8 +1626,8 @@ class AmoCdrDaemon extends WorkerBase
                         $this->newTasks[$phoneId]['entity_id'] = $contactId;
                         $this->newTasks[$phoneId]['entity_type'] = 'contacts';
                     }
-                    if (isset($this->incompleteAnswered[$phoneId])) {
-                        $this->incompleteAnswered[$phoneId]['client'] = $contactId;
+                    foreach ($this->incompleteIdsByPhone((string)$phoneId) as $incompleteId) {
+                        $this->incompleteAnswered[$incompleteId]['client'] = $contactId;
                     }
                     if (isset($calls[$phoneId])) {
                         foreach ($calls[$phoneId] as &$call) {
@@ -1574,8 +1665,8 @@ class AmoCdrDaemon extends WorkerBase
                 $this->newTasks[$contact['request_id']]['entity_id'] = $contact['id'];
                 $this->newTasks[$contact['request_id']]['entity_type'] = 'contacts';
             }
-            if( isset($this->incompleteAnswered[$contact['request_id']]) ){
-                $this->incompleteAnswered[$contact['request_id']]['client'] = $contact['id'];
+            foreach ($this->incompleteIdsByPhone((string)$contact['request_id']) as $incompleteId){
+                $this->incompleteAnswered[$incompleteId]['client'] = $contact['id'];
             }
 
             if(isset($calls[$contact['request_id']])){
@@ -1631,8 +1722,8 @@ class AmoCdrDaemon extends WorkerBase
                 $this->newTasks[$lead['request_id']]['entity_id'] = $lead['id'];
                 $this->newTasks[$lead['request_id']]['entity_type'] = 'leads';
             }
-            if( isset($this->incompleteAnswered[$lead['request_id']]) ){
-                $this->incompleteAnswered[$lead['request_id']]['lead'] = $lead['id'];
+            foreach ($this->incompleteIdsByPhone((string)$lead['request_id']) as $incompleteId){
+                $this->incompleteAnswered[$incompleteId]['lead'] = $lead['id'];
             }
             $leadData['add'][] = [
                 'id'                    => $lead['id'],
