@@ -10,7 +10,7 @@ const idForm    	 = 'module-amo-crm-form';
 const className 	 = 'ModuleAmoCrm';
 const inputClassName = 'mikopbx-module-input';
 
-/* global $, globalRootUrl, globalTranslate, Form, Config */
+/* global $, globalRootUrl, globalTranslate, globalWebAdminLanguage, Form, Config */
 const ModuleAmoCrm = {
 	$formObj: 				$('#'+idForm),
 	$checkBoxes: 			$('#'+idForm+' .ui.checkbox'),
@@ -21,6 +21,9 @@ const ModuleAmoCrm = {
 	$statusToggle: 			$('#module-status-toggle'),
 	$moduleStatus: 			$('#status'),
 	authWindow: 			undefined,
+	usersLoaded: 			false,
+	// Значение пункта «не сопоставлен»; при сохранении превращается в пустой номер.
+	usersNotMappedValue: 	'__none__',
 
 	/**
 	/**
@@ -77,13 +80,9 @@ const ModuleAmoCrm = {
 		);
 		window[className].onChangeSettings()
 		window[className].$dropDowns.dropdown();
-		$('.info.circle').popup();
-		$('#webhookPort, #tokenForAmo, #externalHostname').on('input', () => window[className].updateWebhookUrlPreview());
-		$('#copy-webhook-url').on('click', function () {
-			const input = document.getElementById('webhook-url-text');
-			input.select();
-			document.execCommand('copy');
-		});
+		$('.info.circle').not('.tab-hint').popup();
+		// Над вкладками строка модуля — подсказки к вкладкам показываем снизу.
+		$('.tab-hint').popup({ position: 'bottom left', variation: 'wide' });
 		$('#copy-pbx-address').on('click', function () {
 			const host = $('#externalHostname').val() || $('#externalHostname').attr('placeholder') || '';
 			const port = $('#webhookPort').val();
@@ -96,20 +95,26 @@ const ModuleAmoCrm = {
 			document.execCommand('copy');
 			tmp.remove();
 		});
-		window[className].updateWebhookUrlPreview();
+		window[className].initIntegrationBadges();
 		window[className].checkStatusToggle();
 		window.addEventListener('ModuleStatusChanged', window[className].checkStatusToggle);
 		window[className].initializeForm();
-		$('.menu .item').tab();
+		window[className].initTabs();
 
 		window[className].checkStatus();
 		setInterval(window[className].checkStatus, 5000);
+
+		window[className].loadUsers();
+		$('#refresh-users-button').popup({ position: 'bottom left' }).on('click', (e) => {
+			// Клик по значку в заголовке вкладки: обновляем список и открываем вкладку.
+			e.preventDefault();
+			window[className].refreshUsers();
+		});
 
 		$(window).bind('message',  window[className].updateAuthInfo);
 		$("#createPassword").on('click', function (e) {
 			$("#tokenForAmo").val(window[className].generatePassword());
 			$('#submitbutton').removeClass('disabled');
-			window[className].updateWebhookUrlPreview();
 		});
 		$("#login-button").on('click', function (e) {
 			let client_id 	 = $('#clientId').val();
@@ -146,23 +151,97 @@ const ModuleAmoCrm = {
 			language: SemanticLocalization.dataTableLocalisation,
 			order: [1, 'asc'],
 		});
-	},
-	updateWebhookUrlPreview() {
-		const port = $('#webhookPort').val();
-		const token = $('#tokenForAmo').val();
-		const host = $('#externalHostname').val() || $('#externalHostname').attr('placeholder') || window.location.hostname || 'your-pbx-host';
-		if (token) {
-			let url;
-			if (port) {
-				url = 'https://' + host + ':' + port + '/' + token + '/entity-update';
-			} else {
-				url = 'https://' + host + '/pbxcore/api/amo-crm/v1/entity-update';
-			}
-			$('#webhook-url-text').val(url);
-			$('#webhook-url-preview').show();
-		} else {
-			$('#webhook-url-preview').hide();
+		// Кнопка "Добавить правило" — в свободную левую колонку над таблицей (рядом с поиском).
+		const $rulesLeftColumn = $('#entitySettingsTable_wrapper .ui.grid > .row:first > .eight.wide.column:not(.right)');
+		if ($rulesLeftColumn.length > 0) {
+			$('#add-new-button').appendTo($rulesLeftColumn.first());
 		}
+	},
+	/**
+	 * Метки состояния интеграции (webhook, виджет, пользователи) в строке "Модуль включен".
+	 * Строку рендерит ядро, поэтому метки добавляются отсюда.
+	 */
+	/**
+	 * Инициализация вкладок с сохранением активной вкладки в URL-хеше (#calls),
+	 * чтобы после обновления страницы открывалась та же вкладка.
+	 */
+	initTabs() {
+		const $items = $('.menu .item[data-tab]');
+		$items.tab({
+			onVisible(tabPath) {
+				if (window.history && window.history.replaceState) {
+					window.history.replaceState(null, '', `#${tabPath}`);
+				}
+			},
+		});
+		const hash = window.location.hash.replace(/[^a-zA-Z0-9_-]/g, '');
+		if (hash !== '' && $items.filter(`[data-tab="${hash}"]`).length > 0) {
+			$items.tab('change tab', hash);
+		}
+	},
+	initIntegrationBadges() {
+		const $segment = $('#module-status-toggle-segment');
+		if ($segment.length === 0 || $('#integration-badges').length > 0) {
+			return;
+		}
+		const escape = window[className].escapeHtml;
+		const sections = {
+			webhook: globalTranslate.mod_amo_integrationWebhook,
+			widget: globalTranslate.mod_amo_integrationWidget,
+			users: globalTranslate.mod_amo_integrationUsers,
+		};
+		// Те же размер и стиль, что у кнопки настроек модуля (ui icon basic button).
+		let html = '<div id="integration-badges" class="ui basic buttons">';
+		Object.keys(sections).forEach((section) => {
+			html += `<div class="ui button integration-badge" data-section="${section}"><i class="icon grey circle"></i>${escape(sections[section])}</div>`;
+		});
+		html += `<button class="ui icon button" id="integration-sync-button" type="button" data-content="${escape(globalTranslate.mod_amo_integrationSyncNow)}"><i class="sync icon"></i></button>`;
+		html += '</div>';
+		const $settingsButton = $segment.find('.pbx-extensions-settings');
+		if ($settingsButton.length > 0) {
+			$settingsButton.after(html);
+		} else {
+			$segment.append(html);
+		}
+		// Копирование URL webhook из подсказки метки.
+		$('body').on('click', '.copy-webhook-url', (e) => {
+			e.preventDefault();
+			const $link = $(e.currentTarget);
+			window[className].copyToClipboard($link.attr('data-url'));
+			$link.find('i.icon').removeClass('copy').addClass('check green');
+			setTimeout(() => $link.find('i.icon').removeClass('check green').addClass('copy'), 1500);
+		});
+		$('#integration-sync-button')
+			.popup({ position: 'bottom right' })
+			.on('click', (e) => {
+				e.preventDefault();
+				window[className].startIntegrationSync();
+			});
+	},
+
+	/**
+	 * @param text
+	 */
+	copyToClipboard(text) {
+		if (navigator.clipboard && window.isSecureContext) {
+			navigator.clipboard.writeText(text);
+			return;
+		}
+		const $tmp = $('<textarea>').val(text).css({ position: 'fixed', top: 0, opacity: 0 }).appendTo('body');
+		$tmp[0].select();
+		document.execCommand('copy');
+		$tmp.remove();
+	},
+
+	/**
+	 * @param text
+	 * @returns {string}
+	 */
+	escapeHtml(text) {
+		// Результат подставляется и в атрибуты: экранируем кавычки тоже.
+		return $('<div>').text(text === undefined || text === null ? '' : String(text)).html()
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;');
 	},
 	onChangeSettings() {
 		if($('#isPrivateWidget').parent().checkbox('is checked')) {
@@ -215,7 +294,171 @@ const ModuleAmoCrm = {
 			}else{
 				$('#WaitSyncMsg').hide();
 			}
+			window[className].renderIntegrationState(result.data.integrationState || {});
 		});
+	},
+
+	/**
+	 * Состояние настройки интеграции в amoCRM: цвет метки и расшифровка во всплывающей подсказке.
+	 * @param state
+	 */
+	renderIntegrationState(state) {
+		const escape = window[className].escapeHtml;
+		const formatTime = (time) => new Date(time * 1000).toLocaleString(globalWebAdminLanguage || undefined);
+		['webhook', 'widget', 'users'].forEach((section) => {
+			const $label = $(`#integration-badges .integration-badge[data-section="${section}"]`);
+			if ($label.length === 0) {
+				return;
+			}
+			const data = state[section];
+			let color = 'grey';
+			const lines = [];
+			if (data) {
+				const isOk = data.state === 'ok';
+				color = isOk ? 'green' : (data.state === 'error' ? 'red' : 'yellow');
+				let text = globalTranslate[`mod_amo_state_${data.state}`] || data.state;
+				if (section === 'users' && isOk && data.count !== undefined) {
+					text += ` (${data.count})`;
+				}
+				lines.push(`<b>${escape(text)}</b>`);
+				if (data.message) {
+					lines.push(escape(data.message));
+				}
+				if (section === 'webhook' && data.url) {
+					lines.push(`<span style="word-break: break-all;">${escape(data.url)}</span> `
+						+ `<a href="#" class="copy-webhook-url" data-url="${escape(data.url)}" title="${escape(globalTranslate.mod_amo_copy)}"><i class="copy icon"></i></a>`);
+					if (isOk && data.selfCheck !== undefined && (data.selfCheck < 200 || data.selfCheck >= 300)) {
+						color = 'yellow';
+						lines.push(escape(globalTranslate.mod_amo_state_selfCheckFail));
+					}
+				}
+				if (data.time) {
+					lines.push(`<span style="color: grey;">${escape(globalTranslate.mod_amo_integrationLastSync)}: ${escape(formatTime(data.time))}</span>`);
+				}
+			} else {
+				lines.push(escape(globalTranslate.mod_amo_state_unknown));
+			}
+			const $icon = $label.find('i.icon');
+			$icon.removeClass('grey green red yellow').addClass(color);
+			const html = lines.join('<br>');
+			// Подсказку пересоздаём только при изменении текста: иначе открытая подсказка мигает каждые 5 с.
+			if ($label.attr('data-popup-html') !== html) {
+				$label.attr('data-popup-html', html);
+				$label.popup('destroy');
+				// hoverable: подсказка не закрывается при переходе в неё мышью — можно выделить и скопировать текст.
+				$label.popup({
+					html,
+					position: 'bottom center',
+					variation: 'wide',
+					hoverable: true,
+					delay: { show: 100, hide: 400 },
+				});
+			}
+		});
+	},
+
+	/**
+	 * Запуск настройки интеграции в фоне. Результат появится в состоянии при следующей проверке.
+	 */
+	startIntegrationSync() {
+		const $button = $('#integration-sync-button');
+		$button.addClass('loading disabled');
+		$.post(`${window.location.origin}${globalRootUrl}${idUrl}/syncIntegration`, {}, () => {
+			setTimeout(() => $button.removeClass('loading disabled'), 5000);
+		}).fail(() => $button.removeClass('loading disabled'));
+	},
+
+	/**
+	 * Загрузка сопоставления пользователей из БД модуля.
+	 */
+	loadUsers() {
+		$.get(`${window.location.origin}${globalRootUrl}${idUrl}/getAccountUsers`, (response) => {
+			window[className].renderUsers(response);
+		});
+	},
+
+	/**
+	 * Обновление списка пользователей из amoCRM.
+	 */
+	refreshUsers() {
+		const $button = $('#refresh-users-button');
+		if ($button.hasClass('loading')) {
+			return;
+		}
+		$button.addClass('loading');
+		$.post(`${window.location.origin}${globalRootUrl}${idUrl}/refreshUsers`, {}, (response) => {
+			window[className].renderUsers(response);
+		}).always(() => $button.removeClass('loading'));
+	},
+
+	/**
+	 * Таблица пользователей amoCRM с выбором сотрудника MikoPBX.
+	 * @param response
+	 */
+	renderUsers(response) {
+		const $table = $('#amo-users-table');
+		const $message = $('#users-message');
+		const users = (response && response.users) || [];
+		const employees = (response && response.employees) || [];
+		const escape = window[className].escapeHtml;
+		$message.hide().removeClass('negative warning');
+		if (response && response.success === false && response.message) {
+			$message.addClass('negative').text(response.message).show();
+		}
+		if (users.length === 0) {
+			$table.hide();
+			if (!$message.is(':visible')) {
+				$message.addClass('warning').text(globalTranslate.mod_amo_usersEmpty).show();
+			}
+			window[className].usersLoaded = false;
+			return;
+		}
+		const $body = $table.find('tbody').empty();
+		const notMapped = window[className].usersNotMappedValue;
+		users.forEach((user) => {
+			// Пустое value Semantic UI делает placeholder-ом, который нельзя выбрать в списке.
+			const noneSelected = user.number === '' ? ' selected' : '';
+			let options = `<option value="${notMapped}"${noneSelected}>${escape(globalTranslate.mod_amo_usersNotMapped)}</option>`;
+			let found = user.number === '';
+			employees.forEach((employee) => {
+				const selected = employee.number === user.number ? ' selected' : '';
+				if (selected) {
+					found = true;
+				}
+				options += `<option value="${escape(employee.number)}"${selected}>${escape(employee.number)} — ${escape(employee.name)}</option>`;
+			});
+			if (!found) {
+				options += `<option value="${escape(user.number)}" selected>${escape(user.number)}</option>`;
+			}
+			$body.append(`<tr>
+				<td>${escape(user.name || user.amoUserId)}</td>
+				<td>${escape(user.email)}</td>
+				<td><select class="ui search fluid dropdown amo-user-select" data-amo-user-id="${escape(user.amoUserId)}">${options}</select></td>
+			</tr>`);
+		});
+		$table.find('select[data-amo-user-id]').dropdown({
+			fullTextSearch: true,
+			onChange() {
+				// Списки без name не входят в значения формы: отмечаем изменение явно.
+				Form.dataChanged();
+			},
+		});
+		$table.show();
+		window[className].usersLoaded = true;
+	},
+
+	/**
+	 * Сопоставление amoUserId => внутренний номер из таблицы пользователей.
+	 * @returns {{}}
+	 */
+	getUsersMapping() {
+		const mapping = {};
+		// Semantic UI переносит классы select на обёртку — ищем по data-атрибуту.
+		$('#amo-users-table select[data-amo-user-id]').each((index, obj) => {
+			const value = $(obj).val() || '';
+			mapping[$(obj).attr('data-amo-user-id')] = value === window[className].usersNotMappedValue ? '' : value;
+		});
+		return mapping;
 	},
 
 	updateAuthInfo(e) {
@@ -233,18 +476,26 @@ const ModuleAmoCrm = {
 		elStatusAuth.removeClass('red green');
 		elStatusAuth.text(globalTranslate.module_amo_crm_connect_refresh);
 
-		$.post(`${window.location.origin}/pbxcore/api/modules/${className}/listener`, params, function( data ) {
-			if (data && data.result === false) {
+		const onResponse = function(data, requestFailed) {
+			if (requestFailed === true || (data && data.result === false)) {
 				let messages = (data && data.messages) || {};
 				let errorData = messages['error-data'] || {};
 				let hint = errorData.hint || '';
 				let detail = errorData.detail || '';
 				let errorText = hint + (detail ? " (" + detail + ")." : "");
+				if (!errorText) {
+					errorText = globalTranslate.module_amo_crm_connect_fail;
+				}
+				elStatusAuth.removeClass('green').addClass('red');
+				elStatusAuth.text(globalTranslate.module_amo_crm_connect_fail);
 				$("#warning-message div.header").text(globalTranslate.mod_amo_Error);
 				$("#warning-message div.body").text(errorText);
 				$("#warning-message").show();
 			}
-		});
+		};
+		$.post(`${window.location.origin}/pbxcore/api/modules/${className}/listener`, params, onResponse)
+			// Newer cores preserve HTTP 4xx/5xx for failed module REST actions.
+			.fail((xhr) => onResponse(xhr.responseJSON, true));
 		if (window[className] && window[className].popup && typeof window[className].popup.close === 'function') {
 			window[className].popup.close();
 		}
@@ -606,6 +857,9 @@ const ModuleAmoCrm = {
 	cbBeforeSendForm(settings) {
 		const result = settings;
 		result.data = window[className].$formObj.form('get values');
+		if (window[className].usersLoaded) {
+			result.data.amoUsersMapping = JSON.stringify(window[className].getUsersMapping());
+		}
 		return result;
 	},
 	/**
@@ -666,4 +920,3 @@ const ModuleAmoCrm = {
 $(document).ready(() => {
 	window[className].initialize();
 });
-

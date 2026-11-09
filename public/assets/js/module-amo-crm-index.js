@@ -12,7 +12,7 @@ var idForm = 'module-amo-crm-form';
 var className = 'ModuleAmoCrm';
 var inputClassName = 'mikopbx-module-input';
 
-/* global $, globalRootUrl, globalTranslate, Form, Config */
+/* global $, globalRootUrl, globalTranslate, globalWebAdminLanguage, Form, Config */
 var ModuleAmoCrm = {
   $formObj: $('#' + idForm),
   $checkBoxes: $('#' + idForm + ' .ui.checkbox'),
@@ -23,6 +23,9 @@ var ModuleAmoCrm = {
   $statusToggle: $('#module-status-toggle'),
   $moduleStatus: $('#status'),
   authWindow: undefined,
+  usersLoaded: false,
+  // Значение пункта «не сопоставлен»; при сохранении превращается в пустой номер.
+  usersNotMappedValue: '__none__',
   /**
   /**
    * Field validation rules
@@ -70,14 +73,11 @@ var ModuleAmoCrm = {
     });
     window[className].onChangeSettings();
     window[className].$dropDowns.dropdown();
-    $('.info.circle').popup();
-    $('#webhookPort, #tokenForAmo, #externalHostname').on('input', function () {
-      return window[className].updateWebhookUrlPreview();
-    });
-    $('#copy-webhook-url').on('click', function () {
-      var input = document.getElementById('webhook-url-text');
-      input.select();
-      document.execCommand('copy');
+    $('.info.circle').not('.tab-hint').popup();
+    // Над вкладками строка модуля — подсказки к вкладкам показываем снизу.
+    $('.tab-hint').popup({
+      position: 'bottom left',
+      variation: 'wide'
     });
     $('#copy-pbx-address').on('click', function () {
       var host = $('#externalHostname').val() || $('#externalHostname').attr('placeholder') || '';
@@ -91,18 +91,25 @@ var ModuleAmoCrm = {
       document.execCommand('copy');
       tmp.remove();
     });
-    window[className].updateWebhookUrlPreview();
+    window[className].initIntegrationBadges();
     window[className].checkStatusToggle();
     window.addEventListener('ModuleStatusChanged', window[className].checkStatusToggle);
     window[className].initializeForm();
-    $('.menu .item').tab();
+    window[className].initTabs();
     window[className].checkStatus();
     setInterval(window[className].checkStatus, 5000);
+    window[className].loadUsers();
+    $('#refresh-users-button').popup({
+      position: 'bottom left'
+    }).on('click', function (e) {
+      // Клик по значку в заголовке вкладки: обновляем список и открываем вкладку.
+      e.preventDefault();
+      window[className].refreshUsers();
+    });
     $(window).bind('message', window[className].updateAuthInfo);
     $("#createPassword").on('click', function (e) {
       $("#tokenForAmo").val(window[className].generatePassword());
       $('#submitbutton').removeClass('disabled');
-      window[className].updateWebhookUrlPreview();
     });
     $("#login-button").on('click', function (e) {
       var client_id = $('#clientId').val();
@@ -150,23 +157,99 @@ var ModuleAmoCrm = {
       language: SemanticLocalization.dataTableLocalisation,
       order: [1, 'asc']
     });
-  },
-  updateWebhookUrlPreview: function updateWebhookUrlPreview() {
-    var port = $('#webhookPort').val();
-    var token = $('#tokenForAmo').val();
-    var host = $('#externalHostname').val() || $('#externalHostname').attr('placeholder') || window.location.hostname || 'your-pbx-host';
-    if (token) {
-      var url;
-      if (port) {
-        url = 'https://' + host + ':' + port + '/' + token + '/entity-update';
-      } else {
-        url = 'https://' + host + '/pbxcore/api/amo-crm/v1/entity-update';
-      }
-      $('#webhook-url-text').val(url);
-      $('#webhook-url-preview').show();
-    } else {
-      $('#webhook-url-preview').hide();
+    // Кнопка "Добавить правило" — в свободную левую колонку над таблицей (рядом с поиском).
+    var $rulesLeftColumn = $('#entitySettingsTable_wrapper .ui.grid > .row:first > .eight.wide.column:not(.right)');
+    if ($rulesLeftColumn.length > 0) {
+      $('#add-new-button').appendTo($rulesLeftColumn.first());
     }
+  },
+  /**
+   * Метки состояния интеграции (webhook, виджет, пользователи) в строке "Модуль включен".
+   * Строку рендерит ядро, поэтому метки добавляются отсюда.
+   */
+  /**
+   * Инициализация вкладок с сохранением активной вкладки в URL-хеше (#calls),
+   * чтобы после обновления страницы открывалась та же вкладка.
+   */
+  initTabs: function initTabs() {
+    var $items = $('.menu .item[data-tab]');
+    $items.tab({
+      onVisible: function onVisible(tabPath) {
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState(null, '', "#".concat(tabPath));
+        }
+      }
+    });
+    var hash = window.location.hash.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (hash !== '' && $items.filter("[data-tab=\"".concat(hash, "\"]")).length > 0) {
+      $items.tab('change tab', hash);
+    }
+  },
+  initIntegrationBadges: function initIntegrationBadges() {
+    var $segment = $('#module-status-toggle-segment');
+    if ($segment.length === 0 || $('#integration-badges').length > 0) {
+      return;
+    }
+    var escape = window[className].escapeHtml;
+    var sections = {
+      webhook: globalTranslate.mod_amo_integrationWebhook,
+      widget: globalTranslate.mod_amo_integrationWidget,
+      users: globalTranslate.mod_amo_integrationUsers
+    };
+    // Те же размер и стиль, что у кнопки настроек модуля (ui icon basic button).
+    var html = '<div id="integration-badges" class="ui basic buttons">';
+    Object.keys(sections).forEach(function (section) {
+      html += "<div class=\"ui button integration-badge\" data-section=\"".concat(section, "\"><i class=\"icon grey circle\"></i>").concat(escape(sections[section]), "</div>");
+    });
+    html += "<button class=\"ui icon button\" id=\"integration-sync-button\" type=\"button\" data-content=\"".concat(escape(globalTranslate.mod_amo_integrationSyncNow), "\"><i class=\"sync icon\"></i></button>");
+    html += '</div>';
+    var $settingsButton = $segment.find('.pbx-extensions-settings');
+    if ($settingsButton.length > 0) {
+      $settingsButton.after(html);
+    } else {
+      $segment.append(html);
+    }
+    // Копирование URL webhook из подсказки метки.
+    $('body').on('click', '.copy-webhook-url', function (e) {
+      e.preventDefault();
+      var $link = $(e.currentTarget);
+      window[className].copyToClipboard($link.attr('data-url'));
+      $link.find('i.icon').removeClass('copy').addClass('check green');
+      setTimeout(function () {
+        return $link.find('i.icon').removeClass('check green').addClass('copy');
+      }, 1500);
+    });
+    $('#integration-sync-button').popup({
+      position: 'bottom right'
+    }).on('click', function (e) {
+      e.preventDefault();
+      window[className].startIntegrationSync();
+    });
+  },
+  /**
+   * @param text
+   */
+  copyToClipboard: function copyToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text);
+      return;
+    }
+    var $tmp = $('<textarea>').val(text).css({
+      position: 'fixed',
+      top: 0,
+      opacity: 0
+    }).appendTo('body');
+    $tmp[0].select();
+    document.execCommand('copy');
+    $tmp.remove();
+  },
+  /**
+   * @param text
+   * @returns {string}
+   */
+  escapeHtml: function escapeHtml(text) {
+    // Результат подставляется и в атрибуты: экранируем кавычки тоже.
+    return $('<div>').text(text === undefined || text === null ? '' : String(text)).html().replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   },
   onChangeSettings: function onChangeSettings() {
     if ($('#isPrivateWidget').parent().checkbox('is checked')) {
@@ -218,7 +301,171 @@ var ModuleAmoCrm = {
       } else {
         $('#WaitSyncMsg').hide();
       }
+      window[className].renderIntegrationState(result.data.integrationState || {});
     });
+  },
+  /**
+   * Состояние настройки интеграции в amoCRM: цвет метки и расшифровка во всплывающей подсказке.
+   * @param state
+   */
+  renderIntegrationState: function renderIntegrationState(state) {
+    var escape = window[className].escapeHtml;
+    var formatTime = function formatTime(time) {
+      return new Date(time * 1000).toLocaleString(globalWebAdminLanguage || undefined);
+    };
+    ['webhook', 'widget', 'users'].forEach(function (section) {
+      var $label = $("#integration-badges .integration-badge[data-section=\"".concat(section, "\"]"));
+      if ($label.length === 0) {
+        return;
+      }
+      var data = state[section];
+      var color = 'grey';
+      var lines = [];
+      if (data) {
+        var isOk = data.state === 'ok';
+        color = isOk ? 'green' : data.state === 'error' ? 'red' : 'yellow';
+        var text = globalTranslate["mod_amo_state_".concat(data.state)] || data.state;
+        if (section === 'users' && isOk && data.count !== undefined) {
+          text += " (".concat(data.count, ")");
+        }
+        lines.push("<b>".concat(escape(text), "</b>"));
+        if (data.message) {
+          lines.push(escape(data.message));
+        }
+        if (section === 'webhook' && data.url) {
+          lines.push("<span style=\"word-break: break-all;\">".concat(escape(data.url), "</span> ") + "<a href=\"#\" class=\"copy-webhook-url\" data-url=\"".concat(escape(data.url), "\" title=\"").concat(escape(globalTranslate.mod_amo_copy), "\"><i class=\"copy icon\"></i></a>"));
+          if (isOk && data.selfCheck !== undefined && (data.selfCheck < 200 || data.selfCheck >= 300)) {
+            color = 'yellow';
+            lines.push(escape(globalTranslate.mod_amo_state_selfCheckFail));
+          }
+        }
+        if (data.time) {
+          lines.push("<span style=\"color: grey;\">".concat(escape(globalTranslate.mod_amo_integrationLastSync), ": ").concat(escape(formatTime(data.time)), "</span>"));
+        }
+      } else {
+        lines.push(escape(globalTranslate.mod_amo_state_unknown));
+      }
+      var $icon = $label.find('i.icon');
+      $icon.removeClass('grey green red yellow').addClass(color);
+      var html = lines.join('<br>');
+      // Подсказку пересоздаём только при изменении текста: иначе открытая подсказка мигает каждые 5 с.
+      if ($label.attr('data-popup-html') !== html) {
+        $label.attr('data-popup-html', html);
+        $label.popup('destroy');
+        // hoverable: подсказка не закрывается при переходе в неё мышью — можно выделить и скопировать текст.
+        $label.popup({
+          html: html,
+          position: 'bottom center',
+          variation: 'wide',
+          hoverable: true,
+          delay: {
+            show: 100,
+            hide: 400
+          }
+        });
+      }
+    });
+  },
+  /**
+   * Запуск настройки интеграции в фоне. Результат появится в состоянии при следующей проверке.
+   */
+  startIntegrationSync: function startIntegrationSync() {
+    var $button = $('#integration-sync-button');
+    $button.addClass('loading disabled');
+    $.post("".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/syncIntegration"), {}, function () {
+      setTimeout(function () {
+        return $button.removeClass('loading disabled');
+      }, 5000);
+    }).fail(function () {
+      return $button.removeClass('loading disabled');
+    });
+  },
+  /**
+   * Загрузка сопоставления пользователей из БД модуля.
+   */
+  loadUsers: function loadUsers() {
+    $.get("".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/getAccountUsers"), function (response) {
+      window[className].renderUsers(response);
+    });
+  },
+  /**
+   * Обновление списка пользователей из amoCRM.
+   */
+  refreshUsers: function refreshUsers() {
+    var $button = $('#refresh-users-button');
+    if ($button.hasClass('loading')) {
+      return;
+    }
+    $button.addClass('loading');
+    $.post("".concat(window.location.origin).concat(globalRootUrl).concat(idUrl, "/refreshUsers"), {}, function (response) {
+      window[className].renderUsers(response);
+    }).always(function () {
+      return $button.removeClass('loading');
+    });
+  },
+  /**
+   * Таблица пользователей amoCRM с выбором сотрудника MikoPBX.
+   * @param response
+   */
+  renderUsers: function renderUsers(response) {
+    var $table = $('#amo-users-table');
+    var $message = $('#users-message');
+    var users = response && response.users || [];
+    var employees = response && response.employees || [];
+    var escape = window[className].escapeHtml;
+    $message.hide().removeClass('negative warning');
+    if (response && response.success === false && response.message) {
+      $message.addClass('negative').text(response.message).show();
+    }
+    if (users.length === 0) {
+      $table.hide();
+      if (!$message.is(':visible')) {
+        $message.addClass('warning').text(globalTranslate.mod_amo_usersEmpty).show();
+      }
+      window[className].usersLoaded = false;
+      return;
+    }
+    var $body = $table.find('tbody').empty();
+    var notMapped = window[className].usersNotMappedValue;
+    users.forEach(function (user) {
+      // Пустое value Semantic UI делает placeholder-ом, который нельзя выбрать в списке.
+      var noneSelected = user.number === '' ? ' selected' : '';
+      var options = "<option value=\"".concat(notMapped, "\"").concat(noneSelected, ">").concat(escape(globalTranslate.mod_amo_usersNotMapped), "</option>");
+      var found = user.number === '';
+      employees.forEach(function (employee) {
+        var selected = employee.number === user.number ? ' selected' : '';
+        if (selected) {
+          found = true;
+        }
+        options += "<option value=\"".concat(escape(employee.number), "\"").concat(selected, ">").concat(escape(employee.number), " \u2014 ").concat(escape(employee.name), "</option>");
+      });
+      if (!found) {
+        options += "<option value=\"".concat(escape(user.number), "\" selected>").concat(escape(user.number), "</option>");
+      }
+      $body.append("<tr>\n\t\t\t\t<td>".concat(escape(user.name || user.amoUserId), "</td>\n\t\t\t\t<td>").concat(escape(user.email), "</td>\n\t\t\t\t<td><select class=\"ui search fluid dropdown amo-user-select\" data-amo-user-id=\"").concat(escape(user.amoUserId), "\">").concat(options, "</select></td>\n\t\t\t</tr>"));
+    });
+    $table.find('select[data-amo-user-id]').dropdown({
+      fullTextSearch: true,
+      onChange: function onChange() {
+        // Списки без name не входят в значения формы: отмечаем изменение явно.
+        Form.dataChanged();
+      }
+    });
+    $table.show();
+    window[className].usersLoaded = true;
+  },
+  /**
+   * Сопоставление amoUserId => внутренний номер из таблицы пользователей.
+   * @returns {{}}
+   */
+  getUsersMapping: function getUsersMapping() {
+    var mapping = {};
+    // Semantic UI переносит классы select на обёртку — ищем по data-атрибуту.
+    $('#amo-users-table select[data-amo-user-id]').each(function (index, obj) {
+      var value = $(obj).val() || '';
+      mapping[$(obj).attr('data-amo-user-id')] = value === window[className].usersNotMappedValue ? '' : value;
+    });
+    return mapping;
   },
   updateAuthInfo: function updateAuthInfo(e) {
     var payload = e && e.originalEvent && e.originalEvent.data || {};
@@ -234,17 +481,27 @@ var ModuleAmoCrm = {
     var elStatusAuth = $('#login-button');
     elStatusAuth.removeClass('red green');
     elStatusAuth.text(globalTranslate.module_amo_crm_connect_refresh);
-    $.post("".concat(window.location.origin, "/pbxcore/api/modules/").concat(className, "/listener"), params, function (data) {
-      if (data && data.result === false) {
+    var onResponse = function onResponse(data, requestFailed) {
+      if (requestFailed === true || data && data.result === false) {
         var messages = data && data.messages || {};
         var errorData = messages['error-data'] || {};
         var hint = errorData.hint || '';
         var detail = errorData.detail || '';
         var errorText = hint + (detail ? " (" + detail + ")." : "");
+        if (!errorText) {
+          errorText = globalTranslate.module_amo_crm_connect_fail;
+        }
+        elStatusAuth.removeClass('green').addClass('red');
+        elStatusAuth.text(globalTranslate.module_amo_crm_connect_fail);
         $("#warning-message div.header").text(globalTranslate.mod_amo_Error);
         $("#warning-message div.body").text(errorText);
         $("#warning-message").show();
       }
+    };
+    $.post("".concat(window.location.origin, "/pbxcore/api/modules/").concat(className, "/listener"), params, onResponse)
+    // Newer cores preserve HTTP 4xx/5xx for failed module REST actions.
+    .fail(function (xhr) {
+      return onResponse(xhr.responseJSON, true);
     });
     if (window[className] && window[className].popup && typeof window[className].popup.close === 'function') {
       window[className].popup.close();
@@ -593,6 +850,9 @@ var ModuleAmoCrm = {
   cbBeforeSendForm: function cbBeforeSendForm(settings) {
     var result = settings;
     result.data = window[className].$formObj.form('get values');
+    if (window[className].usersLoaded) {
+      result.data.amoUsersMapping = JSON.stringify(window[className].getUsersMapping());
+    }
     return result;
   },
   /**

@@ -311,15 +311,24 @@ class AmoCrmMain extends AmoCrmMainBase
         $url = str_replace(self::EMPTY_HOST_VALUE, $this->baseDomain ,$pageLink);
         $params = [];
         $response = ClientHTTP::sendHttpGetRequest($url, $params, $headers);
-        $result   = new PBXApiResult();
-        $nextUrl = $response->data['_links']['next']['href']??'';
-        $result->data = [
-            $type => [],
-            'nextPage' => $nextUrl,
-        ];
-        foreach ($response->data['_embedded'][$type]??[] as $contact){
-            $contact['type'] = $types[$type];
-            $result->data[$type][]  = $contact;
+        $page     = ChangedEntityPage::parse(
+            (bool)$response->success,
+            $response->data,
+            (array)$response->messages,
+            $type,
+            $types[$type] ?? $type
+        );
+        $result          = new PBXApiResult();
+        $result->success = $page['success'];
+        if ($page['success']) {
+            $result->data = [
+                $type      => $page['items'],
+                'nextPage' => $page['nextPage'],
+            ];
+        } else {
+            // Ошибка HTTP (401, 5xx, таймаут) — не пустая страница: SyncDaemon повторит запрос,
+            // а в init не завершит проход и не удалит кэш.
+            $result->messages = $page['messages'];
         }
         return $result;
     }
@@ -365,6 +374,198 @@ class AmoCrmMain extends AmoCrmMainBase
             $result = ClientHTTP::sendHttpPostRequest($url, $params, $headers);
         }
         return $result;
+    }
+
+    /**
+     * Заголовки авторизации для API amoCRM.
+     * @return array
+     */
+    private function authHeaders():array
+    {
+        return [
+            'Authorization' => $this->token->getTokenType().' '.$this->token->getAccessToken(),
+        ];
+    }
+
+    /**
+     * UUID OAuth-интеграции, с которой связан виджет (client_uuid в API виджетов).
+     * @return string
+     */
+    public function getIntegrationUuid():string
+    {
+        return $this->getClientId();
+    }
+
+    /**
+     * Страница каталога виджетов (code и client_uuid) — для поиска кода приватного виджета.
+     * @param int $page
+     * @return PBXAmoResult data: ['widgets' => [['code','client_uuid','is_active_in_account'], ...], 'pageCount' => int]
+     */
+    public function getWidgetsPage(int $page):PBXAmoResult
+    {
+        $url      = "https://$this->baseDomain/api/v4/widgets";
+        $response = ClientHTTP::sendHttpGetRequest($url, ['limit' => 250, 'page' => max(1, $page)], $this->authHeaders());
+        $result   = new PBXAmoResult();
+        $result->success  = $response->success;
+        $result->messages = $response->messages;
+        if (!$response->success) {
+            return $result;
+        }
+        $widgets = [];
+        foreach ($response->data['_embedded']['widgets'] ?? [] as $widget) {
+            $widgets[] = [
+                'code'                 => (string)($widget['code'] ?? ''),
+                'client_uuid'          => (string)($widget['client_uuid'] ?? ''),
+                'is_active_in_account' => !empty($widget['is_active_in_account']),
+            ];
+        }
+        $result->data = [
+            'widgets'   => $widgets,
+            'pageCount' => (int)($response->data['_page_count'] ?? 0),
+            'hasNext'   => isset($response->data['_links']['next']),
+        ];
+        return $result;
+    }
+
+    /**
+     * Настройки виджета MikoPBX в аккаунте.
+     * Значения настроек amoCRM возвращает только ключу связанной с виджетом интеграции.
+     * @param string $widgetCode Код виджета; пусто — код публичного виджета.
+     * @return PBXAmoResult data: ['code', 'client_uuid', 'is_active_in_account', 'settings' => [...], 'pbx_users' => [amoUserId => номер]]
+     */
+    public function getWidgetSettings(string $widgetCode = ''):PBXAmoResult
+    {
+        if ($widgetCode === '') {
+            $widgetCode = IntegrationConfig::PUBLIC_WIDGET_CODE;
+        }
+        $url      = "https://$this->baseDomain/api/v4/widgets/".rawurlencode($widgetCode);
+        $response = ClientHTTP::sendHttpGetRequest($url, [], $this->authHeaders());
+        $result   = new PBXAmoResult();
+        $result->success  = $response->success;
+        $result->messages = $response->messages;
+        if (!$response->success) {
+            return $result;
+        }
+        $settings = $response->data['settings'] ?? [];
+        if (!is_array($settings)) {
+            $settings = [];
+        }
+        $result->data = [
+            'code'                 => (string)($response->data['code'] ?? $widgetCode),
+            'client_uuid'          => (string)($response->data['client_uuid'] ?? ''),
+            'is_active_in_account' => !empty($response->data['is_active_in_account']),
+            'has_settings'         => isset($response->data['settings']),
+            'settings'             => $settings,
+            'pbx_users'            => IntegrationConfig::normalizeUsersMap($settings['pbx_users'] ?? []),
+        ];
+        return $result;
+    }
+
+    /**
+     * Запись настроек виджета (POST /api/v4/widgets/{code}). Требуются права администратора аккаунта.
+     * @param string $widgetCode
+     * @param array  $settings Поля шаблона настроек: token, miko_pbx_host, pbx_users.
+     * @return PBXAmoResult
+     */
+    public function saveWidgetSettings(string $widgetCode, array $settings):PBXAmoResult
+    {
+        $url  = "https://$this->baseDomain/api/v4/widgets/".rawurlencode($widgetCode);
+        $body = $settings;
+        if (isset($body['pbx_users']) && is_array($body['pbx_users']) && empty($body['pbx_users'])) {
+            // Пустой массив сериализуется в [], amoCRM ждёт объект.
+            $body['pbx_users'] = new \stdClass();
+        }
+        $response = ClientHTTP::sendHttpPostRequest($url, $body, $this->authHeaders());
+        if ($response->success) {
+            // В ответе — токен и адрес АТС, вызывающей стороне они не нужны.
+            $response->data = ['code' => (string)($response->data['code'] ?? $widgetCode)];
+        }
+        return $response;
+    }
+
+    /**
+     * Все пользователи аккаунта amoCRM.
+     * @return PBXAmoResult data: ['users' => [['id','name','email','is_active'], ...]]
+     */
+    public function getAccountUsers():PBXAmoResult
+    {
+        $url      = "https://$this->baseDomain/api/v4/users";
+        $users    = [];
+        $result   = new PBXAmoResult();
+        $complete = false;
+        for ($page = 1; $page <= 20; $page++) {
+            $response = ClientHTTP::sendHttpGetRequest($url, ['limit' => 250, 'page' => $page], $this->authHeaders());
+            if (!$response->success) {
+                $result->success  = false;
+                $result->messages = $response->messages;
+                return $result;
+            }
+            foreach ($response->data['_embedded']['users'] ?? [] as $user) {
+                if (!isset($user['id'])) {
+                    continue;
+                }
+                $users[] = [
+                    'id'        => (string)$user['id'],
+                    'name'      => (string)($user['name'] ?? ''),
+                    'email'     => (string)($user['email'] ?? ''),
+                    'is_active' => !isset($user['rights']['is_active']) || !empty($user['rights']['is_active']),
+                ];
+            }
+            if (!isset($response->data['_links']['next'])) {
+                $complete = true;
+                break;
+            }
+        }
+        if (!$complete) {
+            // Неполный список нельзя считать актуальным: по нему удаляются пользователи и их сопоставления.
+            $result->success  = false;
+            $result->messages = ['error-code' => 0, 'error-msg' => 'Too many amoCRM users (more than 20 pages), list is incomplete'];
+            return $result;
+        }
+        $result->success = true;
+        $result->data    = ['users' => $users];
+        return $result;
+    }
+
+    /**
+     * Webhook аккаунта.
+     * @return PBXAmoResult data: ['webhooks' => [...]]
+     */
+    public function getWebhooks():PBXAmoResult
+    {
+        $url      = "https://$this->baseDomain/api/v4/webhooks";
+        $response = ClientHTTP::sendHttpGetRequest($url, [], $this->authHeaders());
+        if ($response->success) {
+            $response->data = ['webhooks' => $response->data['_embedded']['webhooks'] ?? []];
+        }
+        return $response;
+    }
+
+    /**
+     * Создание webhook. Для существующего destination amoCRM заменяет список событий.
+     * @param string   $destination
+     * @param string[] $events
+     * @return PBXAmoResult
+     */
+    public function addWebhook(string $destination, array $events):PBXAmoResult
+    {
+        $url = "https://$this->baseDomain/api/v4/webhooks";
+        return ClientHTTP::sendHttpPostRequest(
+            $url,
+            ['destination' => $destination, 'settings' => array_values($events)],
+            $this->authHeaders()
+        );
+    }
+
+    /**
+     * Удаление webhook по destination.
+     * @param string $destination
+     * @return PBXAmoResult 404 — webhook уже удалён.
+     */
+    public function deleteWebhook(string $destination):PBXAmoResult
+    {
+        $url = "https://$this->baseDomain/api/v4/webhooks";
+        return ClientHTTP::sendHttpDeleteRequest($url, ['destination' => $destination], $this->authHeaders());
     }
 
     /**

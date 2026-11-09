@@ -12,6 +12,13 @@
         "token": "Token",
         "time_unit": "s."
     },
+    "errors": {
+        "alert": "MikoPBX: Attention!",
+        "errorLoadFrame": "No connection to the server.",
+        "errorAuthAPI": "Authorization error.",
+        "errorAPITimeOut": "Connection to the server lost.",
+        "createContactError": "Error creating contact."
+    },
     "advanced":{
         "title":"Settings menu item title"
     },

@@ -31,8 +31,14 @@ use MikoPBX\Core\Workers\WorkerBase;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ClientHTTP;
+use Modules\ModuleAmoCrm\Lib\EntitySettingsDefaults;
+use Modules\ModuleAmoCrm\Lib\IntegrationConfig;
+use Modules\ModuleAmoCrm\Lib\IntegrationSync;
 use Modules\ModuleAmoCrm\Lib\Logger;
+use Modules\ModuleAmoCrm\Lib\ModelsEventMessage;
+use Modules\ModuleAmoCrm\Lib\PhoneBookEntity;
 use Modules\ModuleAmoCrm\Lib\ResponsibleResolver;
+use Modules\ModuleAmoCrm\Models\ModuleAmoAccountUsers;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoEntitySettings;
 use Modules\ModuleAmoCrm\Models\ModuleAmoLeads;
@@ -124,6 +130,12 @@ class ConnectorDb extends WorkerBase
         $settings = ModuleAmoCrm::findFirst();
         if($settings){
             $this->portalId              = (int)$settings->portalId;
+            // Перезапуск во время init: записи из webhook/CDR должны получить текущий initTime,
+            // иначе deleteWithFailTime удалит их по завершении init.
+            $initSyncTime = (int)($settings->initSyncTime ?? 0);
+            if ($initSyncTime > 0) {
+                $this->initTime = $initSyncTime;
+            }
         }else{
             $settings = new ModuleAmoCrm();
             $settings->lastContactsSyncTime  = 0;
@@ -255,8 +267,9 @@ class ConnectorDb extends WorkerBase
         if($data['action'] === 'entity-update'){
             $this->checkMemLimits();
 
-            $res_data['entity'] = $this->updatePhoneBook($data['data']['contacts']??[]);
-            $this->updateLeads($data['data']['leads']??[]);
+            $webhookData = is_array($data['data'] ?? null) ? $data['data'] : [];
+            $res_data['entity'] = $this->updatePhoneBook(PhoneBookEntity::webhookUpdates($webhookData));
+            $this->updateLeads(is_array($webhookData['leads'] ?? null) ? $webhookData['leads'] : []);
         }elseif($data['action'] === 'invoke'){
             $this->checkMemLimits();
 
@@ -295,8 +308,9 @@ class ConnectorDb extends WorkerBase
      */
     public function entityUpdate($data):void
     {
-        $this->updatePhoneBook($data['contacts']??[]);
-        $this->updateLeads($data['leads']??[]);
+        $data = is_array($data) ? $data : [];
+        $this->updatePhoneBook(PhoneBookEntity::webhookUpdates($data));
+        $this->updateLeads(is_array($data['leads'] ?? null) ? $data['leads'] : []);
     }
 
     /**
@@ -348,6 +362,34 @@ class ConnectorDb extends WorkerBase
     }
 
     /**
+     * Атомарное изменение состояния init: применяется, только если сохранённый initSyncTime
+     * равен ожидаемому. ConnectorDb — единственный процесс, обрабатывающий запросы последовательно,
+     * и все записи initSyncTime (cron, SyncDaemon) идут через него, поэтому проверка и запись
+     * не разделены гонкой. Защищает от перезаписи состояния нового init процессом со старым initTime.
+     *
+     * @param int   $expectedInitTime   Ожидаемый initSyncTime (0 — init не идёт).
+     * @param array $data               Новые значения настроек.
+     * @param bool  $deleteNotSynced    Перед сохранением удалить записи, не обновлённые в init $expectedInitTime.
+     * @return bool false — состояние init сменилось (или настройки не найдены), ничего не изменено.
+     */
+    public function saveInitSettings(int $expectedInitTime, array $data, bool $deleteNotSynced = false): bool
+    {
+        $settings = ModuleAmoCrm::findFirst();
+        $current  = $settings ? (int)($settings->initSyncTime ?? 0) : -1;
+        if ($current !== $expectedInitTime) {
+            $this->logger->writeInfo(
+                ['expected' => $expectedInitTime, 'current' => $current, 'data' => array_keys($data)],
+                'Init state changed, settings are not saved'
+            );
+            return false;
+        }
+        if ($deleteNotSynced && $expectedInitTime > 0) {
+            $this->deleteWithFailTime($expectedInitTime);
+        }
+        return $this->saveNewSettings($data);
+    }
+
+    /**
      * Удаляет все записи, что не соответствуют $initTime
      * Используется при синхронизации / актуализации контактов
      * @param int $initTime
@@ -370,54 +412,65 @@ class ConnectorDb extends WorkerBase
         $result = [];
         if(isset($updates['initTime'])){
             $initTime = (int)$updates['initTime'];
-            if($initTime !== $this->initTime){
+            // initTime только растёт: страница устаревшего (заменённого) init не должна
+            // откатывать initTime нового — иначе записи webhook/CDR удалит deleteWithFailTime.
+            if($initTime > $this->initTime){
                 $this->initTime = $initTime;
                 $this->logger->writeInfo("New initTime: $initTime");
             }
         }
-        $idEntityFields = [
-            'contact' => 'idEntity',
-            'company' => 'linked_company_id',
-        ];
-
         $actions = ['update', 'add', 'delete'];
         foreach ($actions as $action){
             $entities = $updates[$action]??[];
+            if (!is_array($entities)) {
+                $entities = [];
+            }
             $result[$action.'-all'] = count($entities);
             $result[$action.'-saved'] = 0;
             $result[$action.'-fail'] = 0;
             foreach ($entities as $entity){
-                $idEntity = $idEntityFields[$entity['type']];
-                ModuleAmoPhones::find("$idEntity='$entity[id]'")->delete();
-                if($action === 'delete'){
+                // Некорректная сущность не должна обрывать сохранение всей пачки (GitHub #55).
+                // Счётчики -saved / -fail — в сущностях (как и -all).
+                $idEntity = PhoneBookEntity::idField($entity);
+                if ($idEntity === null) {
+                    $result[$action.'-fail']++;
+                    $this->logger->writeError(['error' => 'Invalid phone book entity', 'action' => $action, 'data' => $entity]);
                     continue;
                 }
-                $custom_fields = $entity['custom_fields']??$entity['custom_fields_values']??'';
-                foreach ($custom_fields as $field){
-                    $fCode = $field['code']??$field['field_code']??'';
-                    if($fCode !== 'PHONE'){
-                        continue;
-                    }
-                    foreach ($field['values'] as $value){
+                $db = null;
+                try {
+                    $rows = $action === 'delete' ? [] : PhoneBookEntity::rows($entity, $idEntity);
+                    // Удаление старых телефонов и запись новых — одной транзакцией: при сбое у сущности
+                    // остаются прежние телефоны, а не пустота до следующего init.
+                    $db = (new ModuleAmoPhones())->getWriteConnection();
+                    $db->begin();
+                    ModuleAmoPhones::find([
+                        'conditions' => "$idEntity = :id:",
+                        'bind'       => ['id' => (string)$entity['id']],
+                    ])->delete();
+                    foreach ($rows as $row){
                         /** @var ModuleAmoPhones $newRecord */
                         $newRecord = new ModuleAmoPhones();
-                        $newRecord->portalId            = $this->portalId;
-                        $newRecord->entityType          = $entity['type'];
-                        $newRecord->responsible_user_id = $entity['responsible_user_id'];
-                        $newRecord->phone               = $value['value'];
-                        $newRecord->idPhone             = AmoCrmMain::getPhoneIndex($value['value']);
-                        $newRecord->name                = $entity['name']??'';
-                        $newRecord->company_name        = $entity['company_name']??'';
-                        $newRecord->linked_company_id   = $entity['linked_company_id']??'';
-                        $newRecord->initTime            = $this->initTime;
-                        $newRecord->writeAttribute($idEntity,$entity['id']);
+                        foreach ($row as $column => $value){
+                            $newRecord->writeAttribute($column, $value);
+                        }
+                        $newRecord->idPhone  = AmoCrmMain::getPhoneIndex($row['phone']);
+                        $newRecord->portalId = $this->portalId;
+                        $newRecord->initTime = $this->initTime;
                         if(!$newRecord->save()){
-                            $result[$action.'-fail']++;
-                            $this->logger->writeError(['error' => 'Fail save contact', 'msg' => $newRecord->getMessages(), 'data' => $entity]);
-                        }else{
-                            $result[$action.'-saved']++ ;
+                            throw new \RuntimeException('Fail save contact: '.implode('; ', array_map('strval', $newRecord->getMessages())));
                         }
                     }
+                    $db->commit();
+                    $result[$action.'-saved']++;
+                } catch (\Throwable $e) {
+                    if ($db !== null && $db->isUnderTransaction()) {
+                        $db->rollback();
+                    }
+                    $result[$action.'-fail']++;
+                    $this->logger->writeError(
+                        ['error' => 'Fail update phone book entity', 'msg' => $e->getMessage(), 'action' => $action, 'data' => $entity]
+                    );
                 }
             }
         }
@@ -528,12 +581,7 @@ class ConnectorDb extends WorkerBase
         $haveEmptyDefUser  = false;
         $haveEmptyPipeline = false;
         if(count($dbSettings->toArray()) === 0){
-            $defSettingsFile = dirname(__DIR__).'/db/default-entity-settings.json';
-            try {
-                $defSettings = json_decode(file_get_contents($defSettingsFile), true, 512, JSON_THROW_ON_ERROR);
-            }catch (\Exception $e){
-                $defSettings = [];
-            }
+            $defSettings = EntitySettingsDefaults::load();
             foreach ($defSettings as $defSetting){
                 $setting = new ModuleAmoEntitySettings();
                 foreach ($defSetting as $key => $value){
@@ -605,7 +653,8 @@ class ConnectorDb extends WorkerBase
         $isSync = true; $logMessage = '';
         if (isset($updates['initTime'])) {
             $initTimeValue = (int)$updates['initTime'];
-            if ($initTimeValue !== $this->initTime) {
+            // initTime только растёт (см. updatePhoneBook).
+            if ($initTimeValue > $this->initTime) {
                 $this->initTime = $initTimeValue;
                 $logMessage = "Updated initTime to $initTimeValue";
             }
@@ -632,69 +681,18 @@ class ConnectorDb extends WorkerBase
                 $contacts = $lead['_embedded']['contacts']??[];
                 $company  = $lead['_embedded']['companies'][0]['id']??'';
 
-                $oldData = ModuleAmoLeads::find("idAmo='{$lead['id']}' AND {$this->portalId}=portalId");
+                // Значения только через bind: Phalcon кэширует разбор каждой уникальной строки PHQL
+                // навсегда, и интерполяция id приводит к росту памяти воркера (#63).
+                $oldData = ModuleAmoLeads::find($this->leadFilter($lead['id']));
                 if($action === 'delete'){
                     $this->logger->writeInfo($lead, "Remove all lead data (action '$action')");
                     $oldData->delete();
                     unset($oldData);
                     continue;
                 }
-                if ($isSync) {
-                    foreach ($oldData as $oldRecord) {
-                        $haveContact = false;
-                        foreach ($contacts as $contact) {
-                            if ((int)$oldRecord->contactId === $contact['id']) {
-                                $haveContact = true;
-                                break;
-                            }
-                        }
-                        // Если контакт не найден и $oldRecord->contactId пустой и $company совпадает, считаем, что контакт есть
-                        if (!$haveContact && $oldRecord->contactId === '' && $company === (int)$oldRecord->companyId) {
-                            $haveContact = true;
-                        }
-                        if (!$haveContact) {
-                            $this->logger->writeInfo($oldRecord->toArray(), "Remove data for removed contact (action '$action')");
-                            $oldRecord->delete();
-                        }
-                    }
-                }
-                unset($oldData);
-
-                if($isSync){
-                    // В этом случае есть данные о контактах.
-                    foreach ($contacts as $contact) {
-                        $newRecord = $this->findOrCreateAmoLead($lead['id'], $contact['id']);
-                        $newRecord->portalId = $this->portalId;
-                        $newRecord->idAmo = $lead['id'];
-                        $newRecord->name = $lead['name'];
-                        $newRecord->responsible_user_id = $lead['responsible_user_id'];
-                        $newRecord->status_id = $lead['status_id'];
-                        $newRecord->pipeline_id = $lead['pipeline_id'];
-                        $newRecord->contactId = $contact['id'];
-                        $newRecord->companyId = $company;
-                        $newRecord->isMainContact = $contact['is_main'] ? '1' : '0';
-                        $newRecord->closed_at = $lead['closed_at'] ?? 0;
-                        $newRecord->initTime = $this->initTime;
-                        $this->saveAmoLead($newRecord, $contact);
-                    }
-
-                    if (!empty($company) && empty($contacts)) {
-                        $newRecord = $this->findOrCreateAmoLead($lead['id'], null, $company);
-                        $newRecord->portalId = $this->portalId;
-                        $newRecord->idAmo = $lead['id'];
-                        $newRecord->name = $lead['name'];
-                        $newRecord->responsible_user_id = $lead['responsible_user_id'];
-                        $newRecord->status_id = $lead['status_id'];
-                        $newRecord->pipeline_id = $lead['pipeline_id'];
-                        $newRecord->companyId = $company;
-                        $newRecord->closed_at = $lead['closed_at'] ?? 0;
-                        $newRecord->initTime = $this->initTime;
-                        $this->saveAmoLead($newRecord, $lead);
-                    }
-                }else{
+                if(!$isSync){
                     // В этом случае нет информации о контактах. Обновляем поля сделки.
-                    $records = ModuleAmoLeads::find("idAmo = '{$lead['id']}' AND $this->portalId = portalId");
-                    foreach ($records as $record){
+                    foreach ($oldData as $record){
                         $record->name = $lead['name'];
                         $record->responsible_user_id = $lead['responsible_user_id'];
                         $record->status_id = $lead['status_id'];
@@ -702,6 +700,58 @@ class ConnectorDb extends WorkerBase
                         $record->closed_at = $lead['closed_at'] ?? 0;
                         $this->saveAmoLead($record, $lead);
                     }
+                    unset($oldData);
+                    continue;
+                }
+
+                foreach ($oldData as $oldRecord) {
+                    $haveContact = false;
+                    foreach ($contacts as $contact) {
+                        if ((int)$oldRecord->contactId === $contact['id']) {
+                            $haveContact = true;
+                            break;
+                        }
+                    }
+                    // Если контакт не найден и $oldRecord->contactId пустой и $company совпадает, считаем, что контакт есть
+                    if (!$haveContact && $oldRecord->contactId === '' && $company === (int)$oldRecord->companyId) {
+                        $haveContact = true;
+                    }
+                    if (!$haveContact) {
+                        $this->logger->writeInfo($oldRecord->toArray(), "Remove data for removed contact (action '$action')");
+                        $oldRecord->delete();
+                    }
+                }
+                unset($oldData);
+
+                // В этом случае есть данные о контактах.
+                foreach ($contacts as $contact) {
+                    $newRecord = $this->findOrCreateAmoLead($lead['id'], $contact['id']);
+                    $newRecord->portalId = $this->portalId;
+                    $newRecord->idAmo = $lead['id'];
+                    $newRecord->name = $lead['name'];
+                    $newRecord->responsible_user_id = $lead['responsible_user_id'];
+                    $newRecord->status_id = $lead['status_id'];
+                    $newRecord->pipeline_id = $lead['pipeline_id'];
+                    $newRecord->contactId = $contact['id'];
+                    $newRecord->companyId = $company;
+                    $newRecord->isMainContact = $contact['is_main'] ? '1' : '0';
+                    $newRecord->closed_at = $lead['closed_at'] ?? 0;
+                    $newRecord->initTime = $this->initTime;
+                    $this->saveAmoLead($newRecord, $contact);
+                }
+
+                if (!empty($company) && empty($contacts)) {
+                    $newRecord = $this->findOrCreateAmoLead($lead['id'], null, $company);
+                    $newRecord->portalId = $this->portalId;
+                    $newRecord->idAmo = $lead['id'];
+                    $newRecord->name = $lead['name'];
+                    $newRecord->responsible_user_id = $lead['responsible_user_id'];
+                    $newRecord->status_id = $lead['status_id'];
+                    $newRecord->pipeline_id = $lead['pipeline_id'];
+                    $newRecord->companyId = $company;
+                    $newRecord->closed_at = $lead['closed_at'] ?? 0;
+                    $newRecord->initTime = $this->initTime;
+                    $this->saveAmoLead($newRecord, $lead);
                 }
             }
         }
@@ -719,21 +769,38 @@ class ConnectorDb extends WorkerBase
     private function findOrCreateAmoLead($leadId, $contactId = null, $companyId = null):ModuleAmoLeads
     {
         // Формирование условий для поиска записи в базе данных
-        $conditions = "idAmo = '$leadId' AND ";
+        $filter = $this->leadFilter($leadId);
         if(!empty($contactId)){
-            $conditions .= "contactId = $contactId AND ";
+            $filter['conditions'] .= ' AND contactId = :contactId:';
+            $filter['bind']['contactId'] = (string)$contactId;
         }
         if(!empty($companyId)){
-            $conditions .= "companyId = $companyId AND ";
+            $filter['conditions'] .= ' AND companyId = :companyId:';
+            $filter['bind']['companyId'] = (string)$companyId;
         }
-        $conditions .= "$this->portalId = portalId";
         // Поиск записи в базе данных по указанным условиям
-        $newRecord = ModuleAmoLeads::findFirst($conditions);
+        $newRecord = ModuleAmoLeads::findFirst($filter);
         // Если запись не найдена, создается новая запись
         if (!$newRecord) {
             $newRecord = new ModuleAmoLeads();
         }
         return $newRecord;
+    }
+
+    /**
+     * Фильтр ModuleAmoLeads по id сделки в текущем портале (параметры через bind).
+     * @param  $leadId
+     * @return array
+     */
+    private function leadFilter($leadId):array
+    {
+        return [
+            'conditions' => 'idAmo = :idAmo: AND portalId = :portalId:',
+            'bind'       => [
+                'idAmo'    => (string)$leadId,
+                'portalId' => $this->portalId,
+            ],
+        ];
     }
 
     /**
@@ -762,7 +829,7 @@ class ConnectorDb extends WorkerBase
      */
     public function addContactLeadFromUnsorted($phone, $contactId, $leadId):bool
     {
-        $oldData = ModuleAmoLeads::findFirst("idAmo='{$leadId}'");
+        $oldData = ModuleAmoLeads::findFirst($this->leadFilter($leadId));
         if(!$oldData){
             $newRecord = new ModuleAmoLeads();
             $newRecord->portalId            = $this->portalId;
@@ -773,7 +840,11 @@ class ConnectorDb extends WorkerBase
             $newRecord->save();
         }
 
-        $oldData = ModuleAmoPhones::findFirst("idEntity='{$phone}'");
+        // $phone — request_id неразобранного, т.е. индекс телефона (AmoCrmMain::getPhoneIndex), ищем по idPhone.
+        $oldData = ModuleAmoPhones::findFirst([
+            'conditions' => 'idPhone = :phone: AND portalId = :portalId:',
+            'bind'       => ['phone' => (string)$phone, 'portalId' => $this->portalId],
+        ]);
         if(!$oldData){
             /** @var ModuleAmoPhones $newRecord */
             $newRecord = new ModuleAmoPhones();
@@ -977,32 +1048,34 @@ class ConnectorDb extends WorkerBase
         // не отправляется автоматически. Отправляем вручную.
         $changedFields = $settings->getChangedFields();
         $result = $settings->save();
+        if ($result && isset($data['initSyncTime']) && (int)$data['initSyncTime'] > $this->initTime) {
+            // Старт init (cron или SyncDaemon): записи из webhook/CDR сразу получают новый initTime,
+            // не дожидаясь первой страницы SyncDaemon — иначе deleteWithFailTime удалит их по завершении init.
+            $this->initTime = (int)$data['initSyncTime'];
+        }
         if ($result && !empty($changedFields)) {
             $queue = $this->di->getShared(BeanstalkConnectionModelsProvider::SERVICE_NAME);
             if ($queue !== null) {
                 // Уведомляем модули об изменении модели
-                $queue->publish(json_encode([
-                    'source' => BeanstalkConnectionModelsProvider::SOURCE_MODELS_CHANGED,
-                    'model'  => get_class($settings),
-                    'recordId' => $settings->id,
-                    'action' => 'afterSave',
-                    'changedFields' => $changedFields,
-                ]));
+                $queue->publish(json_encode(ModelsEventMessage::modelChanged(
+                    BeanstalkConnectionModelsProvider::SOURCE_MODELS_CHANGED,
+                    get_class($settings),
+                    $settings->id,
+                    $changedFields
+                )));
                 // Перегенерация nginx и firewall при изменении webhook-порта или токена
                 $nginxFields = ['webhookPort', 'tokenForAmo'];
                 if (!empty(array_intersect($nginxFields, $changedFields))) {
-                    $queue->publish(json_encode([
-                        'source' => BeanstalkConnectionModelsProvider::SOURCE_INVOKE_ACTION,
-                        'action' => ReloadNginxConfAction::class,
-                        'parameters' => [],
-                    ]));
+                    $queue->publish(json_encode(ModelsEventMessage::invokeAction(
+                        BeanstalkConnectionModelsProvider::SOURCE_INVOKE_ACTION,
+                        ReloadNginxConfAction::class
+                    )));
                 }
                 if (in_array('webhookPort', $changedFields, true)) {
-                    $queue->publish(json_encode([
-                        'source' => BeanstalkConnectionModelsProvider::SOURCE_INVOKE_ACTION,
-                        'action' => ReloadFirewallAction::class,
-                        'parameters' => [],
-                    ]));
+                    $queue->publish(json_encode(ModelsEventMessage::invokeAction(
+                        BeanstalkConnectionModelsProvider::SOURCE_INVOKE_ACTION,
+                        ReloadFirewallAction::class
+                    )));
                 }
             }
         }
@@ -1032,36 +1105,336 @@ class ConnectorDb extends WorkerBase
     }
 
     /**
+     * Пользователи amoCRM текущего аккаунта с сопоставлением.
+     * @return array
+     */
+    public function getAccountUsers():array
+    {
+        if ($this->portalId === 0) {
+            return [];
+        }
+        return ModuleAmoAccountUsers::find([
+            'conditions' => 'portalId = :portalId:',
+            'bind'       => ['portalId' => $this->portalId],
+            'order'      => 'isActive DESC, name',
+        ])->toArray();
+    }
+
+    /**
+     * Сохраняет список пользователей аккаунта amoCRM.
+     * Прежние сопоставления переносятся из m_ModuleAmoUsers как есть; новым пользователям
+     * номер берётся из настроек виджета (только номера, существующие на АТС).
+     * Неактивные пользователи не сохраняются; ставшие неактивными и удалённые из amoCRM
+     * удаляются вместе с сопоставлением (m_ModuleAmoUsers перестраивается).
+     * @param array $amoUsers  [['id','name','email','is_active'], ...]
+     * @param array $widgetMap amoUserId => номер из настройки виджета pbx_users.
+     * @return array ['success' => bool, 'users' => getAccountUsers()]
+     */
+    public function saveAccountUsers(array $amoUsers, array $widgetMap = []):array
+    {
+        if ($this->portalId === 0) {
+            return ['success' => false, 'users' => []];
+        }
+        $this->seedAccountUsersFromLegacy();
+        $pbxNumbers = array_flip($this->getPbxNumbers());
+        $existing = [];
+        $rows = ModuleAmoAccountUsers::find([
+            'conditions' => 'portalId = :portalId:',
+            'bind'       => ['portalId' => $this->portalId],
+        ]);
+        foreach ($rows as $row) {
+            $existing[(string)$row->amoUserId] = $row;
+        }
+        $seen = [];
+        $success = true;
+        $hasUsers = false;
+        foreach ($amoUsers as $user) {
+            $amoUserId = (string)($user['id'] ?? '');
+            if (preg_match('/^[1-9][0-9]*$/', $amoUserId) !== 1) {
+                continue;
+            }
+            $hasUsers = true;
+            if (empty($user['is_active'])) {
+                // Неактивных не храним: их нельзя назначить ответственным и передать в виджет.
+                continue;
+            }
+            $seen[$amoUserId] = true;
+            $record = $existing[$amoUserId] ?? null;
+            if ($record === null) {
+                $record = new ModuleAmoAccountUsers();
+                $record->portalId  = $this->portalId;
+                $record->amoUserId = $amoUserId;
+                // Прежние сопоставления перенесены seedAccountUsersFromLegacy(); новому пользователю —
+                // номер из настроек виджета, если он есть на АТС.
+                $number = trim((string)($widgetMap[$amoUserId] ?? ''));
+                $record->number = isset($pbxNumbers[$number]) ? $number : '';
+            }
+            $record->name      = (string)($user['name'] ?? '');
+            $record->email     = (string)($user['email'] ?? '');
+            $record->isActive  = '1';
+            $record->inAccount = '1';
+            if (!$record->save()) {
+                $success = false;
+                $this->logger->writeError(['error' => 'Fail save amoCRM user', 'msg' => $record->getMessages(), 'data' => $user]);
+            }
+        }
+        // Пустой ответ amoCRM не считается пустым аккаунтом: сопоставление не трогаем.
+        if ($hasUsers) {
+            foreach ($existing as $amoUserId => $record) {
+                if (!isset($seen[$amoUserId])) {
+                    $this->logger->writeInfo($record->toArray(), 'amoCRM user removed (inactive or deleted from account)');
+                    $record->delete();
+                }
+            }
+        }
+        $this->rebuildPortalUsers();
+        return ['success' => $success, 'users' => $this->getAccountUsers()];
+    }
+
+    /**
+     * Изменение сопоставления пользователей (из настроек модуля или виджета amoCRM).
+     * Номер, которого нет на АТС, обнуляет сопоставление. Пользователи, которых нет
+     * во входных данных, не меняются.
+     * @param array $map amoUserId => внутренний номер.
+     * @param int $portalId Аккаунт, из которого пришли данные (0 — текущий).
+     * @return array ['success' => bool, 'changed' => string[], 'rejected' => [amoUserId => номер]]
+     */
+    public function saveUsersMapping(array $map, int $portalId = 0):array
+    {
+        if ($this->portalId === 0 || ($portalId > 0 && $portalId !== $this->portalId)) {
+            $this->logger->writeError(['portalId' => $portalId, 'modulePortalId' => $this->portalId], 'Users mapping ignored: other amoCRM account');
+            return ['success' => false, 'changed' => [], 'rejected' => []];
+        }
+        $this->seedAccountUsersFromLegacy();
+        $records = [];
+        $current = [];
+        $rows = ModuleAmoAccountUsers::find([
+            'conditions' => 'portalId = :portalId:',
+            'bind'       => ['portalId' => $this->portalId],
+        ]);
+        foreach ($rows as $row) {
+            $records[(string)$row->amoUserId] = $row;
+            $current[(string)$row->amoUserId] = trim((string)$row->number);
+        }
+        $result  = IntegrationConfig::applyUsersMap($current, $map, $this->getPbxNumbers());
+        $success = true;
+        foreach ($result['changed'] as $amoUserId) {
+            $record = $records[$amoUserId] ?? null;
+            if ($record === null) {
+                // Пользователь ещё не загружен из amoCRM (виджет сохранён раньше обновления списка).
+                $record = new ModuleAmoAccountUsers();
+                $record->portalId  = $this->portalId;
+                $record->amoUserId = $amoUserId;
+                $record->inAccount = '0';
+            }
+            $record->number = $result['map'][$amoUserId];
+            if (!$record->save()) {
+                $success = false;
+                $this->logger->writeError(['error' => 'Fail save users mapping', 'msg' => $record->getMessages(), 'amoUserId' => $amoUserId]);
+            }
+        }
+        if (!empty($result['rejected'])) {
+            $this->logger->writeInfo($result['rejected'], 'Users mapping: numbers not found on PBX, reset');
+        }
+        if (!empty($result['changed'])) {
+            $this->logger->writeInfo(array_intersect_key($result['map'], array_flip($result['changed'])), 'Users mapping changed');
+            $this->rebuildPortalUsers();
+        }
+        return ['success' => $success, 'changed' => $result['changed'], 'rejected' => $result['rejected']];
+    }
+
+    /**
+     * Первое заполнение m_ModuleAmoAccountUsers из прежней таблицы m_ModuleAmoUsers (обновление модуля).
+     * Номера переносятся без проверки: рабочие сопоставления не должны пропасть, пока список
+     * пользователей amoCRM ещё не загружен (иначе rebuildPortalUsers удалил бы их).
+     * @return void
+     */
+    private function seedAccountUsersFromLegacy():void
+    {
+        $exists = ModuleAmoAccountUsers::findFirst([
+            'conditions' => 'portalId = :portalId:',
+            'bind'       => ['portalId' => $this->portalId],
+        ]);
+        if ($exists) {
+            return;
+        }
+        $legacy = ModuleAmoUsers::find([
+            'conditions' => 'portalId = :portalId: AND enable = 1',
+            'bind'       => ['portalId' => $this->portalId],
+        ]);
+        $seeded = [];
+        foreach ($legacy as $row) {
+            $amoUserId = trim((string)$row->amoUserId);
+            $number    = trim((string)$row->number);
+            if (preg_match('/^[1-9][0-9]*$/', $amoUserId) !== 1 || $number === '' || isset($seeded[$amoUserId])) {
+                continue;
+            }
+            $record = new ModuleAmoAccountUsers();
+            $record->portalId  = $this->portalId;
+            $record->amoUserId = $amoUserId;
+            $record->number    = $number;
+            $record->inAccount = '0';
+            if ($record->save()) {
+                $seeded[$amoUserId] = $number;
+            }
+        }
+        if (!empty($seeded)) {
+            $this->logger->writeInfo($seeded, 'Users mapping migrated from m_ModuleAmoUsers');
+        }
+    }
+
+    /**
+     * Пересобирает рабочую таблицу m_ModuleAmoUsers (её читают AmoCdrDaemon, WorkerAmoCrmAMI)
+     * по сопоставлению из m_ModuleAmoAccountUsers.
+     * @return void
+     */
+    private function rebuildPortalUsers():void
+    {
+        $desired = [];
+        $rows = ModuleAmoAccountUsers::find([
+            'conditions' => 'portalId = :portalId:',
+            'bind'       => ['portalId' => $this->portalId],
+        ]);
+        foreach ($rows as $row) {
+            $number = trim((string)$row->number);
+            if ($number !== '') {
+                $desired[(string)$row->amoUserId] = $number;
+            }
+        }
+        $legacy = ModuleAmoUsers::find([
+            'conditions' => 'portalId = :portalId:',
+            'bind'       => ['portalId' => $this->portalId],
+        ]);
+        foreach ($legacy as $row) {
+            $amoUserId = (string)$row->amoUserId;
+            if (!isset($desired[$amoUserId])) {
+                $row->delete();
+                continue;
+            }
+            if ((string)$row->number !== $desired[$amoUserId] || (int)$row->enable !== 1) {
+                $row->number = $desired[$amoUserId];
+                $row->enable = '1';
+                $row->save();
+            }
+            unset($desired[$amoUserId]);
+        }
+        foreach ($desired as $amoUserId => $number) {
+            $row = new ModuleAmoUsers();
+            $row->amoUserId = $amoUserId;
+            $row->portalId  = $this->portalId;
+            $row->number    = $number;
+            $row->enable    = '1';
+            $row->save();
+        }
+        $this->users = [];
+        foreach (ModuleAmoUsers::find('enable=1') as $user) {
+            if (is_numeric($user->amoUserId)) {
+                $this->users[1 * $user->amoUserId] = (string)$user->number;
+            }
+        }
+    }
+
+    /**
+     * Запуск настройки интеграции в amoCRM отдельным процессом (от root).
+     * Для веб-интерфейса, который работает не от root.
+     * @param string $mode all | users | widget
+     * @param int $delay
+     * @return bool
+     */
+    public function startIntegrationSync(string $mode = IntegrationSync::MODE_ALL, int $delay = 0):bool
+    {
+        IntegrationSync::startInBackground($mode, $delay);
+        return true;
+    }
+
+    /**
+     * Внутренние номера сотрудников АТС.
+     * @return string[]
+     */
+    private function getPbxNumbers():array
+    {
+        $numbers = [];
+        $extensions = Extensions::find([
+            'conditions' => 'type = :type:',
+            'bind'       => ['type' => Extensions::TYPE_SIP],
+            'columns'    => 'number',
+        ]);
+        foreach ($extensions as $ext) {
+            $numbers[] = (string)$ext->number;
+        }
+        return $numbers;
+    }
+
+    /**
      * Метод следует вызывать при работе с API из прочих процессов.
      * @param string $function
      * @param array $args
      * @param bool $retVal
-     * @return array|bool|mixed
+     * @param int $timeout Ожидание ответа, секунд.
+     * @return array|bool|mixed При отказе (таймаут, ошибка очереди, битый ответ) — [].
      */
-    public static function invoke(string $function, array $args = [], bool $retVal = true){
+    public static function invoke(string $function, array $args = [], bool $retVal = true, int $timeout = 60){
+        if(!$retVal){
+            try {
+                $client = new BeanstalkClient(self::class);
+                $client->publish(json_encode([
+                    'action'   => 'invoke',
+                    'function' => $function,
+                    'args'     => $args
+                ], JSON_THROW_ON_ERROR));
+                return true;
+            } catch (\Throwable $e) {
+                return [];
+            }
+        }
+        $ok     = false;
+        $object = self::requestResult($function, $args, $timeout, $ok);
+        return $ok ? $object : [];
+    }
+
+    /**
+     * Как invoke() с ожиданием результата, но отказ отличим от пустого результата.
+     * @param string $function
+     * @param array $args
+     * @param int $timeout Ожидание ответа, секунд.
+     * @return mixed|null null — ConnectorDb не ответил или ответ не разобран.
+     */
+    public static function tryInvoke(string $function, array $args = [], int $timeout = 60)
+    {
+        $ok     = false;
+        $object = self::requestResult($function, $args, $timeout, $ok);
+        return $ok ? $object : null;
+    }
+
+    /**
+     * @param string $function
+     * @param array $args
+     * @param int $timeout
+     * @param bool $ok true, если получен и разобран ответ ConnectorDb.
+     * @return mixed
+     */
+    private static function requestResult(string $function, array $args, int $timeout, bool &$ok)
+    {
+        $ok  = false;
         $req = [
             'action'   => 'invoke',
             'function' => $function,
-            'args'     => $args
+            'args'     => $args,
+            'need-ret' => true,
         ];
-        $client = new BeanstalkClient(self::class);
-        $object = [];
         try {
-            if($retVal){
-                $req['need-ret'] = true;
-                $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), 60);
-            }else{
-                $client->publish(json_encode($req, JSON_THROW_ON_ERROR));
-                return true;
+            $client = new BeanstalkClient(self::class);
+            $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), $timeout);
+            if(!is_string($result) || $result === '' || !file_exists($result)){
+                return null;
             }
-            if(file_exists($result)){
-                $object = json_decode(file_get_contents($result), true, 512, JSON_THROW_ON_ERROR);
-                unlink($result);
-            }
+            $object = json_decode(file_get_contents($result), true, 512, JSON_THROW_ON_ERROR);
+            unlink($result);
+            $ok = true;
+            return $object;
         } catch (\Throwable $e) {
-            $object = [];
+            return null;
         }
-        return $object;
     }
 
     /**

@@ -18,6 +18,44 @@
  */
 
 use Modules\ModuleAmoCrm\bin\ConnectorDb;
+use Modules\ModuleAmoCrm\Lib\Logger;
+use Modules\ModuleAmoCrm\Lib\SyncState;
 require_once 'Globals.php';
-$settings = ['lastContactsSyncTime'=>0, 'lastCompaniesSyncTime' => 0, 'lastLeadsSyncTime' => 0];
-ConnectorDb::invoke('saveNewSettings', [$settings]);
+
+// Старт init-синхронизации: фиксируем initTime в настройках, чтобы после перезапуска
+// SyncDaemon продолжил тот же проход, а не начал инкремент с нуля.
+$logger   = new Logger('SyncDaemon', 'ModuleAmoCrm');
+// ConnectorDb может перезапускаться в момент запуска cron — несколько попыток, иначе init пропустит сутки.
+$settings = [];
+for ($attempt = 1; $attempt <= 3; $attempt++) {
+    $settings = ConnectorDb::invoke('getModuleSettings', [true])['ModuleAmoCrm'] ?? [];
+    if (!empty($settings) && is_array($settings)) {
+        break;
+    }
+    if ($attempt < 3) {
+        sleep(10);
+    }
+}
+if (empty($settings) || !is_array($settings)) {
+    $logger->writeError('Scheduled init skipped: module settings are unavailable (ConnectorDb)');
+    exit(1);
+}
+$now = time();
+if (!SyncState::canStartScheduledInit($settings, $now)) {
+    $logger->writeInfo(
+        ['initSyncTime' => $settings['initSyncTime'] ?? null],
+        'Scheduled init skipped: previous init is not finished'
+    );
+    exit(0);
+}
+$prevInit = (int)($settings['initSyncTime'] ?? 0);
+if ($prevInit > 0) {
+    $logger->writeError(['initSyncTime' => $prevInit], 'Previous init expired, replaced by scheduled init');
+}
+$initTime = $now;
+// Атомарно: старт только если initSyncTime не изменился с момента чтения (SyncDaemon мог начать/завершить init).
+if (ConnectorDb::invoke('saveInitSettings', [$prevInit, SyncState::startSettings($initTime)]) !== true) {
+    $logger->writeError(['expectedInitSyncTime' => $prevInit], 'Scheduled init not started: init state changed or ConnectorDb unavailable');
+    exit(1);
+}
+$logger->writeInfo("Scheduled init started, initTime: $initTime");

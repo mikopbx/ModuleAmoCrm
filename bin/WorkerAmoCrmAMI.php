@@ -116,7 +116,8 @@ class WorkerAmoCrmAMI extends WorkerBase
 
         $allSettings = ConnectorDb::invoke('getModuleSettings', [true]);
         if(!empty($allSettings) && is_array($allSettings)){
-            $this->useInterception = ($allSettings['ModuleAmoCrm']['useInterception']??'0') === '1';
+            // Флаг приходит из integer-столбца числом (#65).
+            $this->useInterception = intval($allSettings['ModuleAmoCrm']['useInterception'] ?? 0) === 1;
         }
     }
 
@@ -623,10 +624,11 @@ class WorkerAmoCrmAMI extends WorkerBase
         } else {
             return;
         }
+        $eventTime = strtotime($data['start'] ?? $data['event_time'] ?? 'now');
         $call = [
             'uid'              => $data['UNIQUEID'],
             'id'               => $data['linkedid'],
-            'date'             => date(\DateTimeInterface::ATOM, strtotime($data['start'])),
+            'date'             => date(\DateTimeInterface::ATOM, $eventTime === false ? time() : $eventTime),
             'user'             => $USER_ID,
             'src'              => $src_num,
             'dst'              => '', // Канал назначения не был создан.

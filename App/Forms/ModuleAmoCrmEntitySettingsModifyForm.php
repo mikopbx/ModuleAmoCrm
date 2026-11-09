@@ -53,6 +53,7 @@ class ModuleAmoCrmEntitySettingsModifyForm extends ModuleBaseForm
             AmoCdrDaemon::MISSING_UNKNOWN       => Util::translate('mod_amo_type_' . AmoCdrDaemon::MISSING_UNKNOWN, false),
             AmoCdrDaemon::MISSING_KNOWN         => Util::translate('mod_amo_type_' . AmoCdrDaemon::MISSING_KNOWN, false),
             AmoCdrDaemon::OUTGOING_UNKNOWN      => Util::translate('mod_amo_type_' . AmoCdrDaemon::OUTGOING_UNKNOWN, false),
+            AmoCdrDaemon::OUTGOING_UNKNOWN_FAIL => Util::translate('mod_amo_type_' . AmoCdrDaemon::OUTGOING_UNKNOWN_FAIL, false),
             AmoCdrDaemon::OUTGOING_KNOWN_FAIL   => Util::translate('mod_amo_type_' . AmoCdrDaemon::OUTGOING_KNOWN_FAIL, false),
             AmoCdrDaemon::OUTGOING_KNOWN        => Util::translate('mod_amo_type_' . AmoCdrDaemon::OUTGOING_KNOWN, false),
         ];

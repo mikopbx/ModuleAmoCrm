@@ -82,7 +82,8 @@ var ModuleAmoCrmEntityEdit = {
       $("#lead_pipeline_id").parents('div.field').first().show();
     }
     var type = window[className].$typeDropdown.parent().dropdown('get value');
-    if (type === 'MISSING_UNKNOWN' || type === 'MISSING_KNOWN') {
+    if (type === 'MISSING_UNKNOWN' || type === 'MISSING_KNOWN' || type === 'OUTGOING_UNKNOWN_FAIL') {
+      // Для неудачного исходящего на неизвестный ответственный — сотрудник, совершивший вызов.
       $("#responsible").parents('div.field').first().hide();
     }
     window[className].setVisibilityElements();
@@ -146,7 +147,7 @@ var ModuleAmoCrmEntityEdit = {
           value: 'lead',
           selected: create_contact === false && create_lead === true && create_unsorted === false
         }];
-      } else if (type === 'OUTGOING_UNKNOWN') {
+      } else if (type === 'OUTGOING_UNKNOWN' || type === 'OUTGOING_UNKNOWN_FAIL') {
         entityActionVariants = [{
           name: globalTranslate['mod_amo_action_none'],
           value: 'none',
@@ -217,6 +218,21 @@ var ModuleAmoCrmEntityEdit = {
           name: globalTranslate['mod_amo_task_responsible_type_lastAnswerUser'],
           value: 'lastAnswerUser',
           selected: task_responsible_type === 'lastAnswerUser'
+        }];
+      } else if (type === 'OUTGOING_UNKNOWN_FAIL') {
+        // Звонок не отвечен: сотрудник, совершивший вызов, записан как firstMissedUser.
+        taskRespVariants = [{
+          name: globalTranslate['mod_amo_task_responsible_type_'],
+          value: '',
+          selected: task_responsible_type === ''
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_def_responsible'],
+          value: 'def_responsible',
+          selected: task_responsible_type === 'def_responsible'
+        }, {
+          name: globalTranslate['mod_amo_task_responsible_type_caller'],
+          value: 'firstMissedUser',
+          selected: task_responsible_type === 'firstMissedUser' || task_responsible_type === 'lastMissedUser'
         }];
       } else if (type === 'MISSING_KNOWN') {
         taskRespVariants = [{
@@ -383,7 +399,7 @@ var ModuleAmoCrmEntityEdit = {
       window[className].$task_responsible_type.parents('div.field').first().hide();
     }
     var type = window[className].$typeDropdown.parent().dropdown('get value');
-    if (type === 'OUTGOING_KNOWN_FAIL' || type === 'OUTGOING_KNOWN' || type === 'OUTGOING_UNKNOWN') {
+    if (type === 'OUTGOING_KNOWN_FAIL' || type === 'OUTGOING_KNOWN' || type === 'OUTGOING_UNKNOWN' || type === 'OUTGOING_UNKNOWN_FAIL') {
       $('#did').parents('div.field').first().hide();
     } else {
       $('#did').parents('div.field').first().show();

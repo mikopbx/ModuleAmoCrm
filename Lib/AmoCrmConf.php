@@ -31,6 +31,19 @@ use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 class AmoCrmConf extends ConfigClass
 {
     /**
+     * Поля настроек, при изменении которых обновляются webhook и настройки виджета в amoCRM.
+     */
+    private const INTEGRATION_FIELDS = [
+        'tokenForAmo',
+        'webhookPort',
+        'externalHostname',
+        'baseDomain',
+        'portalId',
+        'isPrivateWidget',
+        'privateClientId',
+    ];
+
+    /**
      * Prepares additional contexts sections in the extensions.conf file
      *
      * @return string
@@ -76,16 +89,29 @@ class AmoCrmConf extends ConfigClass
      */
     public function modelsEventChangeData($data): void
     {
-        if ($data['model'] === ModuleAmoCrm::class) {
-            $changedFields = count($data['changedFields']);
-            $syncKeys = ['offsetCdr', 'lastContactsSyncTime', 'lastCompaniesSyncTime', 'lastLeadsSyncTime'];
-            if ($changedFields === 1 && in_array($data['changedFields'][0],$syncKeys, true)) {
-                return;
-            }
-            if(in_array('tokenForAmo', $data['changedFields'], true)) {
+        // Задания SOURCE_INVOKE_ACTION (в т.ч. от других модулей) могут прийти без 'model' (GitHub #54).
+        if (($data['model'] ?? '') === ModuleAmoCrm::class) {
+            $changedFields = (array)($data['changedFields'] ?? []);
+            if(in_array('tokenForAmo', $changedFields, true)) {
                 $this->makeAuthFiles();
             }
-            if(in_array('tokenForAmo', $data['changedFields'], true) && $changedFields === 1){
+            if (!empty(array_intersect(['tokenForAmo', 'webhookPort'], $changedFields))) {
+                $this->rebuildWafExemptions();
+            }
+            // Курсоры/состояние синхронизации и OAuth-токен (обновляет сам WorkerAmoHTTP)
+            // не требуют перезапуска: иначе ежедневное обновление токена прерывает
+            // ночную init-синхронизацию. Очистка токена — требует (см. SyncState::needRestart).
+            $authData = null;
+            if (in_array('authData', $changedFields, true)) {
+                $settings = ModuleAmoCrm::findFirst();
+                $authData = $settings ? (string)$settings->authData : '';
+            }
+            $needRestart = SyncState::needRestart($changedFields, $authData);
+            if (!empty(array_intersect(self::INTEGRATION_FIELDS, $changedFields))) {
+                // Webhook и настройки виджета в amoCRM: после перезапуска воркеров и перегенерации nginx.
+                IntegrationSync::startInBackground(IntegrationSync::MODE_ALL, $needRestart ? 20 : 5);
+            }
+            if (!$needRestart) {
                 return;
             }
             $this->startAllServices(true);
@@ -353,26 +379,88 @@ class AmoCrmConf extends ConfigClass
     }
 
     /**
+     * Параметры отдельного nginx server block для webhook.
+     * Возвращает null, если отдельный сервер не создаётся (не задан порт/токен
+     * или порт совпадает с системным HTTPS).
+     *
+     * @return array|null ['port' => string, 'token' => string]
+     */
+    private function getWebhookServerSettings(): ?array
+    {
+        $settings = ModuleAmoCrm::findFirst();
+        if ($settings === null) {
+            return null;
+        }
+        $port  = trim((string)($settings->webhookPort ?? ''));
+        $token = trim((string)($settings->tokenForAmo ?? ''));
+        if ($port === '' || $token === '') {
+            return null;
+        }
+        $webHttpsPort = PbxSettings::getValueByKey(PbxSettings::WEB_HTTPS_PORT);
+        if ((int)$port === (int)$webHttpsPort) {
+            return null;
+        }
+        return ['port' => $port, 'token' => $token];
+    }
+
+    /**
+     * Исключения WAF (MikoPBX 2026+, на старых версиях метод не вызывается).
+     *
+     * Webhook amoCRM приходит пачками (сотни запросов в минуту с одного IP
+     * при массовом создании сделок/контактов из CDR) и упирается в lua
+     * rate-limit (strict: 205 req/60s), после чего amoCRM отключает хук.
+     * Исключаем из rate-limit только точный путь webhook на отдельном порту:
+     * путь содержит секретный токен, location существует только в server
+     * block модуля. Прочие проверки WAF (blacklist, request-line, body-scan)
+     * продолжают действовать.
+     *
+     * Ядро перечитывает исключения cron-задачей WorkerWafExemptions раз в минуту.
+     *
+     * @return array
+     */
+    public function getWafExemptions(): array
+    {
+        $webhookServer = $this->getWebhookServerSettings();
+        if ($webhookServer === null) {
+            return [];
+        }
+        return [
+            '/' . $webhookServer['token'] . '/entity-update' => ['rate-limit'],
+        ];
+    }
+
+    /**
+     * Немедленно перепубликовать исключения WAF (иначе — в течение минуты по cron).
+     */
+    private function rebuildWafExemptions(): void
+    {
+        $providerClass = '\MikoPBX\Common\Providers\WafProvider';
+        if (!class_exists($providerClass) || $this->di === null) {
+            return;
+        }
+        try {
+            $serviceName = constant($providerClass . '::SERVICE_NAME');
+            if (!$this->di->has($serviceName)) {
+                return;
+            }
+            $this->di->getShared($serviceName)->rebuildAll();
+        } catch (\Throwable $e) {
+            Util::sysLogMsg(__METHOD__, 'WAF rebuild failed: ' . $e->getMessage(), LOG_WARNING);
+        }
+    }
+
+    /**
      * Создаёт отдельный nginx server block для webhook, если задан нестандартный порт.
      * @return string
      */
     public function createNginxServers(): string
     {
-        $settings = ModuleAmoCrm::findFirst();
-        if ($settings === null) {
+        $webhookServer = $this->getWebhookServerSettings();
+        if ($webhookServer === null) {
             return '';
         }
-        $port = trim($settings->webhookPort ?? '');
-        $token = trim($settings->tokenForAmo ?? '');
-        if (empty($port) || empty($token)) {
-            return '';
-        }
-
-        // Если порт совпадает с системным HTTPS — не создаём отдельный сервер
-        $webHttpsPort = PbxSettings::getValueByKey(PbxSettings::WEB_HTTPS_PORT);
-        if ((int)$port === (int)$webHttpsPort) {
-            return '';
-        }
+        $port  = $webhookServer['port'];
+        $token = $webhookServer['token'];
 
         $webPort = PbxSettings::getValueByKey(PbxSettings::WEB_PORT);
         $proxyTarget = "http://127.0.0.1:{$webPort}";
@@ -529,5 +617,7 @@ class AmoCrmConf extends ConfigClass
         $tasks[]    = "*/1 * * * * $findPath $tmpDir -mmin +1 -type f -delete> /dev/null 2>&1".PHP_EOL;
         $tasks[]    = "*/1 * * * * $phpPath $this->moduleDir/bin/safe.php > /dev/null 2>&1".PHP_EOL;
         $tasks[]    = "0 1 * * * $phpPath $this->moduleDir/bin/start-init-sync.php > /dev/null 2>&1".PHP_EOL;
+        // Проверка webhook и настроек виджета, обновление списка пользователей amoCRM.
+        $tasks[]    = "30 1 * * * $phpPath $this->moduleDir/bin/sync-integration.php all > /dev/null 2>&1".PHP_EOL;
     }
 }

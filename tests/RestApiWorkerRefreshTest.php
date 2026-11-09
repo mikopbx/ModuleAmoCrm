@@ -105,6 +105,18 @@ namespace {
         'disabling the module must remove stale module routes from every REST API worker'
     );
 
+    // GitHub #54: задание SOURCE_INVOKE_ACTION без 'model' (от других модулей / старых версий)
+    // не должно ронять хук. Предупреждения превращаем в исключения, как Whoops в WorkerModelsEvents.
+    set_error_handler(static function (int $no, string $str): bool {
+        throw new ErrorException($str, 0, $no);
+    });
+    try {
+        $config->modelsEventChangeData(['source' => 'invokeAction', 'action' => 'X', 'parameters' => []]);
+    } catch (ErrorException $e) {
+        failTest('modelsEventChangeData must tolerate a message without model: ' . $e->getMessage());
+    }
+    restore_error_handler();
+
     $legacyCalls = [];
     RestApiWorkerRefresher::restartUsing(
         static function () use (&$legacyCalls): void {

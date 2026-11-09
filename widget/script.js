@@ -98,14 +98,24 @@ define(function (require) {
           if($(this).parent().find('a[data-prepare="miko-pbx"]').length === 0){
             return;
           }
-          $(this).each(() => {
-            let oldUrl  = $(this).attr('href');
-            let oldHost = (new URL(oldUrl)).host;
-            if(oldHost === self.settings.pbxHost){
+          let pbxHost = String(self.settings.pbxHost || '').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+          if(pbxHost === ''){
+            return;
+          }
+          // pbxHost может содержать путь (host:port/token): сравниваем префикс URL, а не URL.host,
+          // иначе каждый mousedown добавляет ещё один /token и ссылка ломается.
+          let target = 'https://' + pbxHost + '/';
+          $(this).each(function () {
+            let oldUrl = $(this).attr('href') || '';
+            if(oldUrl.indexOf(target) === 0){
               return;
             }
-            $(this).attr('href', oldUrl.replace(oldHost, self.settings.pbxHost));
-          })
+            let rest = oldUrl.replace(/^https?:\/\/[^/]+\/?/, '');
+            if(rest === oldUrl){
+              return;
+            }
+            $(this).attr('href', target + rest);
+          });
         });
       },
       onMessage: function (msg, message) {
