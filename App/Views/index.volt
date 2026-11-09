@@ -208,31 +208,32 @@
     <div class="ui visible message">
         <p>{{ t._('mod_amo_respCommentMessage') }}</p>
     </div>
-    <br>
-    <div class="field limited-cdr-settings">
-        <label >{{ t._('mod_amo_type_INCOMING_KNOWN') }}</label>
-        <div class="disability ui fluid action input">
-             {{ form.render('respCallAnsweredHaveClient') }}
-        </div>
-    </div>
-    <div class="field limited-cdr-settings">
-        <label >{{ t._('mod_amo_type_INCOMING_UNKNOWN') }}</label>
-        <div class="disability ui fluid action input">
-             {{ form.render('respCallAnsweredNoClient') }}
-        </div>
-    </div>
-    <div class="field limited-cdr-settings">
-        <label >{{ t._('mod_amo_type_MISSING_KNOWN') }}</label>
-        <div class="disability ui fluid action input">
-             {{ form.render('respCallMissedHaveClient') }}
-        </div>
-    </div>
-    <div class="field limited-cdr-settings">
-        <label >{{ t._('mod_amo_type_MISSING_UNKNOWN') }}</label>
-        <div class="disability ui fluid action input">
-             {{ form.render('respCallMissedNoClient') }}
-        </div>
-    </div>
+    <table class="ui selectable compact unstackable table limited-cdr-settings">
+        <thead>
+        <tr>
+            <th class="eight wide">{{ t._('mod_amo_entitySettingsTableType') }}</th>
+            <th>{{ t._('mod_amo_respTableResponsible') }}</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td><i class="icon green call-incoming"></i>{{ t._('mod_amo_type_INCOMING_KNOWN') }}</td>
+            <td>{{ form.render('respCallAnsweredHaveClient') }}</td>
+        </tr>
+        <tr>
+            <td><i class="icon green call-incoming"></i>{{ t._('mod_amo_type_INCOMING_UNKNOWN') }}</td>
+            <td>{{ form.render('respCallAnsweredNoClient') }}</td>
+        </tr>
+        <tr>
+            <td><i class="icon red call-incoming"></i>{{ t._('mod_amo_type_MISSING_KNOWN') }}</td>
+            <td>{{ form.render('respCallMissedHaveClient') }}</td>
+        </tr>
+        <tr>
+            <td><i class="icon red call-incoming"></i>{{ t._('mod_amo_type_MISSING_UNKNOWN') }}</td>
+            <td>{{ form.render('respCallMissedNoClient') }}</td>
+        </tr>
+        </tbody>
+    </table>
 </div>
 
 <div class="ui bottom tab segment disability" data-tab="users">

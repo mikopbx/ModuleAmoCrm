@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'Mitä amoCRM:ään luodaan kunkin puhelutyypin kohdalla: yhteystieto, liidi, tehtävä, lajittelematon sekä myyntiputki, vaihe ja vastuuhenkilö. DID-numerolla varustettu sääntö koskee vain kyseiseen numeroon tulevia puheluita.',
     'mod_amo_tabSettingsHint' => 'Valtuutus amoCRM:ssä, MikoPBX API -käyttöavain, ulkoinen osoite ja portti webhookille ja widgetille, integraation lisätoiminnot.',
     'mod_amo_tabCallsHint' => 'Puheluhistorian lataus amoCRM:ään: yksityiskohtainen tai yksinkertaistettu, rajoitus tunnettuihin työntekijöihin ja vastuuhenkilön valinta yksinkertaistetussa latauksessa.',
+    'mod_amo_respTableResponsible' => 'Vastuuhenkilö',
 ];

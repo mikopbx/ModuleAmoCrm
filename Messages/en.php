@@ -135,4 +135,5 @@ return [
     'mod_amo_tabSettingsHint' => 'amoCRM authorization, MikoPBX API access key, external address and port for the webhook and widget, additional integration features.',
     'mod_amo_tabCallsHint' => 'Uploading call history to amoCRM: detailed or simplified, restriction to known employees and the responsible user for simplified upload.',
     'mod_amo_restrictCdrToKnownEmployees' => 'Upload calls only if the employee has been identified',
+    'mod_amo_respTableResponsible' => 'Responsible',
 ];

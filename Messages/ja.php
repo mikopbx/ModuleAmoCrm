@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => '通話の種類ごとにamoCRMで作成されるもの：連絡先、取引、タスク、未整理、およびパイプライン、ステージ、担当者。DIDを指定したルールは、その番号への通話にのみ適用されます。',
     'mod_amo_tabSettingsHint' => 'amoCRMの認証、MikoPBX APIのアクセスキー、Webhookとウィジェット用の外部アドレスとポート、追加の連携機能。',
     'mod_amo_tabCallsHint' => 'amoCRMへの通話履歴のアップロード：詳細または簡易、従業員による制限、簡易アップロード時の担当者の選択。',
+    'mod_amo_respTableResponsible' => '担当者',
 ];

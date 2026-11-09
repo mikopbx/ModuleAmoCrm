@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'Co se v amoCRM vytvoří při hovoru každého typu: kontakt, obchod, úkol, nezpracované, a také prodejní trychtýř, fáze a odpovědná osoba. Pravidlo s DID platí pouze pro hovory na toto číslo.',
     'mod_amo_tabSettingsHint' => 'Autorizace v amoCRM, přístupový klíč k API MikoPBX, externí adresa a port pro webhook a widget, doplňkové funkce integrace.',
     'mod_amo_tabCallsHint' => 'Nahrávání historie hovorů do amoCRM: podrobné nebo zjednodušené, omezení na známé zaměstnance a výběr odpovědné osoby při zjednodušeném nahrávání.',
+    'mod_amo_respTableResponsible' => 'Odpovědná osoba',
 ];

@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'Hvad der oprettes i amoCRM ved hver opkaldstype: kontakt, lead, opgave, usorteret samt pipeline, fase og ansvarlig bruger. En regel med DID gælder kun for opkald til dette nummer.',
     'mod_amo_tabSettingsHint' => 'Autorisation i amoCRM, adgangsnøgle til MikoPBX API, ekstern adresse og port til webhook og widget, ekstra integrationsfunktioner.',
     'mod_amo_tabCallsHint' => 'Upload af opkaldshistorik til amoCRM: detaljeret eller forenklet, begrænsning til kendte medarbejdere og valg af ansvarlig bruger ved forenklet upload.',
+    'mod_amo_respTableResponsible' => 'Ansvarlig',
 ];

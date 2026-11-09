@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'Mi jön létre az amoCRM-ben az egyes hívástípusoknál: kapcsolat, üzlet, feladat, rendezetlen, valamint értékesítési tölcsér, szakasz és felelős. A DID-del rendelkező szabály csak az erre a számra érkező hívásokra vonatkozik.',
     'mod_amo_tabSettingsHint' => 'Hitelesítés az amoCRM-ben, a MikoPBX API hozzáférési kulcsa, külső cím és port a webhookhoz és a widgethez, további integrációs funkciók.',
     'mod_amo_tabCallsHint' => 'Híváselőzmények feltöltése az amoCRM-be: részletes vagy egyszerűsített, korlátozás az ismert munkatársakra és a felelős kiválasztása egyszerűsített feltöltésnél.',
+    'mod_amo_respTableResponsible' => 'Felelős',
 ];

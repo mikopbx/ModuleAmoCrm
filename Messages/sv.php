@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'Vad som skapas i amoCRM för varje samtalstyp: kontakt, affär, uppgift, osorterat samt pipeline, steg och ansvarig användare. En regel med DID gäller endast samtal till det numret.',
     'mod_amo_tabSettingsHint' => 'Auktorisering i amoCRM, åtkomstnyckel för MikoPBX API, extern adress och port för webhook och widget, ytterligare integrationsfunktioner.',
     'mod_amo_tabCallsHint' => 'Uppladdning av samtalshistorik till amoCRM: detaljerad eller förenklad, begränsning till kända medarbetare och val av ansvarig användare vid förenklad uppladdning.',
+    'mod_amo_respTableResponsible' => 'Ansvarig',
 ];

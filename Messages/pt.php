@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'O que é criado no amoCRM para cada tipo de chamada: contacto, negócio, tarefa, não classificados, bem como funil, etapa e responsável. Uma regra com DID aplica-se apenas às chamadas para esse número.',
     'mod_amo_tabSettingsHint' => 'Autorização no amoCRM, chave de acesso à API do MikoPBX, endereço externo e porta para o webhook e o widget, funções de integração adicionais.',
     'mod_amo_tabCallsHint' => 'Carregamento do histórico de chamadas no amoCRM: detalhado ou simplificado, restrição a colaboradores identificados e escolha do responsável no carregamento simplificado.',
+    'mod_amo_respTableResponsible' => 'Responsável',
 ];

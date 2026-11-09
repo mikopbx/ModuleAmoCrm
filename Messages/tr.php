@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'Her arama türünde amoCRM\'de ne oluşturulur: kişi, fırsat, görev, sıralanmamış ve ayrıca satış hunisi, aşama ve sorumlu kullanıcı. DID içeren bir kural yalnızca o numaraya yapılan aramalar için geçerlidir.',
     'mod_amo_tabSettingsHint' => 'amoCRM\'de yetkilendirme, MikoPBX API erişim anahtarı, webhook ve widget için harici adres ve port, ek entegrasyon işlevleri.',
     'mod_amo_tabCallsHint' => 'Arama geçmişinin amoCRM\'e yüklenmesi: ayrıntılı veya basitleştirilmiş, bilinen çalışanlarla sınırlama ve basitleştirilmiş yüklemede sorumlu kullanıcının seçimi.',
+    'mod_amo_respTableResponsible' => 'Sorumlu',
 ];

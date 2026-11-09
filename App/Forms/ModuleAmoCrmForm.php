@@ -56,7 +56,7 @@ class ModuleAmoCrmForm extends ModuleBaseForm
             $variants,
             [
                              'useEmpty' => false,
-                             'class' => 'ui selection dropdown search',
+                             'class' => 'ui search fluid dropdown',
                          ]
         );
         $this->add($type);
@@ -71,7 +71,7 @@ class ModuleAmoCrmForm extends ModuleBaseForm
             $variants,
             [
                                             'useEmpty' => false,
-                                            'class' => 'ui selection dropdown search',
+                                            'class' => 'ui search fluid dropdown',
                                         ]
         );
         $this->add($type);
@@ -86,7 +86,7 @@ class ModuleAmoCrmForm extends ModuleBaseForm
             $variants,
             [
                                             'useEmpty' => false,
-                                            'class' => 'ui selection dropdown search',
+                                            'class' => 'ui search fluid dropdown',
                                         ]
         );
         $this->add($type);
@@ -102,7 +102,7 @@ class ModuleAmoCrmForm extends ModuleBaseForm
             $variants,
             [
                                             'useEmpty' => false,
-                                            'class' => 'ui selection dropdown search',
+                                            'class' => 'ui search fluid dropdown',
                                         ]
         );
         $this->add($type);

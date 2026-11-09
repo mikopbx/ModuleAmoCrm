@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'Ce se creează în amoCRM pentru fiecare tip de apel: contact, tranzacție, sarcină, nesortate, precum și pâlnia de vânzări, etapa și responsabilul. O regulă cu DID se aplică doar apelurilor către acel număr.',
     'mod_amo_tabSettingsHint' => 'Autorizarea în amoCRM, cheia de acces la API-ul MikoPBX, adresa externă și portul pentru webhook și widget, funcții suplimentare de integrare.',
     'mod_amo_tabCallsHint' => 'Încărcarea istoricului apelurilor în amoCRM: detaliată sau simplificată, restricționare la angajații cunoscuți și alegerea responsabilului la încărcarea simplificată.',
+    'mod_amo_respTableResponsible' => 'Responsabil',
 ];

@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'Wat er in amoCRM wordt aangemaakt per type gesprek: contact, deal, taak, ongesorteerd, evenals pijplijn, fase en verantwoordelijke. Een regel met een DID geldt alleen voor gesprekken naar dat nummer.',
     'mod_amo_tabSettingsHint' => 'Autorisatie in amoCRM, toegangssleutel voor de MikoPBX API, extern adres en poort voor de webhook en widget, extra integratiefuncties.',
     'mod_amo_tabCallsHint' => 'Gespreksgeschiedenis uploaden naar amoCRM: gedetailleerd of vereenvoudigd, beperking tot bekende medewerkers en keuze van de verantwoordelijke bij vereenvoudigde upload.',
+    'mod_amo_respTableResponsible' => 'Verantwoordelijke',
 ];

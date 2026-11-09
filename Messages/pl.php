@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'Co jest tworzone w amoCRM dla każdego typu połączenia: kontakt, transakcja, zadanie, nieposortowane, a także lejek, etap i osoba odpowiedzialna. Reguła z DID dotyczy tylko połączeń na ten numer.',
     'mod_amo_tabSettingsHint' => 'Autoryzacja w amoCRM, klucz dostępu do API MikoPBX, zewnętrzny adres i port dla webhooka i widżetu, dodatkowe funkcje integracji.',
     'mod_amo_tabCallsHint' => 'Przesyłanie historii połączeń do amoCRM: szczegółowe lub uproszczone, ograniczenie do znanych pracowników i wybór osoby odpowiedzialnej przy uproszczonym przesyłaniu.',
+    'mod_amo_respTableResponsible' => 'Odpowiedzialny',
 ];

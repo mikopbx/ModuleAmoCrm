@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => '每种通话类型在 amoCRM 中创建的内容：联系人、交易、任务、未分类，以及销售漏斗、阶段和负责人。带 DID 的规则仅适用于拨打该号码的通话。',
     'mod_amo_tabSettingsHint' => 'amoCRM 授权、MikoPBX API 访问密钥、webhook 和小部件的外部地址与端口、其他集成功能。',
     'mod_amo_tabCallsHint' => '将通话记录上传到 amoCRM：详细或简化模式、按员工限制，以及简化上传时的负责人选择。',
+    'mod_amo_respTableResponsible' => '负责人',
 ];

@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'Što se stvara u amoCRM-u za svaku vrstu poziva: kontakt, posao, zadatak, nerazvrstano, kao i prodajni lijevak, faza i odgovorna osoba. Pravilo s DID-om vrijedi samo za pozive na taj broj.',
     'mod_amo_tabSettingsHint' => 'Autorizacija u amoCRM-u, pristupni ključ za MikoPBX API, vanjska adresa i port za webhook i widget, dodatne funkcije integracije.',
     'mod_amo_tabCallsHint' => 'Učitavanje povijesti poziva u amoCRM: detaljno ili pojednostavljeno, ograničenje na poznate zaposlenike i odabir odgovorne osobe pri pojednostavljenom učitavanju.',
+    'mod_amo_respTableResponsible' => 'Odgovorna osoba',
 ];

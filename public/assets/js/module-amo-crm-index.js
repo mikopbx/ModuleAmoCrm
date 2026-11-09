@@ -95,7 +95,7 @@ var ModuleAmoCrm = {
     window[className].checkStatusToggle();
     window.addEventListener('ModuleStatusChanged', window[className].checkStatusToggle);
     window[className].initializeForm();
-    $('.menu .item').tab();
+    window[className].initTabs();
     window[className].checkStatus();
     setInterval(window[className].checkStatus, 5000);
     window[className].loadUsers();
@@ -167,6 +167,24 @@ var ModuleAmoCrm = {
    * Метки состояния интеграции (webhook, виджет, пользователи) в строке "Модуль включен".
    * Строку рендерит ядро, поэтому метки добавляются отсюда.
    */
+  /**
+   * Инициализация вкладок с сохранением активной вкладки в URL-хеше (#calls),
+   * чтобы после обновления страницы открывалась та же вкладка.
+   */
+  initTabs: function initTabs() {
+    var $items = $('.menu .item[data-tab]');
+    $items.tab({
+      onVisible: function onVisible(tabPath) {
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState(null, '', "#".concat(tabPath));
+        }
+      }
+    });
+    var hash = window.location.hash.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (hash !== '' && $items.filter("[data-tab=\"".concat(hash, "\"]")).length > 0) {
+      $items.tab('change tab', hash);
+    }
+  },
   initIntegrationBadges: function initIntegrationBadges() {
     var $segment = $('#module-status-toggle-segment');
     if ($segment.length === 0 || $('#integration-badges').length > 0) {

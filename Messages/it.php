@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'Cosa viene creato in amoCRM per ogni tipo di chiamata: contatto, lead, attività, non smistati, oltre a pipeline, fase e responsabile. Una regola con DID si applica solo alle chiamate verso quel numero.',
     'mod_amo_tabSettingsHint' => 'Autorizzazione in amoCRM, chiave di accesso all\'API MikoPBX, indirizzo esterno e porta per il webhook e il widget, funzioni di integrazione aggiuntive.',
     'mod_amo_tabCallsHint' => 'Caricamento della cronologia chiamate in amoCRM: dettagliato o semplificato, limitazione ai dipendenti identificati e scelta del responsabile nel caricamento semplificato.',
+    'mod_amo_respTableResponsible' => 'Responsabile',
 ];

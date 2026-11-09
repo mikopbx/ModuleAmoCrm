@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'Những gì được tạo trong amoCRM cho từng loại cuộc gọi: liên hệ, giao dịch, nhiệm vụ, chưa phân loại, cùng với phễu bán hàng, giai đoạn và người phụ trách. Quy tắc có DID chỉ áp dụng cho các cuộc gọi đến số đó.',
     'mod_amo_tabSettingsHint' => 'Ủy quyền amoCRM, khóa truy cập API MikoPBX, địa chỉ ngoài và cổng cho webhook và widget, các chức năng tích hợp bổ sung.',
     'mod_amo_tabCallsHint' => 'Tải lịch sử cuộc gọi lên amoCRM: chi tiết hoặc đơn giản, giới hạn theo nhân viên và chọn người phụ trách khi tải đơn giản.',
+    'mod_amo_respTableResponsible' => 'Người phụ trách',
 ];

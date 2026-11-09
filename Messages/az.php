@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'Hər zəng növü üçün amoCRM-də nə yaradılır: kontakt, sövdələşmə, tapşırıq, çeşidlənməmiş, həmçinin satış qıfı, mərhələ və məsul şəxs. DID ilə qayda yalnız həmin nömrəyə edilən zənglərə şamil olunur.',
     'mod_amo_tabSettingsHint' => 'amoCRM-də avtorizasiya, MikoPBX API-yə giriş açarı, webhook və vidcet üçün xarici ünvan və port, əlavə inteqrasiya funksiyaları.',
     'mod_amo_tabCallsHint' => 'Zəng tarixçəsinin amoCRM-ə yüklənməsi: ətraflı və ya sadələşdirilmiş, əməkdaşlar üzrə məhdudiyyət və sadələşdirilmiş yükləmədə məsul şəxsin seçimi.',
+    'mod_amo_respTableResponsible' => 'Məsul şəxs',
 ];

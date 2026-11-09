@@ -135,4 +135,5 @@ return [
     'mod_amo_tabRulesHint' => 'Was in amoCRM bei jedem Anruftyp erstellt wird: Kontakt, Lead, Aufgabe, Unsortiert sowie Pipeline, Phase und verantwortlicher Benutzer. Eine Regel mit DID gilt nur für Anrufe an diese Nummer.',
     'mod_amo_tabSettingsHint' => 'Autorisierung in amoCRM, MikoPBX-API-Zugriffsschlüssel, externe Adresse und Port für Webhook und Widget, zusätzliche Integrationsfunktionen.',
     'mod_amo_tabCallsHint' => 'Hochladen des Anrufverlaufs in amoCRM: detailliert oder vereinfacht, Beschränkung auf bekannte Mitarbeiter und Auswahl des Verantwortlichen beim vereinfachten Hochladen.',
+    'mod_amo_respTableResponsible' => 'Verantwortlicher',
 ];
