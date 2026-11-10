@@ -208,7 +208,7 @@
     <div class="ui visible message">
         <p>{{ t._('mod_amo_respCommentMessage') }}</p>
     </div>
-    <table class="ui selectable compact unstackable table limited-cdr-settings">
+    <table id="respCallsTable" class="ui selectable compact unstackable table limited-cdr-settings">
         <thead>
         <tr>
             <th class="eight wide">{{ t._('mod_amo_entitySettingsTableType') }}</th>

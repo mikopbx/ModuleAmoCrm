@@ -431,14 +431,18 @@ const ModuleAmoCrm = {
 				options += `<option value="${escape(user.number)}" selected>${escape(user.number)}</option>`;
 			}
 			$body.append(`<tr>
-				<td>${escape(user.name || user.amoUserId)}</td>
+				<td><i class="icon user circle ${user.number === '' ? 'grey' : 'blue'} amo-user-icon"></i>${escape(user.name || user.amoUserId)}</td>
 				<td>${escape(user.email)}</td>
 				<td><select class="ui search fluid dropdown amo-user-select" data-amo-user-id="${escape(user.amoUserId)}">${options}</select></td>
 			</tr>`);
 		});
 		$table.find('select[data-amo-user-id]').dropdown({
 			fullTextSearch: true,
-			onChange() {
+			onChange(value) {
+				const mapped = value !== '' && value !== notMapped;
+				$(this).closest('tr').find('.amo-user-icon')
+					.toggleClass('blue', mapped)
+					.toggleClass('grey', !mapped);
 				// Списки без name не входят в значения формы: отмечаем изменение явно.
 				Form.dataChanged();
 			},
