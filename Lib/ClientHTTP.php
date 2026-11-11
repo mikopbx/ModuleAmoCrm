@@ -20,6 +20,7 @@
 namespace Modules\ModuleAmoCrm\Lib;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp;
+use Psr\Http\Client\NetworkExceptionInterface;
 use MikoPBX\Core\System\Util;
 use Throwable;
 
@@ -105,7 +106,9 @@ class ClientHTTP
     }
 
     /**
-     * Выполнение HTTP-запроса с retry при ConnectException (таймауты, сетевые ошибки).
+     * Выполнение HTTP-запроса с retry при сетевых ошибках и таймаутах.
+     * Ловится PSR-18 NetworkExceptionInterface: в Guzzle 7 его реализует ConnectException,
+     * в Guzzle 8 — NetworkException и подклассы (в т.ч. NetworkTimeoutException).
      * До 3 попыток с линейным backoff (2, 4, 6 сек).
      * @param GuzzleHttp\Client $client
      * @param string $method
@@ -125,13 +128,13 @@ class ClientHTTP
                 $resultHttp = $client->request($method, $url, $options);
                 $code       = $resultHttp->getStatusCode();
                 break;
-            } catch (GuzzleHttp\Exception\ConnectException $e) {
+            } catch (NetworkExceptionInterface $e) {
                 $message = $e->getMessage();
                 $errorMessage = "Error: " . $e->getMessage() . ',';
                 $errorMessage .= "Request URL: " . $e->getRequest()->getUri() . ',';
                 $errorMessage .= "Request Method: " . $e->getRequest()->getMethod() . ',';
                 $errorMessage .= "Attempt: $attempt/$maxRetries";
-                Util::sysLogMsg('ModuleAmoCrm', "ConnectException: " . $errorMessage);
+                Util::sysLogMsg('ModuleAmoCrm', get_class($e) . ": " . $errorMessage);
                 if ($attempt < $maxRetries) {
                     sleep($retryDelay * $attempt);
                 }
