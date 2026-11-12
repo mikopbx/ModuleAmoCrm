@@ -24,7 +24,6 @@ return [
     'mod_amo_baseDomain' => 'Adresa portala (primjer: example.amocrm.ru)',
     'mod_amo_Error' => 'Greška',
     'mod_amo_isPrivateWidget' => 'Ovo je privatna integracija',
-    'mod_amo_panelIsEnable' => 'Koristite upravljačku ploču poziva',
     'mod_amo_privateClientId' => 'ID integracije',
     'mod_amo_privateClientSecret' => 'Tajni integracijski ključ',
     'mod_amo_entitySettingsTableDid' => 'DID',

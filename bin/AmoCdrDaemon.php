@@ -35,24 +35,19 @@ use Modules\ModuleAmoCrm\Lib\ResponsibleResolver;
 use Modules\ModuleAmoCrm\Lib\ValidationErrors;
 use MikoPBX\Common\Providers\CDRDatabaseProvider;
 use DateTime;
-use MikoPBX\Common\Models\Extensions;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use Throwable;
-use DateTimeInterface;
-use Exception;
 
 class AmoCdrDaemon extends WorkerBase
 {
     public const  SOURCE_ID    = 'miko-pbx';
     private const LIMIT_CDR   = 50;
     private int   $offset = 1;
-    private bool  $panelIsEnable = false;
     public array  $innerNums = [];
     private array $users = [];
     public string $referenceDate='';
     private array $cdrRows = [];
-    private string $lastCacheCdr = '';
     private Logger $logger;
     private string $extHostname = '';
     private int $lastSyncTime = 0;
@@ -183,7 +178,6 @@ class AmoCdrDaemon extends WorkerBase
             }
             if($workIsAllowed){
                 $this->updateActiveCalls();
-                $this->updateUsers();
                 $this->cdrSync();
             }
             sleep(1);
@@ -200,7 +194,6 @@ class AmoCdrDaemon extends WorkerBase
         $allSettings = ConnectorDb::invoke('getModuleSettings', [false]);
         if(!empty($allSettings) && is_array($allSettings)){
             $oldOffset = $this->offset;
-            $this->panelIsEnable = intval($allSettings['ModuleAmoCrm']['panelIsEnable']??0) ===0;
             $this->offset        = max(1*$allSettings['ModuleAmoCrm']['offsetCdr']??1,1);
             $this->referenceDate = $allSettings['ModuleAmoCrm']['referenceDate']??'';
             $this->portalId      = intval($allSettings['ModuleAmoCrm']['portalId']??0);
@@ -235,57 +228,11 @@ class AmoCdrDaemon extends WorkerBase
     }
 
     /**
-     * Обновление списка пользователей в nchan.
-     * @return void
-     */
-    private function updateUsers():void
-    {
-        $usersAmo = ConnectorDb::invoke('getPortalUsers', [1]);
-        $amoUsersArray = [];
-        foreach ($usersAmo as $user){
-            $amoUsersArray[$user['number']] = $user['amoUserId'];
-        }
-        $extensionFilter = [
-            'type IN ({types:array})',
-            'bind'    => [
-                'types' => [Extensions::TYPE_SIP, Extensions::TYPE_QUEUE]
-            ],
-            'columns' => 'number,callerid,type'
-        ];
-        $data = [];
-        $extensions = Extensions::find($extensionFilter);
-        foreach ($extensions as $extension){
-            $amoId = $amoUsersArray[$extension->number]??'';
-            if($this->restrictCdrToKnownEmployees && empty($amoId)){
-                continue;
-            }
-            $data[] = [
-                'number' => $extension->number,
-                'name' => $extension->callerid,
-                'amoId' => $amoUsersArray[$extension->number]??'',
-                'type' => $extension->type
-            ];
-        }
-        unset($extensions);
-        $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['data' => $data, 'action' => 'USERS']);
-        if(!$result->success){
-            $this->logger->writeError("Update user list. Count: ".count($data));
-            try {
-                $this->logger->writeError("Send data: ". json_encode($data, JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));
-                $this->logger->writeError("Result: ". json_encode($result, JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));
-            }catch (Throwable $e){
-                $this->logger->writeError($e->getMessage());
-            }
-        }
-    }
-
-    /**
-     * Обновление информации по текущим звонкам в nchan.
+     * Отслеживание отвеченных входящих для автооткрытия карточки.
      * @return void
      */
     private function updateActiveCalls():void
     {
-        $params  = [];
         $cdrData = CDRDatabaseProvider::getCacheCdr();
         $activeIds = [];
         foreach ($cdrData as $cdr){
@@ -316,39 +263,6 @@ class AmoCdrDaemon extends WorkerBase
                 ];
                 $this->logger->writeInfo($this->incompleteAnswered[$linkedId], "New incomplete answered");
             }
-
-            $endTime    = '';
-            $answerTime = '';
-            try {
-                $startTime = date(DateTimeInterface::ATOM, strtotime($cdr['start']));
-                if(!empty($cdr['answer'])){
-                    $answerTime = date(DateTimeInterface::ATOM, strtotime($cdr['answer']));
-                }
-                if(!empty($cdr['endtime'])){
-                    $endTime    = date(DateTimeInterface::ATOM, strtotime($cdr['endtime']));
-                }
-            }catch (Exception $e){
-                continue;
-            }
-            $params[] = [
-                'start'            => $startTime,
-                'answer'           => $answerTime,
-                'end'              => $endTime,
-                'src'              => $cdr['src_num'],
-                'dst'              => $cdr['dst_num'],
-                'uid'              => $cdr['UNIQUEID'],
-                'id'               => $cdr['linkedid'],
-                'user-src'         => $this->users[$cdr['src_num']]??'',
-                'user-dst'         => $dstUser,
-                'src-chan'         => $cdr['src_chan'],
-                'dst-chan'         => $cdr['dst_chan'],
-            ];
-        }
-        $md5Cdr = md5(print_r($params, true));
-        if($this->panelIsEnable && $md5Cdr !== $this->lastCacheCdr){
-            // Оповещаме только если изменилось состояние.
-            ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['data' => $params, 'action' => 'CDRs']);
-            $this->lastCacheCdr = $md5Cdr;
         }
         $this->purgeIncompleteAnswered(time(), $activeIds);
     }

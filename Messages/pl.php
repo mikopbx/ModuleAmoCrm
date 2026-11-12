@@ -86,7 +86,6 @@ return [
     'mod_amo_SaveSettingsError' => 'Wystąpił błąd podczas zapisywania ustawień. Usługa ConnectorDB może nie być uruchomiona.',
     'mod_amo_NeedWaitSyncTitle' => 'Synchronizowanie kontaktów',
     'mod_amo_NeedWaitSyncBody' => 'Kontakty i transakcje są synchronizowane. Poczekaj na zakończenie procesu. Przesyłanie wywołań do portalu zostało zatrzymane.',
-    'mod_amo_panelIsEnable' => 'Skorzystaj z panelu sterowania połączeniami',
     'mod_amo_type_responsible_answered_first' => 'Pierwszy, który odpowie na połączenie',
     'mod_amo_type_responsible_answered_last' => 'Ostatnia osoba, która odbierze połączenie',
     'mod_amo_type_responsible_missed_first' => 'Pierwszy, który przegapił połączenie',

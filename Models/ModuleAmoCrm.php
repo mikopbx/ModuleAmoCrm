@@ -64,7 +64,7 @@ class ModuleAmoCrm extends ModulesModelsBase
     public $useInterception = 1;
 
     /**
-     * Toggle
+     * Не используется: панель управления вызовами удалена. Колонка сохранена в схеме.
      *
      * @Column(type="integer", default="1", nullable=true)
      */

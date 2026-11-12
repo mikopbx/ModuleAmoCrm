@@ -202,7 +202,7 @@ class ModuleAmoCrmController extends BaseController
         $ModuleSettings = PbxExtensionModules::findFirst(["uniqid='$this->moduleUniqueID'",'columns' => ['disabled']]);
 
         $ignoreColumns = ['id','offsetCdr','authData','widgetCode','integrationState','amoUsersMapping'];
-        $boolColumns = ['useInterception', 'isPrivateWidget', 'disableDetailedCdr', 'panelIsEnable', 'restrictCdrToKnownEmployees'];
+        $boolColumns = ['useInterception', 'isPrivateWidget', 'disableDetailedCdr', 'restrictCdrToKnownEmployees'];
         $usersMapping = json_decode((string)($data['amoUsersMapping'] ?? ''), true);
         if(intval($ModuleSettings->disabled) !== 1){
             $settings = [];

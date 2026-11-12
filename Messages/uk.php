@@ -86,7 +86,6 @@ return [
     'mod_amo_SaveSettingsError' => 'Виникла помилка збереження налаштувань. Можливо не запущено сервіс ConnectorDB.',
     'mod_amo_NeedWaitSyncTitle' => 'Синхронізація контактів',
     'mod_amo_NeedWaitSyncBody' => 'Виконується синхронізація контактів та операцій. Дочекайтеся завершення процесу. Завантаження дзвінків на портал зупинено.',
-    'mod_amo_panelIsEnable' => 'Використовувати панель керування викликами',
     'mod_amo_type_responsible_answered_first' => 'Перший, хто відповів на виклик',
     'mod_amo_type_responsible_answered_last' => 'Останній, хто відповів на виклик',
     'mod_amo_type_responsible_missed_first' => 'Перший, хто пропустив виклик',

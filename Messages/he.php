@@ -24,7 +24,6 @@ return [
     'mod_amo_baseDomain' => 'כתובת הפורטל (לדוגמה: example.amocrm.ru)',
     'mod_amo_Error' => 'שגיאה',
     'mod_amo_isPrivateWidget' => 'זוהי אינטגרציה פרטית',
-    'mod_amo_panelIsEnable' => 'שימוש בלוח בקרת שיחות',
     'mod_amo_privateClientId' => 'מזהה אינטגרציה',
     'mod_amo_privateClientSecret' => 'מפתח סודי של האינטגרציה',
     'mod_amo_entitySettingsTableDid' => 'DID',

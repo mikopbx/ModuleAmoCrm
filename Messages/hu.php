@@ -24,7 +24,6 @@ return [
     'mod_amo_baseDomain' => 'Portálcím (példa: example.amocrm.ru)',
     'mod_amo_Error' => 'Hiba',
     'mod_amo_isPrivateWidget' => 'Ez egy privát integráció',
-    'mod_amo_panelIsEnable' => 'A hívásvezérlő panel használata',
     'mod_amo_privateClientId' => 'Integrációs azonosító',
     'mod_amo_privateClientSecret' => 'Az integráció titkos kulcsa',
     'mod_amo_entitySettingsTableDid' => 'DID',

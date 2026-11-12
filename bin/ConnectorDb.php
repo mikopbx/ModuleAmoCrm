@@ -30,7 +30,6 @@ use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
-use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 use Modules\ModuleAmoCrm\Lib\EntitySettingsDefaults;
 use Modules\ModuleAmoCrm\Lib\IntegrationConfig;
 use Modules\ModuleAmoCrm\Lib\IntegrationSync;
@@ -566,7 +565,6 @@ class ConnectorDb extends WorkerBase
                 $this->saveCache(self::class.':'.$phone, [], 10);
             }
         }
-        ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['action' => 'findContact', 'data' => $result]);
         return $result;
     }
 
@@ -1284,7 +1282,7 @@ class ConnectorDb extends WorkerBase
     }
 
     /**
-     * Пересобирает рабочую таблицу m_ModuleAmoUsers (её читают AmoCdrDaemon, WorkerAmoCrmAMI)
+     * Пересобирает рабочую таблицу m_ModuleAmoUsers (её читает AmoCdrDaemon)
      * по сопоставлению из m_ModuleAmoAccountUsers.
      * @return void
      */

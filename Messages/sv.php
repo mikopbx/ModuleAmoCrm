@@ -86,7 +86,6 @@ return [
     'mod_amo_SaveSettingsError' => 'Ett fel uppstod när inställningarna skulle sparas. ConnectorDB-tjänsten kanske inte körs.',
     'mod_amo_NeedWaitSyncTitle' => 'Synkronisera kontakter',
     'mod_amo_NeedWaitSyncBody' => 'Kontakter och transaktioner synkroniseras. Vänta tills processen är klar. Ladda upp samtal till portalen har slutat.',
-    'mod_amo_panelIsEnable' => 'Använd samtalskontrollpanelen',
     'mod_amo_type_responsible_answered_first' => 'Först att svara på samtalet',
     'mod_amo_type_responsible_answered_last' => 'Sist att svara på samtalet',
     'mod_amo_type_responsible_missed_first' => 'Den första som missar samtalet',

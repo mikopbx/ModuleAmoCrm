@@ -86,7 +86,6 @@ return [
     'mod_amo_SaveSettingsError' => 'Une erreur s\'est produite lors de l\'enregistrement des paramètres. Le service ConnectorDB n\'est peut-être pas en cours d\'exécution.',
     'mod_amo_NeedWaitSyncTitle' => 'Synchronisation des contacts',
     'mod_amo_NeedWaitSyncBody' => 'Les contacts et les transactions sont synchronisés. Attendez la fin du processus. Le téléchargement des appels vers le portail s\'est arrêté.',
-    'mod_amo_panelIsEnable' => 'Utiliser le panneau de contrôle des appels',
     'mod_amo_disableDetailedCdr' => 'Désactiver le chargement des CDR détaillés',
     'mod_amo_type_responsible_answered_first' => 'Premier à répondre à l\'appel',
     'mod_amo_type_responsible_answered_last' => 'Dernière personne à répondre à l\'appel',

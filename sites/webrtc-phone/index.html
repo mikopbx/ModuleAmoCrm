@@ -1,141 +1,214 @@
-<!doctype html>
-<html lang="ru" style="display: none">
+<!DOCTYPE html>
+<html>
 <head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- Bootstrap CSS -->
-    <link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
-    <link href="bootstrap/css/dataTables.bootstrap5.min.css" rel="stylesheet">
-    <link href="bootstrap/css/rowGroup.bootstrap5.min.css" rel="stylesheet">
-    <link href="css/all.min.css" rel="stylesheet">
-    <link href="css/brands.min.css" rel="stylesheet">
-    <link href="css/regular.min.css" rel="stylesheet">
-    <link href="css/solid.min.css" rel="stylesheet">
-
-    <script data-main="js/app-entrypoint" src="js/vendors/require.js"></script>
-    <style>
-        .m-btn-dial-pad {
-            height: 3.2em;
-            width: 3.2em;
-            border-color: #adb5bd;
-        }
-        #users td, #users tr {
-            border: none;
-        }
-    </style>
+<meta charset="utf-8">
+<title>MikoPBX</title>
 </head>
-<body style="background: rgba(0, 0, 0, 0);">
-
-<div id="web-rtc-phone" class="p-1 invisible fixed-bottom" style="width: 300px">
-    <div id="web-rtc-phone-calls" class="tab-content" style="overflow-y: scroll;">
-        <div id="web-rtc-phone-cdr" class="tab-pane fade show active rounded" role="tabpanel" aria-labelledby="web-rtc-phone-cdr-tab" >
-        </div>
-    </div>
-
-    <div id="web-rtc-phone-dial-pad" class="tab-pane fade container shadow bg-light rounded d-none" role="tabpanel" aria-labelledby="web-rtc-phone-dial-pad-tab">
-        <div class="row justify-content-center ">
-            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="1">1</button>
-            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="2">2</button>
-            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="3">3</button>
-        </div>
-        <div class="row justify-content-center">
-            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="4">4</button>
-            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="5" >5</button>
-            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="6" >6</button>
-        </div>
-        <div class="row justify-content-center">
-            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="7" >7</button>
-            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="8" >8</button>
-            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0" data-digit="9" >9</button>
-        </div>
-        <div class="row justify-content-center">
-            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0"  data-digit="*"><i class="fa fa-asterisk"></i></button>
-            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0"  data-digit="0">0</button>
-            <button type="button" class="btn btn-outline-secondary rounded-circle m-btn-dial-pad m-1 shadow border-0"  data-digit="#">#</button>
-        </div>
-        <div class="row justify-content-center">
-            <button type="button" class="btn btn-outline-success rounded-circle m-btn-dial-pad m-1 shadow border-0 m-call-button" ><i class="fa fa-phone-alt"></i></button>
-        </div>
-    </div>
-
-    <div id="users-list" class="d-none">
-        <div class="container bg-light p-1 shadow rounded position-relative mt-1">
-            <table id="users" data-order='[[ 1, "asc" ]]' class="w-100 table table-hover " > </table>
-        </div>
-    </div>
-
-    <div id="web-rtc-phone-status" class="input-group rounded shadow bg-light mb-2 mt-1">
-        <button id='usersButton' type="button" class="btn btn-outline-secondary"><i class="fa fa-users"></i></button>
-        <input class="form-control" id="searchInput" autocomplete="off" aria-describedby="" placeholder="">
-        <button id='hideButton' type="button" class="btn btn-outline-secondary"><i class="fa fa-xmark"></i></button>
-    </div>
-</div>
-
-<div id="active-call-twig" class="d-none">
-    <div data-callid='{{ call_id }}'
-         data-start="{{ start }}"
-         data-time-unit="{{ time_unit }}"
-         data-answer="{{ answered }}"
-         data-user-id="{{ user }}"
-         data-user-phone="{{ user_phone }}"
-         data-call-type="{{ call_type }}"
-         class="container card m-cdr-card p-3 shadow fw-lighter mt-2">
-        <div class="row">
-            <div class="col text-start fw-bold text-dark m-company-name" data-phone="{{ number }}" data-contact-id="">
-                {{ company }}
-            </div>
-        </div>
-        <div class="row">
-            <div class="col text-start fw-semibold text-muted m-contact-name" data-phone="{{ number }}" data-contact-id="">
-                {{ contact }}
-            </div>
-        </div>
-        <div class="row">
-            <div class="col text-start">
-                <i class="fa fa-sign-{{ call_type }}-alt me-2"></i> {{ number }}
-            </div>
-            <div class="col-4 text-end" data-type="duration">
-            </div>
-        </div>
-        <div class="row">
-            <div class="d-flex flex-row-reverse mt-1">
-                <button data-action="hangup" class="btn btn-outline-danger rounded ms-1 btn-sm"><i class="fa fa-phone"></i></button>
-<!--                <button data-action="transfer" class="btn btn-outline-primary rounded ms-1 btn-sm"><i class="fa fa-share-square"></i></button>-->
-                <button data-action="card" class="btn btn-outline-dark rounded ms-1 btn-sm {{ additionalCardClass }}"><i class="fa fa-user-tie"></i></button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<audio id="sipRemoteAudio"></audio>
+<body>
 <script>
-window.onload = function() {
-    let pbxHost = window.mikoPbxHost || '';
-    if (!pbxHost) {
-        try {
-            let iframe = window.parent.document.getElementById('miko-pbx-phone');
-            pbxHost = iframe.getAttribute('title');
-        } catch(e) {}
+/*
+ * Совместимость со старыми версиями виджета amoCRM (до удаления панели управления вызовами).
+ *
+ * Старый виджет загружает эту страницу и пишет её в iframe через document.write,
+ * поэтому iframe работает в origin amoCRM. Страница невидима и оставляет виджету
+ * click-to-call, автооткрытие карточки и сохранение настроек.
+ *
+ * Протокол старого виджета: iframe -> 'init-done', виджет -> {action:'connect', data: settings},
+ * дальше команды 'callback' и 'saveSettings'. В виджет уходят 'openCardEntities' и 'error'.
+ *
+ * ВАЖНО: старый виджет глобально заменяет в этом HTML подстроки с атрибутами
+ * href, src и data-main (знак "=" и кавычка). Такие подстроки здесь писать нельзя.
+ */
+(function () {
+    var STYLE_ID = 'mikopbx-legacy-shim-style';
+    try {
+        var doc = window.parent.document;
+        if (!doc.getElementById(STYLE_ID)) {
+            var st = doc.createElement('style');
+            st.id = STYLE_ID;
+            // !important в таблице стилей сильнее inline display, который ставит jQuery .show().
+            st.textContent = '#miko-pbx-phone,#miko-pbx-toggle-tab{display:none!important}';
+            doc.head.appendChild(st);
+        }
+    } catch (e) {}
+
+    var host = window.mikoPbxHost || '';
+    if (!host) {
+        try { host = window.frameElement.getAttribute('title') || ''; } catch (e) {}
     }
-    if (!pbxHost) {
-        pbxHost = window.location.host;
+    if (!host) {
+        return;
     }
-    console.log(pbxHost);
-    let apiUrl = window.location.protocol + '//' + pbxHost + '/pbxcore/api/amo-crm/v1/panel-enable';
-    // Выполняем запрос
-    fetch(apiUrl)
-        .then(function(response) {
-            if (response.status === 200) {
-                console.log('OK');
-                // Получаем элемент, у которого нужно удалить атрибут style
-                document.querySelector('html').style = "";
-            } else {
-                console.log('FALSE');
-                window.parent.postMessage(JSON.stringify({action: 'hide-panel', pbxHost: pbxHost}), '*');
+    var proto   = window.location.protocol === 'http:' ? 'http:' : 'https:';
+    var apiBase = proto + '//' + host + '/pbxcore/api/amo-crm/v1/';
+    var cfg     = null;
+    var ws      = null;
+    var delay   = 1000;
+    var downSince = 0;
+    var lastAlert = 0;
+    var authFailed = false;
+    var ALERT_INTERVAL = 300000;
+
+    function toParent(msg) {
+        msg.pbxHost = host;
+        window.parent.postMessage(JSON.stringify(msg), '*');
+    }
+
+    function alertError(code) {
+        var now = Date.now();
+        if (now - lastAlert < ALERT_INTERVAL) {
+            return;
+        }
+        lastAlert = now;
+        toParent({action: 'error', code: code});
+    }
+
+    function encode(data) {
+        var parts = [];
+        for (var k in data) {
+            if (!Object.prototype.hasOwnProperty.call(data, k) || data[k] === undefined || data[k] === null) {
+                continue;
             }
+            var v = data[k];
+            if (typeof v === 'object') {
+                v = JSON.stringify(v);
+            }
+            parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(v));
+        }
+        return parts.join('&');
+    }
+
+    function post(path, data) {
+        data.token = cfg.token;
+        return fetch(apiBase + path, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
+            body: encode(data)
+        }).then(function (r) {
+            if (r.status === 403) {
+                alertError('errorAuthAPI');
+            }
+        }).catch(function () {
+            alertError('errorLoadFrame');
         });
-};
+    }
+
+    function checkAuth() {
+        fetch(apiBase + 'panel-enable?token=' + encodeURIComponent(cfg.token))
+            .then(function (r) {
+                if (r.status === 403) {
+                    authFailed = true;
+                    alertError('errorAuthAPI');
+                }
+            })
+            .catch(function () {});
+    }
+
+    // Одна карточка на звонок, даже если amoCRM открыт в нескольких вкладках.
+    function claimCard(id, open) {
+        var key = 'mikopbx:open-card:' + id;
+        var hidden = false;
+        try { hidden = window.parent.document.hidden; } catch (e) {}
+        setTimeout(function () {
+            try {
+                var now = Date.now();
+                var prev = parseInt(localStorage.getItem(key) || '0', 10);
+                if (now - prev < 60000) {
+                    return;
+                }
+                localStorage.setItem(key, String(now));
+                for (var i = localStorage.length - 1; i >= 0; i--) {
+                    var k = localStorage.key(i);
+                    if (k && k.indexOf('mikopbx:open-card:') === 0
+                        && now - parseInt(localStorage.getItem(k) || '0', 10) > 300000) {
+                        localStorage.removeItem(k);
+                    }
+                }
+            } catch (e) {}
+            open();
+        }, hidden ? 400 : 0);
+    }
+
+    function onPbxMessage(event) {
+        var d;
+        try { d = JSON.parse(event.data); } catch (e) { return; }
+        if (!d || d.action !== 'open-card' || !d.data) {
+            return;
+        }
+        var c = d.data;
+        // Старый виджет открывает только контакт или сделку.
+        if (!/^\d+$/.test(String(c.client || '')) && !/^\d+$/.test(String(c.lead || ''))) {
+            return;
+        }
+        claimCard(c.id || c.uniq || (c.phone + ':' + c.responsible), function () {
+            toParent({action: 'openCardEntities', data: {
+                number:      c.phone,
+                responsible: c.responsible,
+                client:      /^\d+$/.test(String(c.client || '')) ? String(c.client) : '',
+                lead:        /^\d+$/.test(String(c.lead || '')) ? String(c.lead) : ''
+            }});
+        });
+    }
+
+    function connectWs() {
+        if (ws) {
+            ws.onclose = null;
+            try { ws.close(); } catch (e) {}
+        }
+        var wsProto = proto === 'http:' ? 'ws:' : 'wss:';
+        ws = new WebSocket(wsProto + '//' + host + '/pbxcore/api/nchan/sub/pbx-events?token=' + encodeURIComponent(cfg.token));
+        ws.onopen = function () {
+            delay = 1000;
+            downSince = 0;
+        };
+        ws.onmessage = onPbxMessage;
+        ws.onclose = function () {
+            var now = Date.now();
+            if (downSince === 0) {
+                downSince = now;
+                checkAuth();
+            } else if (!authFailed && now - downSince > 60000) {
+                alertError('errorAPITimeOut');
+            }
+            setTimeout(connectWs, delay);
+            delay = Math.min(delay * 2, 60000);
+        };
+    }
+
+    window.addEventListener('message', function (event) {
+        if (event.source !== window.parent) {
+            return;
+        }
+        var m = event.data;
+        if (typeof m === 'string') {
+            try { m = JSON.parse(m); } catch (e) { return; }
+        }
+        if (!m || typeof m !== 'object' || !m.action) {
+            return;
+        }
+        if (m.action === 'connect') {
+            if (cfg === null && m.data && m.data.token) {
+                cfg = m.data;
+                connectWs();
+            }
+        } else if (cfg !== null && m.action === 'callback') {
+            post('callback', {
+                'action':      'callback',
+                'number':      m.number,
+                'user-number': m['user-number'] || cfg.currentPhone,
+                'user-id':     m['user-id'] || cfg.currentUser
+            });
+        } else if (cfg !== null && m.action === 'saveSettings') {
+            post('change-settings', {
+                'action':   'saveSettings',
+                'users':    m.users,
+                'portalId': m.portalId
+            });
+        }
+    });
+
+    toParent({action: 'init-done'});
+})();
 </script>
 </body>
 </html>

@@ -86,7 +86,6 @@ return [
     'mod_amo_SaveSettingsError' => 'პარამეტრების შენახვისას მოხდა შეცდომა. ConnectorDB სერვისი შეიძლება არ იყოს გაშვებული.',
     'mod_amo_NeedWaitSyncTitle' => 'კონტაქტების სინქრონიზაცია',
     'mod_amo_NeedWaitSyncBody' => 'კონტაქტები და ტრანზაქციები სინქრონიზებულია. დაელოდეთ პროცესის დასრულებას. პორტალზე ზარების ატვირთვა შეწყდა.',
-    'mod_amo_panelIsEnable' => 'გამოიყენეთ ზარის მართვის პანელი',
     'mod_amo_type_responsible_answered_first' => 'პირველმა უპასუხა ზარს',
     'mod_amo_type_responsible_answered_last' => 'ბოლოს უპასუხა ზარს',
     'mod_amo_type_responsible_missed_first' => 'პირველი ვინც გამოტოვა ზარი',

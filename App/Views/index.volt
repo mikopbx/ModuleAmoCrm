@@ -150,14 +150,6 @@
                     </div>
                 </div>
             </div>
-            <div class="field disability">
-                <div class="ui segment">
-                    <div class="ui toggle checkbox ">
-                        {{ form.render('panelIsEnable') }}
-                        <label>{{ t._('mod_amo_panelIsEnable') }}</label>
-                    </div>
-                </div>
-            </div>
 
             <div class="field disability">
                 <div class="ui segment">

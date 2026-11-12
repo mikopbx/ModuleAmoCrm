@@ -86,7 +86,6 @@ return [
     'mod_amo_SaveSettingsError' => 'Παρουσιάστηκε σφάλμα κατά την αποθήκευση των ρυθμίσεων. Η υπηρεσία ConnectorDB ενδέχεται να μην εκτελείται.',
     'mod_amo_NeedWaitSyncTitle' => 'Συγχρονισμός επαφών',
     'mod_amo_NeedWaitSyncBody' => 'Οι επαφές και οι συναλλαγές συγχρονίζονται. Περιμένετε να ολοκληρωθεί η διαδικασία. Η μεταφόρτωση κλήσεων στην πύλη έχει σταματήσει.',
-    'mod_amo_panelIsEnable' => 'Χρησιμοποιήστε τον πίνακα ελέγχου κλήσεων',
     'mod_amo_type_responsible_answered_last' => 'Τελευταίο άτομο που απαντά στην κλήση',
     'mod_amo_settingsCalls' => 'Φόρτωση κλήσεων',
     'mod_amo_type_responsible_answered_first' => 'Πρώτος να απαντήσει στην κλήση',

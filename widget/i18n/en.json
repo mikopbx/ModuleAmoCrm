@@ -1,62 +1,22 @@
 {
-    "widget":{
-        "name":"MyWidget",
-        "short_description":"Short description",
-        "description":"Full description",
-        "tour_description":"Tour description",
+    "widget": {
+        "name": "MikoPBX: integration with a free PBX",
+        "short_description": "One-click calls. Call recordings and automatic client card opening.",
+        "description": "MikoPBX is a free open-source PBX.",
+        "tour_description": "<article class=\"miko-pbx-desc pt-0\">\n    <div class=\"miko-pbx-desc__block\"><strong> MikoPBX is a free Asterisk-based PBX with all the features of modern IP telephony.</strong>\n    </div>\n\n    <div class=\"miko-pbx-desc__block\"><h3>Key features:</h3>\n        <ul>\n            <li>One-click calls from the card</li>\n            <li>Contact / lead card opens automatically when a call is answered</li>\n            <li>Calls are routed to the responsible employee</li>\n            <li>Call recordings are attached to the contact / lead card</li>\n            <li>Contacts, leads and tasks are created by call processing rules</li>\n            <li>Missed calls go to Incoming leads</li>\n        </ul>\n        <a href=\"https://docs.mikopbx.com/mikopbx/modules/miko/amocrm\">Setup guide</a>\n    </div>\n</article>\n\n<style>\n    .miko-pbx-desc {\n        font-family: 'Ubuntu', sans-serif;\n        font-size: 15px;\n        line-height: 1.6em;\n        color: #212121;\n        padding-top: 64px;\n    }\n\n    .miko-pbx-desc.pt-0 {\n        padding-top: 0;\n    }\n\n    .miko-pbx-desc__block + .miko-pbx-desc__block {\n        margin-top: 30px;\n    }\n\n    .miko-pbx-desc strong {\n        display: block;\n        background-color: #e0f7ff;\n        padding: 24px;\n    }\n\n    .miko-pbx-desc em {\n        font-weight: bold;\n        color: #0056f5;\n    }\n\n    .miko-pbx-desc p {\n        margin-bottom: 8px;\n    }\n\n    .miko-pbx-desc li {\n        margin-bottom: 8px;\n    }\n\n    .miko-pbx-desc ul li {\n        display: block;\n        margin-left: 20px;\n        position: relative;\n    }\n\n    .miko-pbx-desc ul li:before {\n        content: \"\";\n        position: absolute;\n        display: inline-flex;\n        flex-shrink: 0;\n        width: 8px;\n        height: 8px;\n        margin-right: 8px;\n        margin-top: 8px;\n        border-radius: 50%;\n        left: -20px;\n        background: #61a0e1;\n    }\n\n    .miko-pbx-desc ol {\n        margin-bottom: 8px;\n    }\n\n    .miko-pbx-desc ol li {\n        list-style-type: decimal;\n    }\n\n    .miko-pbx-desc a {\n        color: #61a0e1;\n    }\n\n    .miko-pbx-desc h3 {\n        font-weight: normal;\n        font-size: 24px;\n        line-height: 32px;\n        margin-bottom: 16px;\n    }\n\n    .miko-pbx-desc i {\n        display: block;\n        margin-bottom: 8px;\n        font-size: 12px;\n        line-height: 16px;\n    }\n\n    .miko-pbx-desc table {\n        width: 100%;\n        margin-bottom: 8px;\n    }\n\n    .miko-pbx-desc table {\n        border-collapse: collapse;\n    }\n\n    .miko-pbx-desc table th {\n        font-size: 12px;\n        line-height: 16px;\n    }\n\n    .miko-pbx-desc table td, .miko-pbx-desc table th {\n        border: 1px solid #FFE0B2;\n        width: 20%;\n        padding: 8px;\n    }\n\n    .miko-pbx-desc table tr:first-child th {\n        border-top: 0;\n    }\n\n    .miko-pbx-desc table tr td:first-child, .miko-pbx-desc table tr th:first-child {\n        border-left: 0;\n    }\n\n    .miko-pbx-desc table tr:not(:nth-child(3)) td:first-child, .miko-pbx-desc table tr th:first-child {\n        padding-left: 0;\n    }\n\n    .miko-pbx-desc table tr td:last-child, .miko-pbx-desc table tr th:last-child {\n        border-right: 0;\n    }\n\n    .miko-pbx-desc table tbody tr:first-child {\n        font-weight: bold;\n    }\n\n    .miko-pbx-desc ul.miko-pbx-desc__icon-list li {\n        display: flex;\n        margin-left: 0;\n        margin-bottom: 8px\n    }\n\n    .miko-pbx-desc ul.miko-pbx-desc__icon-list li::before {\n        content: none;\n    }\n</style>",
         "call_action": "Call"
     },
-    "settings":{
-        "miko_pbx_host": "Address MikoPBX",
+    "settings": {
+        "miko_pbx_host": "MikoPBX server address",
         "pbx_users": "PBX users",
-        "token": "Token",
-        "time_unit": "s."
+        "token": "Token"
     },
     "errors": {
         "alert": "MikoPBX: Attention!",
-        "errorLoadFrame": "No connection to the server.",
-        "errorAuthAPI": "Authorization error.",
-        "errorAPITimeOut": "Connection to the server lost.",
-        "createContactError": "Error creating contact."
-    },
-    "advanced":{
-        "title":"Settings menu item title"
-    },
-    "calls": {
-        "incoming": "Incoming call",
-        "outgoing": "Outgoing call"
-    },
-    "contacts": {
-        "goto_contact" : "Go to the contact card",
-        "create_contact" : "Create a contact",
-        "call_title": "New call"
-    },
-    "sticker": {
-        "label_comment": "Comment",
-        "label_contact": "Contact",
-        "label_email": "Email",
-        "placeholder_comment": "comment...",
-        "placeholder_contact": "contact...",
-        "button_save": "Save",
-        "button_close": "Close",
-        "button_update": "Update",
-        "placeholder_email": "email...",
-        "contact_exists": "The contact already exists"
-    },
-    "menu": {
-        "main_title" : "Panel MikoPBX"
-    },
-    "salesbot":{
-        "button_title":"Button title",
-        "button_caption":"Button caption",
-        "button_title_default_value":"Button title",
-        "button_caption_default_value":"Button caption",
-        "text":"Text",
-        "number":"Number",
-        "url":"URL",
-        "handler_name":"Handler name"
-    },
-    "dp":{
-        "message": "Message"
+        "errorConnect": "No connection to the MikoPBX server.",
+        "errorAuthAPI": "Authorization error: check the token in the widget settings.",
+        "errorAPITimeOut": "Connection to the MikoPBX server lost.",
+        "errorSaveSettings": "Failed to send the settings to the MikoPBX server.",
+        "unknown": "MikoPBX server communication error."
     }
 }
