@@ -189,9 +189,7 @@ class AmoCrmConf extends ConfigClass
             [ApiController::class, 'listenerAction', '/pbxcore/api/amo-crm/v1/listener', 'post', '/', true],
             [ApiController::class, 'listenerAction', '/pbxcore/api/amo-crm/v1/listener', 'get', '/', true],
             [ApiController::class, 'panelIsEnable', '/pbxcore/api/amo-crm/v1/panel-enable', 'get', '/', true],
-            [ApiController::class, 'commandAction', '/pbxcore/api/amo-crm/v1/command', 'post', '/', true],
             [ApiController::class, 'changeSettingsAction', '/pbxcore/api/amo-crm/v1/change-settings', 'post', '/', true],
-            [ApiController::class, 'findContactAction', '/pbxcore/api/amo-crm/v1/find-contact', 'post', '/', true],
         ];
     }
 
@@ -221,12 +219,11 @@ class AmoCrmConf extends ConfigClass
                 $amo = new RestHandlers();
                 $res = $amo->processRequest($request);
                 break;
-            case 'COMMAND':
-            case 'TRANSFER':
             case 'CALLBACK':
+                // Отказ (пользователь не сопоставлен, ConnectorDb не ответил) отдаётся как есть:
+                // ядро вернёт 422/503, виджет покажет причину по data.code.
                 $amo = new RestHandlers();
-                $res          = $amo->processCallback($request);
-                $res->success = true;
+                $res = $amo->processCallback($request);
                 break;
             case 'CHANGE-SETTINGS':
                 $amo          = new RestHandlers();
@@ -349,15 +346,6 @@ class AmoCrmConf extends ConfigClass
             '    alias /storage/usbdisk1/mikopbx/astspool/monitor;'.PHP_EOL.
             '    add_header X-debug-message "test" always;'.PHP_EOL.
             '}'.PHP_EOL.PHP_EOL.
-            'location ~ /pbxcore/api/amo/pub/(.*)$ {'.PHP_EOL."\t".
-                'nchan_publisher;'.PHP_EOL."\t".
-                'allow  127.0.0.1;'.PHP_EOL."\t".
-                'nchan_channel_id "$1";'.PHP_EOL."\t".
-                'nchan_message_buffer_length 1;'.PHP_EOL."\t".
-                'nchan_message_timeout 300m;'.PHP_EOL.
-            '}'.
-            PHP_EOL.
-            PHP_EOL.
             "location ^~ /webrtc-phone/ {".PHP_EOL."\t".
                 "root {$this->moduleDir}/sites/;".PHP_EOL."\t".
                 "index index.html;".PHP_EOL."\t".
@@ -366,16 +354,7 @@ class AmoCrmConf extends ConfigClass
                 "add_header 'Access-Control-Allow-Origin' '*' always;".PHP_EOL."\t".
                 'add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0";'.PHP_EOL."\t".
                 'add_header Pragma "no-cache";'.PHP_EOL.
-            "}".
-            PHP_EOL.
-            PHP_EOL.
-            "location /webrtc {".PHP_EOL."\t".
-                'proxy_pass http://127.0.0.1:'.PbxSettings::getValueByKey('AJAMPort').'/asterisk/ws;'.PHP_EOL."\t".
-                'proxy_http_version 1.1;'.PHP_EOL."\t".
-                'proxy_set_header Upgrade $http_upgrade;'.PHP_EOL."\t".
-                'proxy_set_header Connection "upgrade";'.PHP_EOL."\t".
-                'proxy_read_timeout 86400;'.PHP_EOL.
-            '}'.PHP_EOL;
+            "}".PHP_EOL;
     }
 
     /**
@@ -502,7 +481,7 @@ class AmoCrmConf extends ConfigClass
             "    proxy_read_timeout 86400;\n" .
             "}\n\n" .
 
-            // WebRTC-телефон (статика iframe)
+            // Совместимость со старыми версиями виджета (shim вместо панели)
             "location /{$token}/webrtc-phone/ {\n" .
             "    proxy_pass {$proxyTarget}/webrtc-phone/;\n" .
             $proxyHeaders .

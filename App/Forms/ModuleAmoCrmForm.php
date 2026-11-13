@@ -40,7 +40,6 @@ class ModuleAmoCrmForm extends ModuleBaseForm
         $this->add(new Text('tokenForAmo'));
         $this->addCheckBox('restrictCdrToKnownEmployees', intval($entity->restrictCdrToKnownEmployees) === 1);
         $this->addCheckBox('useInterception', intval($entity->useInterception) === 1);
-        $this->addCheckBox('panelIsEnable', intval($entity->panelIsEnable) === 1);
         $this->addCheckBox('isPrivateWidget', intval($entity->isPrivateWidget) === 1);
         $this->addCheckBox('disableDetailedCdr', intval($entity->disableDetailedCdr) === 1);
         $this->add(new Text('privateClientId'));

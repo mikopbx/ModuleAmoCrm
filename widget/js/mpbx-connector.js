@@ -1,6 +1,6 @@
 /*
  * MikoPBX - free phone system for small business
- * Copyright © 2017-2021 Alexey Portnov and Nikolay Beketov
+ * Copyright © 2017-2026 Alexey Portnov and Nikolay Beketov
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,260 +17,277 @@
  */
 
 /* global define */
-define(function (require) {
-    let $       = require('jquery');
-    const PubSub= require('pubsub');
 
-    let connector = {
-        settings: {},
-        iFrame: null,
-        toggleTab: null,
-        panelDisabled: true,
-        /**
-         * Creates a fixed toggle tab on the right edge of the screen
-         */
-        createToggleTab: function () {
-            if (connector.toggleTab) {
-                return;
-            }
-            let tab = document.createElement('div');
-            tab.id = 'miko-pbx-toggle-tab';
-            tab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#555">'
-                + '<path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2a1.004 1.004 0 011.01-.24c1.12.37 2.33.57 3.57.57'
-                + '.55 0 1 .45 1 1v3.49c0 .55-.45 1-1 1C10.07 22 2 13.93 2 4c0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1'
-                + ' 0 1.25.2 2.45.57 3.57.11.35.03.74-.24 1.01l-2.21 2.21z"/>'
-                + '</svg>';
-            let savedY = localStorage.getItem('tabPositionY');
-            let topVal = savedY ? savedY + 'px' : '50%';
-            tab.style.cssText = 'position:fixed;right:0;top:' + topVal + ';z-index:998;width:32px;height:32px;'
-                + 'background:#e0e0e0;border-radius:6px 0 0 6px;cursor:pointer;'
-                + 'box-shadow:-1px 0 4px rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:center;'
-                + 'transition:background 0.15s;user-select:none;';
-            tab.onmouseenter = function () { tab.style.background = '#ccc'; };
-            tab.onmouseleave = function () { tab.style.background = '#e0e0e0'; };
+/**
+ * Связь виджета с MikoPBX:
+ *  - WebSocket nchan `pbx-events`, из событий используется только `open-card`;
+ *  - REST: /callback (звонок из карточки), /change-settings (сопоставление пользователей),
+ *    /panel-enable (проверка токена: 403 — токен не принят).
+ */
+define(['jquery'], function ($) {
+    const RECONNECT_MIN   = 1000;
+    const RECONNECT_MAX   = 60000;
+    const DOWN_ALERT_AFTER= 60000;   // Сообщать о потере связи, если её нет дольше минуты.
+    const ALERT_INTERVAL  = 300000;  // Фоновые ошибки — не чаще раза в 5 минут.
+    const CARD_KEY_PREFIX = 'mikopbx:open-card:'; // Тот же префикс в sites/webrtc-phone/index.html.
+    const CARD_KEY_TTL    = 60000;
+    const CARD_KEY_PURGE  = 300000;
 
-            // Drag logic
-            let isDragging = false;
-            let dragStartY = 0;
-            let dragStartTop = 0;
-            let totalDragDistance = 0;
-
-            tab.addEventListener('mousedown', function (e) {
-                isDragging = true;
-                dragStartY = e.clientY;
-                dragStartTop = parseInt(tab.style.top, 10) || ($(window).height() / 2);
-                totalDragDistance = 0;
-                e.preventDefault();
-            });
-            $(document).on('mousemove.mikoTab', function (e) {
-                if (!isDragging) return;
-                let delta = e.clientY - dragStartY;
-                totalDragDistance = Math.max(totalDragDistance, Math.abs(delta));
-                let newTop = dragStartTop + delta;
-                let maxTop = $(window).height() - 32;
-                if (newTop < 0) newTop = 0;
-                if (newTop > maxTop) newTop = maxTop;
-                tab.style.top = newTop + 'px';
-            });
-            $(document).on('mouseup.mikoTab', function () {
-                if (!isDragging) return;
-                isDragging = false;
-                localStorage.setItem('tabPositionY', parseInt(tab.style.top, 10));
-                if (totalDragDistance < 5) {
-                    // Click without drag — show panel
-                    $(connector.iFrame).show({
-                        duration: 400,
-                        done: function () {
-                            connector.postToFrame({action: 'resize', height: $(window).height()});
-                            connector.setHeightFrame();
-                        }
-                    });
-                    localStorage.setItem('frameVisibility', '1');
-                    $(tab).hide();
-                }
-            });
-
-            document.body.appendChild(tab);
-            connector.toggleTab = tab;
-        },
-        /**
-         * Sending a command to a frame
-         * @param message
-         */
-        postToFrame: function (message){
-            if(connector.iFrame !== null && typeof connector.iFrame.contentWindow === 'object'){
-                connector.iFrame.contentWindow.postMessage(message, window.location.origin);
-            }
-        },
-        /**
-         * Setting the frame height
-         * @param height
-         */
-        setHeightFrame: function (height){
-            if(height === undefined){
-                height = $(window).height();
-            }
-            $('iframe[id="miko-pbx-phone"]').attr('height', height);
-        },
-        /**
-         * Initializing the component
-         * @param newSettings
-         */
-        init: function(newSettings) {
-            // Initializing the connector to MikoPBX
-            connector.settings = newSettings;
-            if(connector.settings.pbxHost){
-                let href = `//${connector.settings.pbxHost}/webrtc-phone/index.html?random=${(new Date()).getTime()}`;
-                // Checking the availability of content located remotely
-                // ModuleAmoCrm/sites/webrtc-phone/index.html
-                $.ajax({
-                    async : true,
-                    url : href
-                })
-                .success(function(htmlContent) {
-                    htmlContent = htmlContent.replace(new RegExp('href="', 'g'), `href="//${connector.settings.pbxHost}/webrtc-phone/`);
-                    htmlContent = htmlContent.replace(new RegExp('src="', 'g'),  `src="//${connector.settings.pbxHost}/webrtc-phone/`);
-                    htmlContent = htmlContent.replace(new RegExp('data-main="', 'g'),  `data-main="//${connector.settings.pbxHost}/webrtc-phone/`);
-                    htmlContent = htmlContent.replace('<head>', `<head><script>window.mikoPbxHost="${connector.settings.pbxHost}";</script>`);
-                    if ($('#miko-pbx-phone').length < 1) {
-                        // Add iframe
-                        let css = 'position: fixed; z-index: 999; right: 0;bottom: 0; border: 0;';
-                        // We connect the style.css file by passing the widget version as a parameter
-                        $("body").prepend(`<iframe id="miko-pbx-phone" src="javascript:void(0);" width="300" height="${$(window).height()}" style="${css}"></iframe>`);
-                    }
-                    connector.iFrame = document.getElementById('miko-pbx-phone');
-                    $(connector.iFrame).attr('title', connector.settings.pbxHost);
-                    $(connector.iFrame).hide();
-                    let previewIframe =  connector.iFrame.contentDocument ||  connector.iFrame.contentWindow.document;
-                    previewIframe.open();
-                    previewIframe.write(htmlContent);
-                    previewIframe.close();
-
-                    connector.iFrame.onload = function (){
-                        // Не показываем ни iframe, ни toggleTab до подтверждения от iframe
-                        // что панель включена (panel-enable API вернул 200).
-                        // iframe отправит 'hide-panel' если отключена, или отобразит контент если включена.
-                        $(connector.iFrame).hide();
-                        let resizeTimer;
-                        $(window).resize(() => {
-                            clearTimeout(resizeTimer);
-                            resizeTimer = setTimeout(() => {
-                                if (connector.panelDisabled) return;
-                                connector.postToFrame({action: 'resize', height: $(window).height()});
-                                connector.setHeightFrame();
-                            }, 150);
-                        });
-                    };
-                    // Subscribing to event processing from a frame
-                    window.removeEventListener("message", connector.onMessage);
-                    window.addEventListener("message", connector.onMessage);
-                })
-                .error(function(){
-                    $(connector.iFrame).hide();
-                    PubSub.publish(connector.settings.ns + ':main', {action: "error", code: 'errorLoadFrame'});
-                })
-            }
-            // Subscribing to events from other widget components
-            PubSub.subscribe(connector.settings.ns + ':connector', connector.onMessage);
-        },
-        /**
-         * Processing notifications from other components and from the frame (MikoPBX)
-         * @param event
-         * @param message
-         */
-        onMessage: function(event, message = null) {
-            let params;
-            try {
-                params = message || JSON.parse(event.data);
-            }catch (e) {
-                return;
-            }
-            if(params.action === 'saveSettings'){
-                // Обновляем значение в настройках.
-                if (params.pbxHost) {
-                    connector.settings.pbxHost = params.pbxHost;
-                }
-                params.pbxHost = connector.settings.pbxHost;
-            }
-            if(connector.settings.pbxHost !== params.pbxHost){
-                return;
-            }
-            if(params.action === 'init-done'){
-                // Message from MikoPBX frame — панель подтвердила что включена
-                connector.panelDisabled = false;
-                connector.setHeightFrame();
-                connector.postToFrame({action: 'connect', data: connector.settings});
-                // Теперь можно показать toggleTab или iframe
-                connector.createToggleTab();
-                let frameVisibility = localStorage.getItem('frameVisibility');
-                if(frameVisibility === '1'){
-                    $(connector.iFrame).show({duration: 400});
-                    $(connector.toggleTab).hide();
-                }else{
-                    $(connector.iFrame).hide();
-                    $(connector.toggleTab).show();
-                }
-            }else if(params.action === 'findContact'){
-                PubSub.publish(connector.settings.ns + ':main', params);
-            }else if(params.action === 'resultFindContact'){
-                let result = {
-                    number:  params.number,
-                    contact: params.element.name,
-                    company: params.element.company,
-                    id:      params.element.id
-                };
-                connector.postToFrame({action: 'updateContact', data:  result});
-            }else if(params.action === 'openCardEntities'){
-                // Открыть карточку клиента / сделки.
-                PubSub.publish(connector.settings.ns + ':main', params);
-            }else if(params.action === 'openCard'){
-                // Открыть карточку клиента.
-                PubSub.publish(connector.settings.ns + ':main', params);
-            }else if(params.action === 'hide-panel'){
-                $(connector.iFrame).hide();
-                localStorage.setItem('frameVisibility', '0');
-                if (connector.panelDisabled) {
-                    // Панель отключена на сервере — не показываем ничего
-                    if (connector.toggleTab) {
-                        $(connector.toggleTab).hide();
-                    }
-                } else {
-                    // Панель свёрнута пользователем — показываем кнопку
-                    connector.createToggleTab();
-                    $(connector.toggleTab).show();
-                }
-            }else if(params.action === 'show-panel'){
-                connector.postToFrame({action: 'resize'});
-                $(connector.iFrame).show({
-                    duration: 400,
-                    done: () => {
-                        connector.postToFrame({action: 'resize'});
-                    }
-                });
-                localStorage.setItem('frameVisibility', '1');
-                if (connector.toggleTab) {
-                    $(connector.toggleTab).hide();
-                }
-            }else if(params.action === 'error'){
-                PubSub.publish(connector.settings.ns + ':main', params);
-            }else if(params.action === 'resize'){
-                connector.setHeightFrame(params.height);
-            }else{
-                connector.postToFrame(message);
-            }
-        }
+    const state = {
+        host:       '',
+        token:      '',
+        handlers:   {},
+        ws:         null,
+        timer:      null,
+        delay:      RECONNECT_MIN,
+        downSince:  0,
+        authFailed: false,
+        lastAlert:  0,
+        stopped:    true,
     };
-    return connector;
+
+    /**
+     * host[:port][/token] без схемы и завершающих слешей.
+     */
+    function normalizeHost(host) {
+        return String(host || '').trim().replace(/^[a-z]+:\/\//i, '').replace(/\/+$/, '');
+    }
+
+    function httpProtocol() {
+        return window.location.protocol === 'http:' ? 'http:' : 'https:';
+    }
+
+    function apiUrl(path) {
+        return `${httpProtocol()}//${state.host}/pbxcore/api/amo-crm/v1/${path}`;
+    }
+
+    /**
+     * @param {string} code ключ из i18n errors
+     * @param {boolean} force true — ответ на действие пользователя, без ограничения частоты
+     */
+    function notify(code, force) {
+        const now = Date.now();
+        if (!force && now - state.lastAlert < ALERT_INTERVAL) {
+            return;
+        }
+        state.lastAlert = now;
+        if (typeof state.handlers.onError === 'function') {
+            state.handlers.onError(code);
+        }
+    }
+
+    // data.code отказа сервера -> ключ i18n errors.
+    const REJECT_CODES = {
+        NOT_MAPPED: 'errorNoPhone',
+        NO_NUMBER:  'errorBadNumber',
+    };
+
+    /**
+     * Отказ сервера в теле ответа: новые ядра отдают его с HTTP 422, старые — с 200 и result=false.
+     * @return {string} ключ i18n или '' если отказа нет
+     */
+    function rejection(body) {
+        if (!body || body.result !== false) {
+            return '';
+        }
+        const code = body.data && body.data.code;
+        return REJECT_CODES[code] || 'unknown';
+    }
+
+    function request(path, data) {
+        if (!state.host || !state.token) {
+            return $.Deferred().reject().promise();
+        }
+        return $.ajax({
+            url:      apiUrl(path),
+            type:     'POST',
+            timeout:  10000,
+            data:     $.extend({}, data, {token: state.token}),
+        }).done(function (body) {
+            const code = rejection(body);
+            if (code) {
+                notify(code, true);
+            }
+        }).fail(function (xhr) {
+            if (xhr.status === 403) {
+                notify('errorAuthAPI', true);
+                return;
+            }
+            notify(rejection(xhr.responseJSON) || 'errorConnect', true);
+        });
+    }
+
+    function checkAuth() {
+        $.ajax({
+            url:     apiUrl('panel-enable'),
+            type:    'GET',
+            timeout: 10000,
+            data:    {token: state.token},
+        }).fail(function (xhr) {
+            if (xhr.status === 403) {
+                state.authFailed = true;
+                notify('errorAuthAPI');
+            }
+        });
+    }
+
+    function onPbxMessage(event) {
+        let message;
+        try {
+            message = JSON.parse(event.data);
+        } catch (e) {
+            return;
+        }
+        if (!message || message.action !== 'open-card' || !message.data) {
+            return;
+        }
+        if (typeof state.handlers.onOpenCard === 'function') {
+            state.handlers.onOpenCard(message.data);
+        }
+    }
+
+    function scheduleReconnect() {
+        clearTimeout(state.timer);
+        state.timer = setTimeout(connect, state.delay);
+        state.delay = Math.min(state.delay * 2, RECONNECT_MAX);
+    }
+
+    function onClose() {
+        if (state.stopped) {
+            return;
+        }
+        const now = Date.now();
+        if (state.downSince === 0) {
+            state.downSince = now;
+            checkAuth();
+        } else if (!state.authFailed && now - state.downSince > DOWN_ALERT_AFTER) {
+            notify('errorAPITimeOut');
+        }
+        scheduleReconnect();
+    }
+
+    function closeSocket() {
+        clearTimeout(state.timer);
+        state.timer = null;
+        if (state.ws) {
+            state.ws.onopen = state.ws.onmessage = state.ws.onclose = state.ws.onerror = null;
+            try {
+                state.ws.close();
+            } catch (e) {
+                // Сокет уже закрыт.
+            }
+            state.ws = null;
+        }
+    }
+
+    function connect() {
+        if (state.stopped) {
+            return;
+        }
+        closeSocket();
+        const protocol = httpProtocol() === 'http:' ? 'ws:' : 'wss:';
+        const url = `${protocol}//${state.host}/pbxcore/api/nchan/sub/pbx-events?token=${encodeURIComponent(state.token)}`;
+        try {
+            state.ws = new WebSocket(url);
+        } catch (e) {
+            notify('errorConnect');
+            scheduleReconnect();
+            return;
+        }
+        state.ws.onopen = function () {
+            state.delay      = RECONNECT_MIN;
+            state.downSince  = 0;
+            state.authFailed = false;
+        };
+        state.ws.onmessage = onPbxMessage;
+        // onerror всегда сопровождается onclose — переподключение там.
+        state.ws.onclose = onClose;
+    }
+
+    return {
+        /**
+         * @param {{pbxHost: string, token: string}} settings
+         * @param {{onOpenCard: function(Object), onError: function(string)}} handlers
+         * @param {boolean} listen подписаться на события АТС. Карточку открывает только
+         *        ответственный с внутренним номером: без номера сокет не нужен, а REST
+         *        (сохранение настроек администратором) остаётся доступен.
+         */
+        init: function (settings, handlers, listen) {
+            this.destroy();
+            state.host       = normalizeHost(settings.pbxHost);
+            state.token      = String(settings.token || '').trim();
+            state.handlers   = handlers || {};
+            state.delay      = RECONNECT_MIN;
+            state.downSince  = 0;
+            state.authFailed = false;
+            if (!state.host || !state.token) {
+                return;
+            }
+            if (listen === false) {
+                // Без сокета неверный токен иначе не обнаружится (проверка идёт из onClose).
+                checkAuth();
+                return;
+            }
+            state.stopped = false;
+            connect();
+        },
+
+        destroy: function () {
+            state.stopped = true;
+            closeSocket();
+        },
+
+        /**
+         * Звонок из карточки: АТС вызывает сотрудника, затем набирает номер.
+         */
+        callback: function (number, userNumber, userId) {
+            return request('callback', {
+                'action':      'callback',
+                'number':      number,
+                'user-number': userNumber,
+                'user-id':     userId,
+            });
+        },
+
+        /**
+         * Передать на АТС сопоставление пользователей amoCRM и внутренних номеров.
+         * users — объект {amoUserId: номер}: jQuery отправит users[id]=номер. Модули до v1.101
+         * включительно принимают только массив, JSON-строку они молча игнорируют.
+         */
+        saveSettings: function (users, portalId) {
+            return request('change-settings', {
+                'action':   'saveSettings',
+                'users':    users,
+                'portalId': portalId,
+            });
+        },
+
+        /**
+         * Выполнить fn один раз для ключа во всех вкладках amoCRM этого браузера.
+         * Видимая вкладка выполняет сразу, скрытые ждут, чтобы уступить ей.
+         */
+        once: function (key, fn) {
+            const storageKey = CARD_KEY_PREFIX + key;
+            setTimeout(function () {
+                try {
+                    const now  = Date.now();
+                    const prev = parseInt(window.localStorage.getItem(storageKey) || '0', 10);
+                    if (now - prev < CARD_KEY_TTL) {
+                        return;
+                    }
+                    window.localStorage.setItem(storageKey, String(now));
+                    for (let i = window.localStorage.length - 1; i >= 0; i--) {
+                        const k = window.localStorage.key(i);
+                        if (k && k.indexOf(CARD_KEY_PREFIX) === 0
+                            && now - parseInt(window.localStorage.getItem(k) || '0', 10) > CARD_KEY_PURGE) {
+                            window.localStorage.removeItem(k);
+                        }
+                    }
+                } catch (e) {
+                    // localStorage недоступен — открываем без дедупликации.
+                }
+                fn();
+            }, document.hidden ? 400 : 0);
+        },
+    };
 });
-
-/*
-curl -X 'GET' -H 'Accept: text/event-stream' -k 'https://127.0.0.1/pbxcore/api/nchan/sub/pbx-events?token=test-token'
-curl -k --request POST --data "test message" -H "Accept: text/json" https://127.0.0.1/pbxcore/api/nchan/pub/pbx-events
-
-
-curl -X 'GET' -H 'Accept: text/event-stream' -k 'https://127.0.0.1/pbxcore/api/nchan/sub/users?token=test-token'
-curl -X 'GET' -H 'Accept: text/event-stream' -k 'https://127.0.0.1/pbxcore/api/nchan/sub/calls?token=test-token'
-curl -X 'GET' -H 'Accept: text/event-stream' -k 'https://127.0.0.1/pbxcore/api/nchan/sub/active-calls?token=test-token'
-curl -k --request POST --data "test message" -H "Accept: text/json" https://127.0.0.1/pbxcore/api/nchan/pub/calls
-curl -k --request POST --data "test message" -H "Accept: text/json" https://172.16.156.223/pbxcore/api/amo/pub/active-calls
-*/

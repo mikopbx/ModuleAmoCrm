@@ -24,7 +24,6 @@ return [
     'mod_amo_baseDomain' => 'ที่อยู่พอร์ทัล (ตัวอย่าง: example.amocrm.ru)',
     'mod_amo_Error' => 'ข้อผิดพลาด',
     'mod_amo_isPrivateWidget' => 'นี่คือการบูรณาการแบบส่วนตัว',
-    'mod_amo_panelIsEnable' => 'ใช้แผงควบคุมการโทร',
     'mod_amo_privateClientId' => 'รหัสบูรณาการ',
     'mod_amo_privateClientSecret' => 'คีย์การรวมความลับ',
     'mod_amo_entitySettingsTableDid' => 'ทำ',

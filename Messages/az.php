@@ -86,7 +86,6 @@ return [
     'mod_amo_SaveSettingsError' => 'Parametrləri saxlayarkən xəta baş verdi. ConnectorDB xidməti işləməyə bilər.',
     'mod_amo_NeedWaitSyncTitle' => 'Kontaktların sinxronlaşdırılması',
     'mod_amo_NeedWaitSyncBody' => 'Kontaktlar və əməliyyatlar sinxronlaşdırılır. Prosesin tamamlanmasını gözləyin. Zənglərin portala yüklənməsi dayandırılıb.',
-    'mod_amo_panelIsEnable' => 'Zəng idarəetmə panelindən istifadə edin',
     'mod_amo_settingsCalls' => 'Zənglər yüklənir',
     'mod_amo_type_responsible_answered_first' => 'Zəngə ilk cavab verən',
     'mod_amo_type_responsible_answered_last' => 'Zəngə cavab verən son şəxs',

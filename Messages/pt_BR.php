@@ -86,7 +86,6 @@ return [
     'mod_amo_SaveSettingsError' => 'Ocorreu um erro ao salvar as configurações. O serviço ConnectorDB pode não estar em execução.',
     'mod_amo_NeedWaitSyncTitle' => 'Sincronizando contatos',
     'mod_amo_NeedWaitSyncBody' => 'Contatos e transações são sincronizados. Aguarde a conclusão do processo. O upload de chamadas para o portal foi interrompido.',
-    'mod_amo_panelIsEnable' => 'Use o painel de controle de chamadas',
     'mod_amo_type_responsible_answered_first' => 'Primeiro a atender a chamada',
     'mod_amo_type_responsible_answered_last' => 'Última pessoa a atender a chamada',
     'mod_amo_type_responsible_missed_first' => 'O primeiro a perder a chamada',

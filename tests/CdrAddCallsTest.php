@@ -57,6 +57,8 @@ namespace {
     try {
         require_once dirname(__DIR__) . '/Lib/CallTypeResolver.php';
         require_once dirname(__DIR__) . '/Lib/IncompleteCallTypes.php';
+        require_once dirname(__DIR__) . '/Lib/ResponsibleResolver.php';
+        require_once dirname(__DIR__) . '/Lib/ValidationErrors.php';
         require_once dirname(__DIR__) . '/bin/AmoCdrDaemon.php';
     } finally {
         set_include_path($includePath);

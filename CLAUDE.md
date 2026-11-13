@@ -61,7 +61,10 @@ jobs:
     secrets: inherit
 ```
 
-Тестов в проекте нет (нет phpunit.xml, нет каталога tests/).
+Тесты — самостоятельные PHP-скрипты без phpunit (`tests/*Test.php`, заглушки MikoPBX внутри файла):
+```bash
+for t in tests/*Test.php; do php "$t" || echo "FAIL $t"; done
+```
 
 ## Сборка и установка модуля
 
@@ -128,7 +131,7 @@ mv babel.config.json.bak babel.config.json
 
 | Worker | Файл | Тип проверки | Назначение |
 |--------|------|-------------|------------|
-| `WorkerAmoCrmAMI` | `bin/WorkerAmoCrmAMI.php` | AMI | Слушает события Asterisk (перехват, звонки) |
+| `WorkerAmoCrmAMI` | `bin/WorkerAmoCrmAMI.php` | AMI | Слушает UserEvent перехвата на ответственного |
 | `AmoCdrDaemon` | `bin/AmoCdrDaemon.php` | PID | Синхронизация CDR → AmoCRM (батчами по 50) |
 | `ConnectorDb` | `bin/ConnectorDb.php` | PID | RPC-сервис для операций с БД через Beanstalk |
 | `WorkerAmoHTTP` | `bin/WorkerAmoHTTP.php` | Beanstalk | HTTP-запросы к API AmoCRM (throttle: 7 req/s) |
@@ -139,7 +142,7 @@ mv babel.config.json.bak babel.config.json
 ### Inter-Process Communication Flow
 
 ```
-AMI Events → WorkerAmoCrmAMI → Beanstalk → ConnectorDb (DB ops)
+AMI Interception → WorkerAmoCrmAMI → Beanstalk → ConnectorDb (DB ops)
                                          → WorkerAmoHTTP (API calls)
 CDR records → AmoCdrDaemon → ConnectorDb → WorkerAmoHTTP → AmoCRM API
 Webhooks → ApiController → ConnectorDb → обработка
@@ -158,7 +161,7 @@ Webhooks → ApiController → ConnectorDb → обработка
 - Регистрацию workers в `getModuleWorkers()`
 - REST-маршруты в `getPBXCoreRESTAdditionalRoutes()`
 - Генерацию dialplan-контекстов (extensions.conf) для перехвата звонков
-- Nginx-локации для WebRTC-телефона и воспроизведения записей
+- Nginx-локации для воспроизведения записей и shim старых виджетов (`/webrtc-phone/`)
 - Cron-задачи: очистка tmp (каждую минуту), начальная синхронизация (01:00 ежедневно)
 - Реакцию на изменения в БД через `modelsEventChangeData()`
 
@@ -172,10 +175,8 @@ Webhooks → ApiController → ConnectorDb → обработка
 |----------|-------|------------|
 | `/callback` | POST | Инициация звонка из AmoCRM |
 | `/listener` | GET/POST | OAuth2 авторизация |
-| `/command` | POST | Команды управления (hangup и др.) |
 | `/change-settings` | POST | Сохранение настроек из виджета |
-| `/find-contact` | POST | Поиск контакта по телефону |
-| `/panel-enable` | GET | Проверка статуса панели |
+| `/panel-enable` | GET | Проверка токена виджетом (200 / 403); имя оставлено для старых виджетов |
 | `/entity-update` | POST | Webhook от AmoCRM при изменении сущностей |
 
 Авторизация API — через файл-токен в `/var/etc/auth/`.
@@ -196,7 +197,9 @@ Webhooks → ApiController → ConnectorDb → обработка
 
 ### Widget (`widget/`)
 
-AmoCRM-виджет для встраивания в интерфейс CRM: WebRTC-телефон через iframe, event-driven коммуникация (PubSub), настройки в `manifest.json`.
+AmoCRM-виджет без UI (панель управления вызовами удалена): click-to-call (`/callback`), передача сопоставления пользователей (`/change-settings`), автооткрытие карточки по событию `open-card` из одного WebSocket nchan `pbx-events` (`widget/js/mpbx-connector.js`). Собирается CI в отдельный `widget.zip`.
+
+`sites/webrtc-phone/index.html` — невидимый shim для старых версий виджета (они грузят его в iframe через `document.write`): тот же функционал по старому postMessage-протоколу. В этом файле нельзя писать подстроки атрибутов href/src/data-main со знаком `=` и кавычкой — старый виджет переписывает их регуляркой.
 
 ### Database Models
 

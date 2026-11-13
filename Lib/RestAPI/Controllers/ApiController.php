@@ -11,11 +11,8 @@ namespace Modules\ModuleAmoCrm\Lib\RestAPI\Controllers;
 
 use MikoPBX\Common\Providers\LoggerProvider;
 use MikoPBX\Core\System\SystemMessages;
-use MikoPBX\Core\System\Util;
 use MikoPBX\PBXCoreREST\Controllers\Modules\ModulesControllerBase;
 use Modules\ModuleAmoCrm\bin\ConnectorDb;
-use Modules\ModuleAmoCrm\bin\WorkerAmoCrmAMI;
-use Modules\ModuleAmoCrm\Lib\ClientHTTP;
 
 class ApiController extends ModulesControllerBase
 {
@@ -24,10 +21,6 @@ class ApiController extends ModulesControllerBase
      *  curl -X POST -d '{"action": "call", "number": "74952293042", "user-id": "1", "user-number": "203"}' http://172.16.156.223/pbxcore/api/amo-crm/v1/callback
         curl 'https://127.0.0.1/pbxcore/api/amo-crm/v1/callback' \
         --data-raw 'action=callback&number=79043332233&user-number=201+&user-id=480711' \
-        --compressed
-
-        curl 'http://127.0.0.1/pbxcore/api/amo-crm/v1/command' \
-        --data-raw 'call-id=mikopbx-1649170490.6_b0691C&user-id=480711&user-phone=201&action=hangup' \
         --compressed
 
         curl 'http://127.0.0.1/pbxcore/api/amo-crm/v1/change-settings' \
@@ -44,38 +37,16 @@ class ApiController extends ModulesControllerBase
     }
 
     /**
-     * curl 'https://127.0.0.1/pbxcore/api/amo-crm/v1/find-contact' -H 'Content-Type: application/x-www-form-urlencoded; charset=UTF-8' --data-raw 'phone=79257183047&action=findContact&token=uFJ6v6DfwBfjNVaTL1zKn6KUbSL2xsBWsm3PZ7yG6kRQMWgqu'
+     * Проверка токена виджетом: 200 — токен принят, 403 — нет (ответ даёт checkAuth).
+     * Имя эндпоинта (panel-enable) сохранено для совместимости со старыми версиями виджета.
      * @return void
      */
-    public function findContactAction():void
-    {
-        if($this->checkAuth() === false){
-            return;
-        }
-        $data   =  $this->request->getPost();
-        $result = ConnectorDb::invoke('findContacts', [[$data['phone']]]);
-        $this->echoResponse($result);
-        $this->response->sendRaw();
-    }
-
-    public function commandAction():void
-    {
-        $this->evalFunction('command');
-    }
-
     public function panelIsEnable():void
     {
         if($this->checkAuth() === false){
             return;
         }
-        $allSettings   = ConnectorDb::invoke('getModuleSettings', [true]);
-        $panelIsEnable = intval($allSettings['ModuleAmoCrm']['panelIsEnable']??0);
-        if($panelIsEnable === 1){
-            $code = 200;
-        }else{
-            $code = 201;
-        }
-        $this->response->setStatusCode($code, 'OK')->sendHeaders();
+        $this->response->setStatusCode(200, 'OK')->sendHeaders();
         $this->response->sendRaw();
     }
 

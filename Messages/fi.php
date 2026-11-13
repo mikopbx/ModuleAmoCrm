@@ -24,7 +24,6 @@ return [
     'mod_amo_baseDomain' => 'Portaalin osoite (esimerkki: example.amocrm.ru)',
     'mod_amo_Error' => 'Virhe',
     'mod_amo_isPrivateWidget' => 'Tämä on yksityinen integraatio',
-    'mod_amo_panelIsEnable' => 'Käytä puhelun ohjauspaneelia',
     'mod_amo_privateClientId' => 'Integrointitunnus',
     'mod_amo_privateClientSecret' => 'Salainen integrointiavain',
     'mod_amo_entitySettingsTableDid' => 'TEKIIN',

@@ -19,8 +19,6 @@
 
 namespace Modules\ModuleAmoCrm\Lib;
 
-use MikoPBX\Common\Providers\CDRDatabaseProvider;
-use MikoPBX\Core\System\Util;
 use Modules\ModuleAmoCrm\bin\ConnectorDb;
 use Modules\ModuleAmoCrm\bin\WorkerAmoHTTP;
 
@@ -94,7 +92,7 @@ class RestHandlers extends AmoCrmMainBase
         if(!is_array($params)){
             return $res;
         }
-        $allowedActions = ['callback', 'hangup', 'transfer'];
+        $allowedActions = ['callback'];
         $actionName = $params['action']??'';
         if(!in_array($actionName, $allowedActions, true)){
             return $res;
@@ -107,36 +105,6 @@ class RestHandlers extends AmoCrmMainBase
     }
 
     /**
-     * Обработка команды завершения вызова.
-     * @param array $request
-     * @return PBXAmoResult
-     */
-    public function hangupAction(array $request):PBXAmoResult
-    {
-        $res = new PBXAmoResult();
-        $cdrData = CDRDatabaseProvider::getCacheCdr();
-        try {
-            $am = Util::getAstManager('off');
-        }catch (\Exception $e){
-            return $res;
-        }
-        foreach ($cdrData as $cdr){
-            if($cdr['UNIQUEID'] !== $request['call-id']){
-                continue;
-            }
-            if($request['user-phone'] === $cdr['src_num']){
-                $channel = $cdr['src_chan'];
-            }else{
-                $channel = $cdr['dst_chan'];
-            }
-            $am->Hangup($channel);
-            $res->success = true;
-        }
-
-        return $res;
-    }
-
-    /**
      * Запуск Originate.
      * @param $params
      * @return PBXAmoResult
@@ -145,60 +113,36 @@ class RestHandlers extends AmoCrmMainBase
     public function callbackAction($params):PBXAmoResult
     {
         $res = new PBXAmoResult();
-        $dst = preg_replace("/[^0-9+]/", '', $params['number']);
-        AmoCrmMain::amiOriginate($params['user-number'], '', $dst);
+        $userId    = CallbackPeer::userId($params['user-id'] ?? '');
+        $requested = preg_replace('/[^0-9]/', '', (string)($params['user-number'] ?? ''));
+        $dst       = CallbackPeer::destination($params['number'] ?? '');
+        if ($dst === '') {
+            $res->data = ['code' => CallbackPeer::NO_NUMBER];
+            $res->messages[] = 'Empty destination number';
+            return $res;
+        }
+        // Таймаут меньше таймаута запроса виджета (10 с): иначе пользователь увидит ошибку,
+        // повторит клик, а оба звонка уйдут позже.
+        $userNumbers = $userId === '' ? [] : ConnectorDb::tryInvoke('getUserNumbers', [$userId], 5);
+        if ($userNumbers === null) {
+            $this->logger->writeError("ONEXTERNALCALLSTART failed: ConnectorDb did not answer, user {$userId}");
+            $res->messages[] = 'ConnectorDb did not answer';
+            return $res;
+        }
+        $peer = CallbackPeer::resolve($requested, is_array($userNumbers) ? $userNumbers : []);
+        if ($peer === null) {
+            $this->logger->writeError(
+                "ONEXTERNALCALLSTART rejected: user {$userId} <{$requested}> is not mapped to a single PBX extension"
+            );
+            $res->data = ['code' => CallbackPeer::NOT_MAPPED];
+            $res->messages[] = 'User is not mapped to a PBX extension';
+            return $res;
+        }
+        AmoCrmMain::amiOriginate($peer, '', $dst);
         $this->logger->writeInfo(
-            "ONEXTERNALCALLSTART: originate from user {$params['user-id']} <{$params['user-number']}> to {$dst})"
+            "ONEXTERNALCALLSTART: originate from user {$userId} <{$peer}> to {$dst}"
         );
         $res->success = true;
         return $res;
     }
-
-    /**
-     * Переадресация вызова.
-     * @param $params
-     * @return PBXAmoResult
-     * @throws \Phalcon\Exception
-     */
-    public function transferAction($params):PBXAmoResult
-    {
-        $res     = new PBXAmoResult();
-        $action  = 'Redirect';
-        $cdrData = CDRDatabaseProvider::getCacheCdr();
-        foreach ($cdrData as $cdr){
-            if(!in_array($params['user-number'], [$cdr['src_num'], $cdr['dst_num']], true)){
-                continue;
-            }
-            if( !empty($cdr['endtime']) ){
-                continue;
-            }
-            if(!empty($cdr['answer'])){
-                $action = 'Atxfer';
-                if($cdr['src_num'] === $params['user-number']){
-                    $chanForRedirect = $cdr['src_chan'];
-                }else{
-                    $chanForRedirect = $cdr['dst_chan'];
-                }
-            }elseif($cdr['src_num'] === $params['user-number']){
-                $chanForRedirect = $cdr['dst_chan'];
-            }else{
-                $chanForRedirect = $cdr['src_chan'];
-            }
-        }
-
-        if(empty($chanForRedirect)){
-            return $res;
-        }
-        $am = Util::getAstManager('off');
-        $command = [
-            'Channel'   => $chanForRedirect,
-            'Exten'     => $params['number'],
-            'Context'   => 'internal-transfer',
-            'Priority'  => '1'
-        ];
-        $am->sendRequestTimeout($action, $command);
-        $res->success = true;
-        return $res;
-    }
-
 }

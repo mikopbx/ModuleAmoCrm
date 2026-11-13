@@ -86,7 +86,6 @@ return [
     'mod_amo_SaveSettingsError' => 'An error occurred while saving settings. The ConnectorDB service may not be running.',
     'mod_amo_NeedWaitSyncTitle' => 'Synchronizing contacts',
     'mod_amo_NeedWaitSyncBody' => 'Contacts and transactions are synchronized. Wait for the process to complete. Uploading calls to the portal has stopped.',
-    'mod_amo_panelIsEnable' => 'Use the call control panel',
     'mod_amo_type_responsible_answered_first' => 'First to answer the call',
     'mod_amo_type_responsible_rule' => 'According to the rule for creating an entity',
     'mod_amo_externalHostname' => 'External PBX address',

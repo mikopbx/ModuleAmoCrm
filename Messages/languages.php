@@ -24,7 +24,6 @@ return [
     'mod_amo_baseDomain' => '',
     'mod_amo_Error' => '',
     'mod_amo_isPrivateWidget' => '',
-    'mod_amo_panelIsEnable' => '',
     'mod_amo_privateClientId' => '',
     'mod_amo_privateClientSecret' => '',
     'mod_amo_entitySettingsTableDid' => '',

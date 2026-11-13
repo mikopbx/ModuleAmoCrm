@@ -62,21 +62,20 @@
 #amo-users-table .ui.selection.dropdown {
     font-size: 1em;
 }
-/* Тип звонка в таблице правил: ↙ входящий, ↗ исходящий. */
-#entitySettingsTable i.icon.call-incoming:before {
+/* Тип звонка в таблицах правил и ответственных: ↙ входящий, ↗ исходящий. */
+#entitySettingsTable i.icon.call-incoming:before,
+#respCallsTable i.icon.call-incoming:before {
     content: "\f358"; /* arrow-alt-circle-down */
 }
-#entitySettingsTable i.icon.call-incoming {
-    transform: rotate(45deg);
-}
-#entitySettingsTable i.icon.call-outgoing:before {
+#entitySettingsTable i.icon.call-outgoing:before,
+#respCallsTable i.icon.call-outgoing:before {
     content: "\f35b"; /* arrow-alt-circle-up */
 }
-#entitySettingsTable i.icon.call-outgoing {
-    transform: rotate(45deg);
-}
 #entitySettingsTable i.icon.call-incoming,
-#entitySettingsTable i.icon.call-outgoing {
+#entitySettingsTable i.icon.call-outgoing,
+#respCallsTable i.icon.call-incoming,
+#respCallsTable i.icon.call-outgoing {
+    transform: rotate(45deg);
     font-size: 1.2em;
     margin-right: .4em;
 }
@@ -103,4 +102,9 @@
 }
 .ui.tabular.menu .item .tab-action {
     color: #4183c4;
+}
+/* Иконка пользователя amoCRM на вкладке "Сотрудники": синяя — сопоставлен, серая — нет. */
+#amo-users-table i.icon.amo-user-icon {
+    font-size: 1.2em;
+    margin-right: .4em;
 }

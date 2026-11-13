@@ -24,7 +24,6 @@ return [
     'mod_amo_baseDomain' => 'آدرس پورتال (مثال: example.amocrm.ru)',
     'mod_amo_Error' => 'خطا',
     'mod_amo_isPrivateWidget' => 'این یک یکپارچه‌سازی خصوصی است',
-    'mod_amo_panelIsEnable' => 'استفاده از پنل کنترل تماس',
     'mod_amo_privateClientId' => 'شناسه یکپارچه‌سازی',
     'mod_amo_privateClientSecret' => 'کلید مخفی یکپارچه‌سازی',
     'mod_amo_entitySettingsTableDid' => 'DID',

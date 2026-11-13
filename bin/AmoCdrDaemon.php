@@ -32,26 +32,22 @@ use Modules\ModuleAmoCrm\Lib\RetryBackoff;
 use Modules\ModuleAmoCrm\Lib\Logger;
 use Modules\ModuleAmoCrm\Lib\AmoCrmMain;
 use Modules\ModuleAmoCrm\Lib\ResponsibleResolver;
+use Modules\ModuleAmoCrm\Lib\ValidationErrors;
 use MikoPBX\Common\Providers\CDRDatabaseProvider;
 use DateTime;
-use MikoPBX\Common\Models\Extensions;
 use Modules\ModuleAmoCrm\Models\ModuleAmoCrm;
 use Modules\ModuleAmoCrm\Models\ModuleAmoUsers;
 use Throwable;
-use DateTimeInterface;
-use Exception;
 
 class AmoCdrDaemon extends WorkerBase
 {
     public const  SOURCE_ID    = 'miko-pbx';
     private const LIMIT_CDR   = 50;
     private int   $offset = 1;
-    private bool  $panelIsEnable = false;
     public array  $innerNums = [];
     private array $users = [];
     public string $referenceDate='';
     private array $cdrRows = [];
-    private string $lastCacheCdr = '';
     private Logger $logger;
     private string $extHostname = '';
     private int $lastSyncTime = 0;
@@ -69,6 +65,15 @@ class AmoCdrDaemon extends WorkerBase
     private array $newLeads = [];
     private array $newUnsorted = [];
     private array $newTasks = [];
+    // phoneIndex => запасные ответственные задачи, если amoCRM отклонит основного.
+    private array $newTaskFallbacks = [];
+    // amoUserId => время отказа: пользователи, которых amoCRM отклонил (неактивные / удалённые).
+    // Следующие звонки и задачи сразу получают запасного ответственного; через
+    // REJECTED_USER_TTL пользователь снова пробуется (могли активировать).
+    private array $rejectedUserIds = [];
+    private const REJECTED_USER_TTL = 3600;
+    // Попыток с другим пользователем для одной записи (запасные + без ответственного).
+    private const MAX_USER_ATTEMPTS = 4;
     // linkedid => отвеченный входящий, который ещё идёт (#59: по linkedid, а не по номеру,
     // чтобы CDR предыдущего звонка не удалял запись повторного звонка с того же номера).
     private array $incompleteAnswered = [];
@@ -173,7 +178,6 @@ class AmoCdrDaemon extends WorkerBase
             }
             if($workIsAllowed){
                 $this->updateActiveCalls();
-                $this->updateUsers();
                 $this->cdrSync();
             }
             sleep(1);
@@ -190,7 +194,6 @@ class AmoCdrDaemon extends WorkerBase
         $allSettings = ConnectorDb::invoke('getModuleSettings', [false]);
         if(!empty($allSettings) && is_array($allSettings)){
             $oldOffset = $this->offset;
-            $this->panelIsEnable = intval($allSettings['ModuleAmoCrm']['panelIsEnable']??0) ===0;
             $this->offset        = max(1*$allSettings['ModuleAmoCrm']['offsetCdr']??1,1);
             $this->referenceDate = $allSettings['ModuleAmoCrm']['referenceDate']??'';
             $this->portalId      = intval($allSettings['ModuleAmoCrm']['portalId']??0);
@@ -225,57 +228,11 @@ class AmoCdrDaemon extends WorkerBase
     }
 
     /**
-     * Обновление списка пользователей в nchan.
-     * @return void
-     */
-    private function updateUsers():void
-    {
-        $usersAmo = ConnectorDb::invoke('getPortalUsers', [1]);
-        $amoUsersArray = [];
-        foreach ($usersAmo as $user){
-            $amoUsersArray[$user['number']] = $user['amoUserId'];
-        }
-        $extensionFilter = [
-            'type IN ({types:array})',
-            'bind'    => [
-                'types' => [Extensions::TYPE_SIP, Extensions::TYPE_QUEUE]
-            ],
-            'columns' => 'number,callerid,type'
-        ];
-        $data = [];
-        $extensions = Extensions::find($extensionFilter);
-        foreach ($extensions as $extension){
-            $amoId = $amoUsersArray[$extension->number]??'';
-            if($this->restrictCdrToKnownEmployees && empty($amoId)){
-                continue;
-            }
-            $data[] = [
-                'number' => $extension->number,
-                'name' => $extension->callerid,
-                'amoId' => $amoUsersArray[$extension->number]??'',
-                'type' => $extension->type
-            ];
-        }
-        unset($extensions);
-        $result = ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['data' => $data, 'action' => 'USERS']);
-        if(!$result->success){
-            $this->logger->writeError("Update user list. Count: ".count($data));
-            try {
-                $this->logger->writeError("Send data: ". json_encode($data, JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));
-                $this->logger->writeError("Result: ". json_encode($result, JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));
-            }catch (Throwable $e){
-                $this->logger->writeError($e->getMessage());
-            }
-        }
-    }
-
-    /**
-     * Обновление информации по текущим звонкам в nchan.
+     * Отслеживание отвеченных входящих для автооткрытия карточки.
      * @return void
      */
     private function updateActiveCalls():void
     {
-        $params  = [];
         $cdrData = CDRDatabaseProvider::getCacheCdr();
         $activeIds = [];
         foreach ($cdrData as $cdr){
@@ -306,39 +263,6 @@ class AmoCdrDaemon extends WorkerBase
                 ];
                 $this->logger->writeInfo($this->incompleteAnswered[$linkedId], "New incomplete answered");
             }
-
-            $endTime    = '';
-            $answerTime = '';
-            try {
-                $startTime = date(DateTimeInterface::ATOM, strtotime($cdr['start']));
-                if(!empty($cdr['answer'])){
-                    $answerTime = date(DateTimeInterface::ATOM, strtotime($cdr['answer']));
-                }
-                if(!empty($cdr['endtime'])){
-                    $endTime    = date(DateTimeInterface::ATOM, strtotime($cdr['endtime']));
-                }
-            }catch (Exception $e){
-                continue;
-            }
-            $params[] = [
-                'start'            => $startTime,
-                'answer'           => $answerTime,
-                'end'              => $endTime,
-                'src'              => $cdr['src_num'],
-                'dst'              => $cdr['dst_num'],
-                'uid'              => $cdr['UNIQUEID'],
-                'id'               => $cdr['linkedid'],
-                'user-src'         => $this->users[$cdr['src_num']]??'',
-                'user-dst'         => $dstUser,
-                'src-chan'         => $cdr['src_chan'],
-                'dst-chan'         => $cdr['dst_chan'],
-            ];
-        }
-        $md5Cdr = md5(print_r($params, true));
-        if($this->panelIsEnable && $md5Cdr !== $this->lastCacheCdr){
-            // Оповещаме только если изменилось состояние.
-            ClientHTTP::sendHttpPostRequest(WorkerAmoCrmAMI::getChannelUrl(), ['data' => $params, 'action' => 'CDRs']);
-            $this->lastCacheCdr = $md5Cdr;
         }
         $this->purgeIncompleteAnswered(time(), $activeIds);
     }
@@ -897,6 +821,7 @@ class AmoCdrDaemon extends WorkerBase
         }
         unset($call, $calls);
         $allSuccess = true;
+        $userAttempts = [];
         foreach ($callsArray as $entity_type => $callsData){
             if(empty($callsData)){
                 continue;
@@ -920,6 +845,28 @@ class AmoCdrDaemon extends WorkerBase
                 // A validation response rejects the whole request, not just these records.
                 // Persist only explicitly identified errors, then resend the remaining records.
                 foreach ($rejected as $requestId => $errors) {
+                    $requestId = (string)$requestId;
+                    $attempt = $userAttempts[$entity_type][$requestId] = ($userAttempts[$entity_type][$requestId] ?? 0) + 1;
+                    if ($attempt <= self::MAX_USER_ATTEMPTS && ResponsibleResolver::isUserRejection($errors)) {
+                        // Неактивный пользователь (обычно ответственный контакта): повтор с
+                        // ответственным по правилу звонка, затем без ответственного.
+                        $linkedId = $linkedIds[$entity_type][$requestId];
+                        $fixed = false;
+                        foreach ($callsData as &$item) {
+                            if ((string)$item['request_id'] === $requestId) {
+                                $fixed = $this->applyUserFallback(
+                                    $item,
+                                    $errors,
+                                    [$this->cdrRows[$linkedId]['responsibleRule'] ?? null],
+                                    "call $linkedId request_id=$requestId"
+                                );
+                            }
+                        }
+                        unset($item);
+                        if ($fixed) {
+                            continue;
+                        }
+                    }
                     $reason = "addCalls HTTP 400 validation-errors; entity=$entity_type; request_id=$requestId; "
                         . json_encode($errors, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                     $this->logger->writeError($reason);
@@ -944,38 +891,65 @@ class AmoCdrDaemon extends WorkerBase
     }
 
     /**
-     * Fail closed: never infer a bad record from an index, a network error or a
-     * partially understood response. Every validation error must match exactly
-     * one request in the current HTTP payload.
+     * Запись отклонена amoCRM из-за пользователя: отклонённые ID запоминаются, поле
+     * получает первого неотклонённого запасного, если такого нет — удаляется
+     * (amoCRM создаёт запись от имени владельца токена интеграции).
+     * @param array  $item      Запись запроса (изменяется).
+     * @param array  $errors    Ошибки этой записи (только NotSupportedChoice по пользователю).
+     * @param array  $fallbacks Запасные в порядке приоритета.
+     * @param string $context   Для лога.
+     * @return bool false — менять нечего (повтор не изменит запрос).
+     */
+    private function applyUserFallback(array &$item, array $errors, array $fallbacks, string $context): bool
+    {
+        $now = time();
+        $paths = [];
+        foreach ($errors as $error) {
+            $path = (string)($error['path'] ?? '');
+            $id = ResponsibleResolver::normalize($item[$path] ?? null);
+            if ($id !== null) {
+                $paths[$path] = $id;
+                $this->rejectedUserIds[$id] = $now;
+            }
+        }
+        if ($paths === []) {
+            return false;
+        }
+        $fallback = ResponsibleResolver::pick($fallbacks, $this->rejectedUsers());
+        foreach (array_keys($paths) as $path) {
+            if ($fallback !== null) {
+                $item[$path] = $fallback;
+            } else {
+                unset($item[$path]);
+            }
+        }
+        $this->logger->writeInfo('amoCRM rejected user ' . implode(',', array_unique($paths))
+            . ' in ' . implode(',', array_keys($paths)) . ' (inactive user), retry '
+            . ($fallback !== null ? "with $fallback" : 'without user') . ": $context");
+        return true;
+    }
+
+    /**
+     * Пользователи, отклонённые amoCRM за последние REJECTED_USER_TTL секунд.
+     * @return int[]
+     */
+    private function rejectedUsers(): array
+    {
+        $now = time();
+        foreach ($this->rejectedUserIds as $id => $rejectedAt) {
+            if ($now - (int)$rejectedAt > self::REJECTED_USER_TTL) {
+                unset($this->rejectedUserIds[$id]);
+            }
+        }
+        return array_keys($this->rejectedUserIds);
+    }
+
+    /**
+     * Fail closed: see ValidationErrors::byRequestId().
      */
     private function getRejectedCallRequests($result, array $callsData): array
     {
-        if (($result->messages['error-code'] ?? null) !== 400) {
-            return [];
-        }
-        $validation = $result->messages['error-data']['validation-errors'] ?? null;
-        if (!is_array($validation) || $validation === []) {
-            return [];
-        }
-        $counts = [];
-        foreach ($callsData as $call) {
-            $id = (string)$call['request_id'];
-            $counts[$id] = ($counts[$id] ?? 0) + 1;
-        }
-        $rejected = [];
-        foreach ($validation as $entry) {
-            if (!is_array($entry) || !isset($entry['request_id'])
-                || !is_scalar($entry['request_id'])
-                || !is_array($entry['errors'] ?? null) || $entry['errors'] === []) {
-                return [];
-            }
-            $id = (string)$entry['request_id'];
-            if (($counts[$id] ?? 0) !== 1) {
-                return [];
-            }
-            $rejected[$id] = array_merge($rejected[$id] ?? [], $entry['errors']);
-        }
-        return $rejected;
+        return ValidationErrors::byRequestId($result, array_column($callsData, 'request_id'));
     }
 
     /**
@@ -1078,6 +1052,13 @@ class AmoCdrDaemon extends WorkerBase
                 $responsibleSettingName = $responsibleMap[$typeCall][$this->$settingName]??'';
                 $this->logger->writeInfo($responsibleMap[$typeCall], "Responsible map settings {$call['id']}");
                 $responsible            = $this->cdrRows[$call['id']][$responsibleSettingName]??0;
+                if (!empty($responsible)){
+                    $responsible = $this->replaceRejectedUser(
+                        $responsible,
+                        [$this->cdrRows[$call['id']]['responsibleRule'] ?? null],
+                        "call {$call['id']}"
+                    );
+                }
                 if (!empty($responsible)){
                     $call['created_by']          = 1*$responsible;
                     $call['responsible_user_id'] = 1*$responsible;
@@ -1203,6 +1184,7 @@ class AmoCdrDaemon extends WorkerBase
         $this->newLeads = [];
         $this->newUnsorted = [];
         $this->newTasks = [];
+        $this->newTaskFallbacks = [];
         $this->deferredIncomplete = [];
 
         $phones       = array_values(array_unique(array_merge(
@@ -1526,13 +1508,28 @@ class AmoCdrDaemon extends WorkerBase
         ];
 
         $taskResponsible = (int)($responsibleArray[$settings['task_responsible_type']]??0);
+        // Если основной ответственный (например, ответственный контакта) неактивен в amoCRM —
+        // ответственный по правилу звонка, затем ответственный по умолчанию.
+        $fallbacks = [
+            $this->cdrRows[$call['id']]['responsibleRule'] ?? null,
+            $settings['def_responsible'] ?? null,
+        ];
         if(!empty($taskResponsible)){
+            $this->newTaskFallbacks[$indexAction] = $fallbacks;
             $this->newTasks[$indexAction] = [
                 'text'                =>  $this->replaceTagTemplate($settings['template_task_text'], $call),
                 'complete_till'       =>  time()+3600*(int)$settings['deadline_task'],
                 'task_type_id'        =>  1,
                 'responsible_user_id' =>  $taskResponsible,
             ];
+            // Ответственный уже отклонялся amoCRM — замена сразу; без замены задача
+            // создаётся без ответственного (владелец токена интеграции), а не теряется.
+            $replaced = $this->replaceRejectedUser($taskResponsible, $fallbacks, "task {$call['id']}");
+            if($replaced === null){
+                unset($this->newTasks[$indexAction]['responsible_user_id']);
+            }else{
+                $this->newTasks[$indexAction]['responsible_user_id'] = (int)$replaced;
+            }
             if(!empty($lead)){
                 $this->newTasks[$indexAction]['entity_type'] = 'leads';
                 $this->newTasks[$indexAction]['entity_id'] = (int) $lead;
@@ -1756,11 +1753,58 @@ class AmoCdrDaemon extends WorkerBase
         if(empty($this->newTasks)){
             return;
         }
-        $resultCreateTasks    = WorkerAmoHTTP::invokeAmoApi('addTasks', [array_values($this->newTasks)]);
-        if(!$resultCreateTasks->success) {
-            $this->logger->writeError($this->newTasks, "Error create tasks (REQ)");
-            $this->logger->writeError($resultCreateTasks, "Error create tasks (RES)");
+        // request_id — индекс номера: по нему amoCRM указывает задачу в validation-errors.
+        $tasks = [];
+        foreach ($this->newTasks as $index => $task) {
+            $task['request_id'] = (string)$index;
+            $tasks[(string)$index] = $task;
         }
+        $userAttempts = [];
+        while (!empty($tasks)) {
+            $result = WorkerAmoHTTP::invokeAmoApi('addTasks', [array_values($tasks)]);
+            if($result->success){
+                return;
+            }
+            $rejected = ValidationErrors::byRequestId($result, array_keys($tasks));
+            if($rejected === []){
+                $this->logger->writeError($tasks, "Error create tasks (REQ)");
+                $this->logger->writeError($result, "Error create tasks (RES)");
+                return;
+            }
+            // Ошибка одной задачи отклоняет весь запрос: исправляем или убираем только
+            // названные задачи, остальные отправляются снова одним запросом.
+            foreach ($rejected as $requestId => $errors) {
+                $requestId = (string)$requestId;
+                $attempt = $userAttempts[$requestId] = ($userAttempts[$requestId] ?? 0) + 1;
+                if($attempt <= self::MAX_USER_ATTEMPTS
+                    && ResponsibleResolver::isUserRejection($errors)
+                    && $this->applyUserFallback($tasks[$requestId], $errors, $this->newTaskFallbacks[$requestId] ?? [], "task $requestId")){
+                    continue;
+                }
+                $this->logger->writeError([$requestId => $tasks[$requestId]], "Error create tasks (REQ)");
+                $this->logger->writeError($errors, "Error create tasks (RES)");
+                unset($tasks[$requestId]);
+            }
+        }
+    }
+
+    /**
+     * Заменяет пользователя, ранее отклонённого amoCRM, на первого подходящего запасного.
+     * @param mixed  $responsible
+     * @param array  $fallbacks
+     * @param string $context Для лога.
+     * @return mixed Исходное значение, замена или null, если подходящей замены нет.
+     */
+    private function replaceRejectedUser($responsible, array $fallbacks, string $context)
+    {
+        $id = ResponsibleResolver::normalize(is_int($responsible) ? $responsible : (string)$responsible);
+        $rejected = $this->rejectedUsers();
+        if($id === null || !in_array($id, $rejected, true)){
+            return $responsible;
+        }
+        $fallback = ResponsibleResolver::pick($fallbacks, $rejected);
+        $this->logger->writeInfo("Responsible $id was rejected by amoCRM (inactive user), use " . ($fallback ?? 'none') . ": $context");
+        return $fallback;
     }
 
     /**

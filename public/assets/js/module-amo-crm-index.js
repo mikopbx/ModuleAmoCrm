@@ -442,11 +442,13 @@ var ModuleAmoCrm = {
       if (!found) {
         options += "<option value=\"".concat(escape(user.number), "\" selected>").concat(escape(user.number), "</option>");
       }
-      $body.append("<tr>\n\t\t\t\t<td>".concat(escape(user.name || user.amoUserId), "</td>\n\t\t\t\t<td>").concat(escape(user.email), "</td>\n\t\t\t\t<td><select class=\"ui search fluid dropdown amo-user-select\" data-amo-user-id=\"").concat(escape(user.amoUserId), "\">").concat(options, "</select></td>\n\t\t\t</tr>"));
+      $body.append("<tr>\n\t\t\t\t<td><i class=\"icon user circle ".concat(user.number === '' ? 'grey' : 'blue', " amo-user-icon\"></i>").concat(escape(user.name || user.amoUserId), "</td>\n\t\t\t\t<td>").concat(escape(user.email), "</td>\n\t\t\t\t<td><select class=\"ui search fluid dropdown amo-user-select\" data-amo-user-id=\"").concat(escape(user.amoUserId), "\">").concat(options, "</select></td>\n\t\t\t</tr>"));
     });
     $table.find('select[data-amo-user-id]').dropdown({
       fullTextSearch: true,
-      onChange: function onChange() {
+      onChange: function onChange(value) {
+        var mapped = value !== '' && value !== notMapped;
+        $(this).closest('tr').find('.amo-user-icon').toggleClass('blue', mapped).toggleClass('grey', !mapped);
         // Списки без name не входят в значения формы: отмечаем изменение явно.
         Form.dataChanged();
       }

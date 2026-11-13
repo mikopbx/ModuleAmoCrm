@@ -86,7 +86,6 @@ return [
     'mod_amo_SaveSettingsError' => '設定の保存中にエラーが発生しました。 ConnectorDB サービスが実行されていない可能性があります。',
     'mod_amo_NeedWaitSyncTitle' => '連絡先を同期する',
     'mod_amo_NeedWaitSyncBody' => '連絡先とトランザクションは同期されます。プロセスが完了するまで待ちます。ポータルへの通話のアップロードが停止しました。',
-    'mod_amo_panelIsEnable' => '通話コントロールパネルを使用する',
     'mod_amo_type_responsible_answered_first' => 'まず電話に出ます',
     'mod_amo_type_responsible_answered_last' => '最後に電話に出た人',
     'mod_amo_type_responsible_missed_first' => '最初に電話に出られなかった人',
