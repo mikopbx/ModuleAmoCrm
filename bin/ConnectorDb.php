@@ -925,6 +925,28 @@ class ConnectorDb extends WorkerBase
      * @param int $enable
      * @return array
      */
+    /**
+     * Внутренние номера пользователя amoCRM для звонка из карточки (/callback).
+     * Без фильтра по ModuleAmoCrm.portalId: при portalId=0 до checkConnection или после
+     * повторной авторизации сопоставление всё равно должно работать.
+     * @param string $amoUserId
+     * @return array список номеров
+     */
+    public function getUserNumbers(string $amoUserId):array
+    {
+        if($amoUserId === '' || !ctype_digit($amoUserId)){
+            return [];
+        }
+        $rows = ModuleAmoUsers::find([
+            'conditions' => 'amoUserId = :amoUserId: AND enable = 1',
+            'columns'    => 'number',
+            'bind'       => ['amoUserId' => $amoUserId],
+        ])->toArray();
+        return array_values(array_unique(array_map(static function ($row) {
+            return trim((string)($row['number'] ?? ''));
+        }, $rows)));
+    }
+
     public function getPortalUsers(int $enable = 1):array
     {
         /** @var Manager $manager */

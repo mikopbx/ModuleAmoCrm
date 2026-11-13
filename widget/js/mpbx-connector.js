@@ -76,17 +76,44 @@ define(['jquery'], function ($) {
         }
     }
 
+    // data.code отказа сервера -> ключ i18n errors.
+    const REJECT_CODES = {
+        NOT_MAPPED: 'errorNoPhone',
+        NO_NUMBER:  'errorBadNumber',
+    };
+
+    /**
+     * Отказ сервера в теле ответа: новые ядра отдают его с HTTP 422, старые — с 200 и result=false.
+     * @return {string} ключ i18n или '' если отказа нет
+     */
+    function rejection(body) {
+        if (!body || body.result !== false) {
+            return '';
+        }
+        const code = body.data && body.data.code;
+        return REJECT_CODES[code] || 'unknown';
+    }
+
     function request(path, data) {
         if (!state.host || !state.token) {
             return $.Deferred().reject().promise();
         }
         return $.ajax({
-            url:     apiUrl(path),
-            type:    'POST',
-            timeout: 10000,
-            data:    $.extend({}, data, {token: state.token}),
+            url:      apiUrl(path),
+            type:     'POST',
+            timeout:  10000,
+            data:     $.extend({}, data, {token: state.token}),
+        }).done(function (body) {
+            const code = rejection(body);
+            if (code) {
+                notify(code, true);
+            }
         }).fail(function (xhr) {
-            notify(xhr.status === 403 ? 'errorAuthAPI' : 'errorConnect', true);
+            if (xhr.status === 403) {
+                notify('errorAuthAPI', true);
+                return;
+            }
+            notify(rejection(xhr.responseJSON) || 'errorConnect', true);
         });
     }
 
@@ -181,8 +208,11 @@ define(['jquery'], function ($) {
         /**
          * @param {{pbxHost: string, token: string}} settings
          * @param {{onOpenCard: function(Object), onError: function(string)}} handlers
+         * @param {boolean} listen подписаться на события АТС. Карточку открывает только
+         *        ответственный с внутренним номером: без номера сокет не нужен, а REST
+         *        (сохранение настроек администратором) остаётся доступен.
          */
-        init: function (settings, handlers) {
+        init: function (settings, handlers, listen) {
             this.destroy();
             state.host       = normalizeHost(settings.pbxHost);
             state.token      = String(settings.token || '').trim();
@@ -191,6 +221,11 @@ define(['jquery'], function ($) {
             state.downSince  = 0;
             state.authFailed = false;
             if (!state.host || !state.token) {
+                return;
+            }
+            if (listen === false) {
+                // Без сокета неверный токен иначе не обнаружится (проверка идёт из onClose).
+                checkAuth();
                 return;
             }
             state.stopped = false;

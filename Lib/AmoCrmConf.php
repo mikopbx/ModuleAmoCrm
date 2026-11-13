@@ -220,9 +220,10 @@ class AmoCrmConf extends ConfigClass
                 $res = $amo->processRequest($request);
                 break;
             case 'CALLBACK':
+                // Отказ (пользователь не сопоставлен, ConnectorDb не ответил) отдаётся как есть:
+                // ядро вернёт 422/503, виджет покажет причину по data.code.
                 $amo = new RestHandlers();
-                $res          = $amo->processCallback($request);
-                $res->success = true;
+                $res = $amo->processCallback($request);
                 break;
             case 'CHANGE-SETTINGS':
                 $amo          = new RestHandlers();

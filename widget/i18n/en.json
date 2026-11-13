@@ -15,6 +15,9 @@
         "alert": "MikoPBX: Attention!",
         "errorConnect": "No connection to the MikoPBX server.",
         "errorAuthAPI": "Authorization error: check the token in the widget settings.",
+        "errorNoPhone": "You have no MikoPBX extension. An administrator can assign it in the widget settings, \"PBX users\" section.",
+        "errorNoSettings": "The MikoPBX server address or token is missing in the widget settings.",
+        "errorBadNumber": "The number to call is not recognized.",
         "errorAPITimeOut": "Connection to the MikoPBX server lost.",
         "errorSaveSettings": "Failed to send the settings to the MikoPBX server.",
         "unknown": "MikoPBX server communication error."

@@ -53,7 +53,8 @@ define(function (require) {
         self.settings.token        = String(token || '').trim();
         connector.init(
           {pbxHost: self.settings.pbxHost, token: self.settings.token},
-          {onOpenCard: self.api.onOpenCard, onError: showError}
+          {onOpenCard: self.api.onOpenCard, onError: showError},
+          self.settings.currentPhone !== ''
         );
       },
 
@@ -99,7 +100,12 @@ define(function (require) {
       },
 
       onClickPhone: function (params) {
-        if (!self.settings.pbxHost || self.settings.currentPhone === '') {
+        if (!self.settings.pbxHost || !self.settings.token) {
+          showError('errorNoSettings');
+          return;
+        }
+        if (self.settings.currentPhone === '') {
+          showError('errorNoPhone');
           return;
         }
         connector.callback(params.value, self.settings.currentPhone, self.settings.currentUser);
@@ -161,9 +167,23 @@ define(function (require) {
         return true;
       },
       onSave: function (data) {
-        const fields = data.fields || {};
-        self.api.applySettings(fields.miko_pbx_host, fields.token, fields.pbx_users);
-        const users = parseUsers(fields.pbx_users);
+        const fields  = (data && data.fields) || {};
+        // Поле, не пришедшее в fields, не меняем: иначе пустой токен отключит виджет до перезагрузки.
+        // Запасное значение — сохранённые настройки виджета, затем то, что уже применено.
+        const stored  = self.get_settings() || {};
+        const pick    = function (key, applied) {
+          if (fields[key] !== undefined) {
+            return fields[key];
+          }
+          return stored[key] !== undefined && stored[key] !== '' ? stored[key] : applied;
+        };
+        const pbxUsers = pick('pbx_users', undefined);
+        self.api.applySettings(
+          pick('miko_pbx_host', self.settings.pbxHost),
+          pick('token', self.settings.token),
+          pbxUsers
+        );
+        const users = parseUsers(pbxUsers);
         if (Object.keys(users).length > 0) {
           $.get('/api/v4/account')
             .done(function (account) {

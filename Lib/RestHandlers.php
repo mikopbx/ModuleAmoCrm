@@ -113,10 +113,34 @@ class RestHandlers extends AmoCrmMainBase
     public function callbackAction($params):PBXAmoResult
     {
         $res = new PBXAmoResult();
-        $dst = preg_replace("/[^0-9+]/", '', $params['number']);
-        AmoCrmMain::amiOriginate($params['user-number'], '', $dst);
+        $userId    = CallbackPeer::userId($params['user-id'] ?? '');
+        $requested = preg_replace('/[^0-9]/', '', (string)($params['user-number'] ?? ''));
+        $dst       = CallbackPeer::destination($params['number'] ?? '');
+        if ($dst === '') {
+            $res->data = ['code' => CallbackPeer::NO_NUMBER];
+            $res->messages[] = 'Empty destination number';
+            return $res;
+        }
+        // Таймаут меньше таймаута запроса виджета (10 с): иначе пользователь увидит ошибку,
+        // повторит клик, а оба звонка уйдут позже.
+        $userNumbers = $userId === '' ? [] : ConnectorDb::tryInvoke('getUserNumbers', [$userId], 5);
+        if ($userNumbers === null) {
+            $this->logger->writeError("ONEXTERNALCALLSTART failed: ConnectorDb did not answer, user {$userId}");
+            $res->messages[] = 'ConnectorDb did not answer';
+            return $res;
+        }
+        $peer = CallbackPeer::resolve($requested, is_array($userNumbers) ? $userNumbers : []);
+        if ($peer === null) {
+            $this->logger->writeError(
+                "ONEXTERNALCALLSTART rejected: user {$userId} <{$requested}> is not mapped to a single PBX extension"
+            );
+            $res->data = ['code' => CallbackPeer::NOT_MAPPED];
+            $res->messages[] = 'User is not mapped to a PBX extension';
+            return $res;
+        }
+        AmoCrmMain::amiOriginate($peer, '', $dst);
         $this->logger->writeInfo(
-            "ONEXTERNALCALLSTART: originate from user {$params['user-id']} <{$params['user-number']}> to {$dst})"
+            "ONEXTERNALCALLSTART: originate from user {$userId} <{$peer}> to {$dst}"
         );
         $res->success = true;
         return $res;

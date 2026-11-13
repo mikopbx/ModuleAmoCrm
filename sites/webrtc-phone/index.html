@@ -189,7 +189,10 @@
         if (m.action === 'connect') {
             if (cfg === null && m.data && m.data.token) {
                 cfg = m.data;
-                connectWs();
+                // Карточку открывает только ответственный с внутренним номером: без номера сокет не нужен.
+                if (String(cfg.currentPhone || '').trim() !== '') {
+                    connectWs();
+                }
             }
         } else if (cfg !== null && m.action === 'callback') {
             post('callback', {
