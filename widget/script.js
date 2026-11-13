@@ -80,10 +80,13 @@ define(function (require) {
         } else {
           return;
         }
-        const key = String(data.id || data.uniq || `${data.phone}:${data.responsible}`);
-        connector.once(key, function () {
-          self.api.gotoEntity(entity, id);
-        });
+        connector.showCard({
+          key:         String(data.id || data.uniq || `${data.phone}:${data.responsible}`),
+          entity:      entity,
+          id:          id,
+          responsible: data.responsible,
+          phone:       String(data.phone || ''),
+        }, self.api.gotoEntity);
       },
 
       /**
@@ -150,6 +153,9 @@ define(function (require) {
         self.api.applySettings(settings.miko_pbx_host, settings.token, settings.pbx_users);
         self.add_action('phone', self.api.onClickPhone);
         self.api.bindRecordLinks();
+        connector.watchPendingCards(self.api.gotoEntity, function () {
+          return self.settings.currentUser;
+        });
         return true;
       },
       bind_actions: function () {
@@ -197,6 +203,7 @@ define(function (require) {
       },
       destroy: function () {
         connector.destroy();
+        connector.unwatchPendingCards();
         $(document).off('mousedown.mikoWidget');
       },
     };

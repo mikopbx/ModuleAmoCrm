@@ -104,29 +104,145 @@
             .catch(function () {});
     }
 
-    // Одна карточка на звонок, даже если amoCRM открыт в нескольких вкладках.
-    function claimCard(id, open) {
-        var key = 'mikopbx:open-card:' + id;
-        var hidden = false;
-        try { hidden = window.parent.document.hidden; } catch (e) {}
-        setTimeout(function () {
+    // Одна карточка на звонок на все вкладки amoCRM. Видимая вкладка открывает сразу; если видимой
+    // нет, карточка откладывается и открывается во вкладке, на которую переключится пользователь
+    // (не позже 5 минут). Ключи и формат — общие с widget/js/mpbx-connector.js.
+    var CARD_DONE_PREFIX = 'mikopbx:open-card:';
+    var CARD_DONE_TTL    = 600000;
+    var CARD_PENDING_KEY = 'mikopbx:pending-card';
+    var CARD_PENDING_TTL = 300000;
+    var CARD_HIDDEN_WAIT = 400;
+
+    function pageHidden() {
+        try { return !!window.parent.document.hidden; } catch (e) { return false; }
+    }
+
+    function isCardDone(key, now) {
+        return now - parseInt(localStorage.getItem(CARD_DONE_PREFIX + key) || '0', 10) < CARD_DONE_TTL;
+    }
+
+    function markCardDone(key, now) {
+        localStorage.setItem(CARD_DONE_PREFIX + key, String(now));
+        for (var i = localStorage.length - 1; i >= 0; i--) {
+            var k = localStorage.key(i);
+            if (k && k.indexOf(CARD_DONE_PREFIX) === 0
+                && now - parseInt(localStorage.getItem(k) || '0', 10) > CARD_DONE_TTL) {
+                localStorage.removeItem(k);
+            }
+        }
+    }
+
+    function readPendingCard() {
+        var card;
+        try { card = JSON.parse(localStorage.getItem(CARD_PENDING_KEY) || 'null'); } catch (e) { return null; }
+        if (!card || typeof card.key !== 'string' || typeof card.ts !== 'number'
+            || !/^\d+$/.test(String(card.id)) || ['leads', 'contacts', 'companies'].indexOf(card.entity) < 0) {
+            return null;
+        }
+        return card;
+    }
+
+    // Старый виджет открывает только контакт или сделку (gotoContact(client, lead)).
+    function sendCard(card) {
+        toParent({action: 'openCardEntities', data: {
+            number:      card.phone,
+            responsible: card.responsible,
+            client:      card.entity === 'contacts' ? String(card.id) : '',
+            lead:        card.entity === 'leads' ? String(card.id) : ''
+        }});
+    }
+
+    // Сначала отправка в виджет: если родительское окно уже недоступно (документ iframe
+    // переписан), карточка не должна оказаться отмеченной открытой.
+    function openCardHere(card) {
+        sendCard(card);
+        try {
+            markCardDone(card.key, Date.now());
+            var pending = readPendingCard();
+            if (pending && pending.key === card.key) {
+                localStorage.removeItem(CARD_PENDING_KEY);
+            }
+        } catch (e) {}
+    }
+
+    function showCard(card) {
+        // 'open' | 'skip' | 'wait'; ошибки localStorage -> 'open' без дедупликации.
+        var decide = function (final) {
             try {
                 var now = Date.now();
-                var prev = parseInt(localStorage.getItem(key) || '0', 10);
-                if (now - prev < 60000) {
-                    return;
+                if (isCardDone(card.key, now)) {
+                    return 'skip';
                 }
-                localStorage.setItem(key, String(now));
-                for (var i = localStorage.length - 1; i >= 0; i--) {
-                    var k = localStorage.key(i);
-                    if (k && k.indexOf('mikopbx:open-card:') === 0
-                        && now - parseInt(localStorage.getItem(k) || '0', 10) > 300000) {
-                        localStorage.removeItem(k);
+                if (!pageHidden()) {
+                    return 'open';
+                }
+                if (final) {
+                    card.ts = now;
+                    localStorage.setItem(CARD_PENDING_KEY, JSON.stringify(card));
+                }
+                return 'wait';
+            } catch (e) {
+                return 'open';
+            }
+        };
+        var result = decide(false);
+        if (result === 'open') {
+            openCardHere(card);
+        } else if (result === 'wait') {
+            setTimeout(function () {
+                if (decide(true) === 'open') {
+                    openCardHere(card);
+                }
+            }, CARD_HIDDEN_WAIT);
+        }
+    }
+
+    function openPendingCard() {
+        if (cfg === null || pageHidden()) {
+            return;
+        }
+        try {
+            var card = readPendingCard();
+            if (!card || card.entity === 'companies') {
+                // Карточку компании старый виджет не откроет — оставляем её вкладке с новым виджетом.
+                return;
+            }
+            var now = Date.now();
+            if (now - card.ts > CARD_PENDING_TTL || isCardDone(card.key, now)) {
+                localStorage.removeItem(CARD_PENDING_KEY);
+                return;
+            }
+            if (String(card.responsible) !== String(cfg.currentUser)) {
+                return;
+            }
+            openCardHere(card);
+        } catch (e) {}
+    }
+
+    // Отложенную карточку открывает переключение в вкладку (visibilitychange) или её запись
+    // другой вкладкой, когда эта уже видима (storage). Не при загрузке: открытая пользователем
+    // страница важнее. Обработчики хранятся в родительском окне: старый виджет может переписать
+    // документ iframe, и обработчики прежнего документа нужно снять.
+    function watchPendingCards() {
+        try {
+            var p = window.parent;
+            var prev = p.__mikopbxShimCards;
+            if (prev) {
+                p.document.removeEventListener('visibilitychange', prev.visible);
+                p.removeEventListener('storage', prev.storage);
+            }
+            var handlers = {
+                visible: function () { openPendingCard(); },
+                storage: function (event) {
+                    if (event.key === CARD_PENDING_KEY && event.newValue) {
+                        openPendingCard();
                     }
                 }
-            } catch (e) {}
-            open();
-        }, hidden ? 400 : 0);
+            };
+            p.document.addEventListener('visibilitychange', handlers.visible);
+            p.addEventListener('storage', handlers.storage);
+            p.__mikopbxShimCards = handlers;
+        } catch (e) {}
     }
 
     function onPbxMessage(event) {
@@ -136,17 +252,24 @@
             return;
         }
         var c = d.data;
-        // Старый виджет открывает только контакт или сделку.
-        if (!/^\d+$/.test(String(c.client || '')) && !/^\d+$/.test(String(c.lead || ''))) {
+        // Чужой звонок старый виджет отбросит сам, но отложенным он вытеснил бы карточку этого пользователя.
+        if (String(c.responsible) !== String(cfg.currentUser)) {
             return;
         }
-        claimCard(c.id || c.uniq || (c.phone + ':' + c.responsible), function () {
-            toParent({action: 'openCardEntities', data: {
-                number:      c.phone,
-                responsible: c.responsible,
-                client:      /^\d+$/.test(String(c.client || '')) ? String(c.client) : '',
-                lead:        /^\d+$/.test(String(c.lead || '')) ? String(c.lead) : ''
-            }});
+        var entity = '', id = '';
+        if (/^\d+$/.test(String(c.lead || ''))) {
+            entity = 'leads'; id = String(c.lead);
+        } else if (/^\d+$/.test(String(c.client || ''))) {
+            entity = 'contacts'; id = String(c.client);
+        } else {
+            return;
+        }
+        showCard({
+            key:         String(c.id || c.uniq || (c.phone + ':' + c.responsible)),
+            entity:      entity,
+            id:          id,
+            responsible: c.responsible,
+            phone:       String(c.phone || '')
         });
     }
 
@@ -192,6 +315,7 @@
                 // Карточку открывает только ответственный с внутренним номером: без номера сокет не нужен.
                 if (String(cfg.currentPhone || '').trim() !== '') {
                     connectWs();
+                    watchPendingCards();
                 }
             }
         } else if (cfg !== null && m.action === 'callback') {

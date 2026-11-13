@@ -29,9 +29,13 @@ define(['jquery'], function ($) {
     const RECONNECT_MAX   = 60000;
     const DOWN_ALERT_AFTER= 60000;   // Сообщать о потере связи, если её нет дольше минуты.
     const ALERT_INTERVAL  = 300000;  // Фоновые ошибки — не чаще раза в 5 минут.
-    const CARD_KEY_PREFIX = 'mikopbx:open-card:'; // Тот же префикс в sites/webrtc-phone/index.html.
-    const CARD_KEY_TTL    = 60000;
-    const CARD_KEY_PURGE  = 300000;
+    // Открытие карточки между вкладками amoCRM. Те же ключи и формат — в sites/webrtc-phone/index.html.
+    const CARD_DONE_PREFIX = 'mikopbx:open-card:'; // + id звонка => время открытия
+    const CARD_DONE_TTL    = 600000;               // Карточка звонка уже открыта: не открывать повторно
+    const CARD_PENDING_KEY = 'mikopbx:pending-card';
+    const CARD_PENDING_TTL = 300000;               // Отложенная карточка ждёт переключения в amoCRM 5 минут
+    const CARD_HIDDEN_WAIT = 400;                  // Скрытая вкладка уступает видимой
+    const CARD_ENTITIES    = ['leads', 'contacts', 'companies'];
 
     const state = {
         host:       '',
@@ -44,7 +48,103 @@ define(['jquery'], function ($) {
         authFailed: false,
         lastAlert:  0,
         stopped:    true,
+        onVisible:  null,
+        onStorage:  null,
     };
+
+    function storage() {
+        try {
+            return window.localStorage || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function isCardDone(ls, key, now) {
+        const at = parseInt(ls.getItem(CARD_DONE_PREFIX + key) || '0', 10);
+        return now - at < CARD_DONE_TTL;
+    }
+
+    function markCardDone(ls, key, now) {
+        ls.setItem(CARD_DONE_PREFIX + key, String(now));
+        for (let i = ls.length - 1; i >= 0; i--) {
+            const k = ls.key(i);
+            if (k && k.indexOf(CARD_DONE_PREFIX) === 0
+                && now - parseInt(ls.getItem(k) || '0', 10) > CARD_DONE_TTL) {
+                ls.removeItem(k);
+            }
+        }
+    }
+
+    /**
+     * @return {?{key: string, entity: string, id: string, responsible: *, phone: string, ts: number}}
+     */
+    function readPendingCard(ls) {
+        let card;
+        try {
+            card = JSON.parse(ls.getItem(CARD_PENDING_KEY) || 'null');
+        } catch (e) {
+            return null;
+        }
+        if (!card || typeof card.key !== 'string' || CARD_ENTITIES.indexOf(card.entity) < 0
+            || !/^\d+$/.test(String(card.id)) || typeof card.ts !== 'number') {
+            return null;
+        }
+        return card;
+    }
+
+    /**
+     * Открыть карточку в этой вкладке и отметить звонок, чтобы другие вкладки её не открывали.
+     */
+    /**
+     * Занять карточку для этой вкладки: отметить звонок и снять его из отложенных.
+     * @return {boolean} false — localStorage недоступен
+     */
+    function claimCard(ls, card) {
+        try {
+            markCardDone(ls, card.key, Date.now());
+            const pending = readPendingCard(ls);
+            if (pending && pending.key === card.key) {
+                ls.removeItem(CARD_PENDING_KEY);
+            }
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
+     * Открыть отложенную карточку, если вкладка видима, карточка свежая и принадлежит текущему
+     * пользователю (localStorage общий для браузера и переживает смену пользователя amoCRM).
+     * Вызывается только по visibilitychange и storage — не при загрузке страницы: открытая
+     * пользователем ссылка важнее отложенной карточки.
+     */
+    function openPendingCard(open, currentUser) {
+        const ls = storage();
+        if (!ls || document.hidden) {
+            return;
+        }
+        let card;
+        try {
+            card = readPendingCard(ls);
+            if (!card) {
+                return;
+            }
+            const now = Date.now();
+            if (now - card.ts > CARD_PENDING_TTL || isCardDone(ls, card.key, now)) {
+                ls.removeItem(CARD_PENDING_KEY);
+                return;
+            }
+        } catch (e) {
+            return;
+        }
+        if (String(card.responsible) !== String(currentUser())) {
+            return;
+        }
+        if (claimCard(ls, card)) {
+            open(card.entity, card.id);
+        }
+    }
 
     /**
      * host[:port][/token] без схемы и завершающих слешей.
@@ -263,31 +363,80 @@ define(['jquery'], function ($) {
         },
 
         /**
-         * Выполнить fn один раз для ключа во всех вкладках amoCRM этого браузера.
-         * Видимая вкладка выполняет сразу, скрытые ждут, чтобы уступить ей.
+         * Открыть карточку звонка один раз на все вкладки amoCRM этого браузера.
+         * Видимая вкладка открывает сразу. Если видимой нет, карточка откладывается и
+         * открывается во вкладке, на которую пользователь переключится (не позже 5 минут).
+         * @param {{key: string, entity: string, id: string, responsible: *, phone: string}} card
+         * @param {function(string, string)} open (entity, id)
          */
-        once: function (key, fn) {
-            const storageKey = CARD_KEY_PREFIX + key;
-            setTimeout(function () {
+        showCard: function (card, open) {
+            const ls = storage();
+            if (!ls) {
+                // Без localStorage вкладки не договориться — открываем, как до дедупликации.
+                open(card.entity, card.id);
+                return;
+            }
+            // 'open' | 'skip' | 'wait'; ошибки localStorage -> 'open' без дедупликации.
+            const decide = function (final) {
                 try {
-                    const now  = Date.now();
-                    const prev = parseInt(window.localStorage.getItem(storageKey) || '0', 10);
-                    if (now - prev < CARD_KEY_TTL) {
-                        return;
+                    const now = Date.now();
+                    if (isCardDone(ls, card.key, now)) {
+                        return 'skip';
                     }
-                    window.localStorage.setItem(storageKey, String(now));
-                    for (let i = window.localStorage.length - 1; i >= 0; i--) {
-                        const k = window.localStorage.key(i);
-                        if (k && k.indexOf(CARD_KEY_PREFIX) === 0
-                            && now - parseInt(window.localStorage.getItem(k) || '0', 10) > CARD_KEY_PURGE) {
-                            window.localStorage.removeItem(k);
-                        }
+                    if (!document.hidden) {
+                        claimCard(ls, card);
+                        return 'open';
                     }
+                    if (final) {
+                        ls.setItem(CARD_PENDING_KEY, JSON.stringify($.extend({}, card, {ts: now})));
+                    }
+                    return 'wait';
                 } catch (e) {
-                    // localStorage недоступен — открываем без дедупликации.
+                    return 'open';
                 }
-                fn();
-            }, document.hidden ? 400 : 0);
+            };
+            const result = decide(false);
+            if (result === 'open') {
+                open(card.entity, card.id);
+            } else if (result === 'wait') {
+                setTimeout(function () {
+                    if (decide(true) === 'open') {
+                        open(card.entity, card.id);
+                    }
+                }, CARD_HIDDEN_WAIT);
+            }
+        },
+
+        /**
+         * Открывать отложенную карточку, когда пользователь переключается в эту вкладку
+         * (visibilitychange) или когда её откладывает другая вкладка, а эта уже видима
+         * (storage: эта вкладка могла не получить событие, пока переподключался сокет).
+         * @param {function(string, string)} open (entity, id)
+         * @param {function(): *} currentUser id текущего пользователя amoCRM
+         */
+        watchPendingCards: function (open, currentUser) {
+            this.unwatchPendingCards();
+            state.onVisible = function () {
+                openPendingCard(open, currentUser);
+            };
+            state.onStorage = function (event) {
+                if (event.key === CARD_PENDING_KEY && event.newValue) {
+                    openPendingCard(open, currentUser);
+                }
+            };
+            document.addEventListener('visibilitychange', state.onVisible);
+            window.addEventListener('storage', state.onStorage);
+        },
+
+        unwatchPendingCards: function () {
+            if (state.onVisible) {
+                document.removeEventListener('visibilitychange', state.onVisible);
+                state.onVisible = null;
+            }
+            if (state.onStorage) {
+                window.removeEventListener('storage', state.onStorage);
+                state.onStorage = null;
+            }
         },
     };
 });
